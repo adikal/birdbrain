@@ -8,12 +8,19 @@ from typing import Any
 from uuid import uuid4
 
 from birdbrain.observability.events import EventEnvelope
+from birdbrain.observability.store import JsonlRunStore
 
 
 class EventJournal:
     """Retain a bounded, ordered trace and wake live subscribers."""
 
-    def __init__(self, *, run_id: str | None = None, capacity: int = 10_000) -> None:
+    def __init__(
+        self,
+        *,
+        run_id: str | None = None,
+        capacity: int = 10_000,
+        store: JsonlRunStore | None = None,
+    ) -> None:
         if capacity < 1:
             raise ValueError("capacity must be positive")
         self.run_id = run_id or f"sim-{uuid4().hex[:12]}"
@@ -21,6 +28,7 @@ class EventJournal:
         self._events: deque[EventEnvelope] = deque(maxlen=capacity)
         self._sequence = 0
         self._condition = Condition()
+        self.store = store
 
     @property
     def latest_sequence(self) -> int:
@@ -43,6 +51,8 @@ class EventJournal:
                 event_type=event_type,
                 payload=payload,
             )
+            if self.store is not None:
+                self.store.append(event)
             self._events.append(event)
             self._condition.notify_all()
             return event

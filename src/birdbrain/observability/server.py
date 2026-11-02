@@ -10,11 +10,12 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 from birdbrain.observability.director import SimulationDirector
 from birdbrain.observability.events import SCHEMA_VERSION
 from birdbrain.observability.journal import EventJournal
+from birdbrain.observability.store import JsonlRunStore
 
 
 class ObservabilityServer(ThreadingHTTPServer):
@@ -25,10 +26,12 @@ class ObservabilityServer(ThreadingHTTPServer):
         server_address: tuple[str, int],
         journal: EventJournal,
         dashboard_dir: Path,
+        store: JsonlRunStore | None = None,
     ) -> None:
         super().__init__(server_address, ObservabilityHandler)
         self.journal = journal
         self.dashboard_dir = dashboard_dir.resolve()
+        self.store = store
 
     def handle_error(self, request: object, client_address: object) -> None:
         error = sys.exc_info()[1]
@@ -41,7 +44,8 @@ class ObservabilityHandler(BaseHTTPRequestHandler):
     server: ObservabilityServer
 
     def do_GET(self) -> None:
-        route = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        route = parsed.path
         if route == "/api/status":
             self._send_json(
                 {
@@ -50,6 +54,8 @@ class ObservabilityHandler(BaseHTTPRequestHandler):
                     "run_id": self.server.journal.run_id,
                     "latest_sequence": self.server.journal.latest_sequence,
                     "stream": "/api/events",
+                    "persistent_history": self.server.store is not None,
+                    "runs": "/api/runs",
                 }
             )
         elif route == "/api/snapshot":
@@ -57,6 +63,15 @@ class ObservabilityHandler(BaseHTTPRequestHandler):
             self._send_json(event.to_dict() if event else {}, status=200 if event else 204)
         elif route == "/api/events":
             self._stream_events()
+        elif route == "/api/runs":
+            self._send_json(
+                {
+                    "current_run_id": self.server.journal.run_id,
+                    "runs": self.server.store.list_runs() if self.server.store else [],
+                }
+            )
+        elif route.startswith("/api/runs/"):
+            self._serve_recorded_run(route, parse_qs(parsed.query))
         else:
             self._serve_static(route)
 
@@ -106,6 +121,36 @@ class ObservabilityHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             return
 
+    def _serve_recorded_run(
+        self, route: str, query: dict[str, list[str]]
+    ) -> None:
+        if self.server.store is None:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        suffix = unquote(route.removeprefix("/api/runs/"))
+        wants_events = suffix.endswith("/events")
+        run_id = suffix.removesuffix("/events") if wants_events else suffix
+        try:
+            summary = self.server.store.get_summary(run_id)
+            if summary is None:
+                self.send_error(HTTPStatus.NOT_FOUND, "Run not found")
+                return
+            if not wants_events:
+                self._send_json(summary)
+                return
+            after = int(query.get("after", ["0"])[0])
+            limit = int(query.get("limit", ["5000"])[0])
+            self._send_json(
+                {
+                    "run": summary,
+                    "events": self.server.store.read_events(
+                        run_id, after_sequence=after, limit=limit
+                    ),
+                }
+            )
+        except (ValueError, json.JSONDecodeError):
+            self.send_error(HTTPStatus.BAD_REQUEST, "Invalid run request")
+
     def _serve_static(self, route: str) -> None:
         relative = "index.html" if route == "/" else route.lstrip("/")
         candidate = (self.server.dashboard_dir / relative).resolve()
@@ -131,8 +176,9 @@ def build_server(
     port: int,
     journal: EventJournal,
     dashboard_dir: Path,
+    store: JsonlRunStore | None = None,
 ) -> ObservabilityServer:
-    return ObservabilityServer((host, port), journal, dashboard_dir)
+    return ObservabilityServer((host, port), journal, dashboard_dir, store)
 
 
 def main() -> None:
@@ -141,15 +187,18 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dashboard-dir", type=Path, default=_default_dashboard_dir())
+    parser.add_argument("--data-dir", type=Path, default=Path("data/runs"))
     args = parser.parse_args()
 
-    journal = EventJournal()
+    store = JsonlRunStore(args.data_dir)
+    journal = EventJournal(store=store)
     director = SimulationDirector(journal, seed=args.seed)
     server = build_server(
         host=args.host,
         port=args.port,
         journal=journal,
         dashboard_dir=args.dashboard_dir,
+        store=store,
     )
     director.start()
     print(f"BirdBrain dashboard: http://{args.host}:{server.server_port}")

@@ -8,6 +8,7 @@ const attentionCone = document.querySelector("#attention-cone");
 const pauseButton = document.querySelector("#pause-button");
 const playButton = document.querySelector("#play-button");
 const playbackRate = document.querySelector("#playback-rate");
+const runSelect = document.querySelector("#run-select");
 const eventList = document.querySelector("#event-list");
 const inspector = document.querySelector("#json-inspector");
 
@@ -19,6 +20,7 @@ let timer;
 let liveMode = false;
 let runId = "SIM-0042";
 let liveActionCount = 0;
+let eventSource;
 
 let events = [
   { id:"boot", frame:2, kind:"body", icon:"↯", type:"RUN_STARTED", text:"MuJoCo adapter ready · seed 42", duration:"12ms", payload:{seed:42, model:"birdbrain_microduck_arena", mujoco:"3.17.0"} },
@@ -182,7 +184,7 @@ function liveFrame(snapshot, simTime) {
 }
 
 function liveEventView(envelope) {
-  const icons = {RUN_STARTED:"↯", ACTION_SELECTED:"▶", ANOMALY:"!", RUN_FAILED:"×"};
+  const icons = {RUN_STARTED:"↯", RUN_STOPPED:"■", ACTION_SELECTED:"▶", ANOMALY:"!", RUN_FAILED:"×"};
   const kind = ["ACTION_SELECTED", "ANOMALY", "RUN_FAILED"].includes(envelope.type) ? "body" : "mind";
   return {
     id: `live-${envelope.sequence}`,
@@ -267,15 +269,68 @@ async function connectLiveBridge() {
     setText("#inspector-time", "00:00.00");
     inspector.textContent = JSON.stringify({run_id:runId, status:"connected", schema_version:status.schema_version}, null, 2);
     document.querySelector(".status-pill").title = `Connected to ${runId}`;
-    const source = new EventSource(status.stream);
-    source.addEventListener("birdbrain", event => ingestLiveEvent(JSON.parse(event.data)));
-    source.onopen = () => setText("#connection-label", "Live simulator");
-    source.onerror = () => setText("#connection-label", "Reconnecting");
+    await populateRuns();
+    eventSource = new EventSource(status.stream);
+    eventSource.addEventListener("birdbrain", event => ingestLiveEvent(JSON.parse(event.data)));
+    eventSource.onopen = () => setText("#connection-label", "Live simulator");
+    eventSource.onerror = () => setText("#connection-label", "Reconnecting");
   } catch (_error) {
     // The private hosted dashboard intentionally remains in demo mode when
     // there is no same-origin local simulator bridge.
   }
 }
+
+async function populateRuns() {
+  const response = await fetch("/api/runs", {cache:"no-store"});
+  if (!response.ok) return;
+  const catalog = await response.json();
+  runSelect.innerHTML = "";
+  const liveOption = new Option(`Live · ${catalog.current_run_id}`, "live", true, true);
+  runSelect.add(liveOption);
+  catalog.runs.filter(run => run.run_id !== catalog.current_run_id).forEach(run => {
+    const date = new Date(run.started_at).toLocaleString([], {month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"});
+    runSelect.add(new Option(`${date} · ${run.status} · ${run.event_count} events`, run.run_id));
+  });
+}
+
+async function loadRecordedRun(selectedRunId) {
+  if (selectedRunId === "live") {
+    window.location.reload();
+    return;
+  }
+  if (eventSource) eventSource.close();
+  setText("#connection-label", "Loading recording");
+  const response = await fetch(`/api/runs/${encodeURIComponent(selectedRunId)}/events?limit=10000`, {cache:"no-store"});
+  if (!response.ok) {
+    setText("#connection-label", "Recording unavailable");
+    return;
+  }
+  const recording = await response.json();
+  clearInterval(timer);
+  liveMode = false;
+  playing = false;
+  runId = selectedRunId;
+  frames = [];
+  events = [];
+  totalFrames = 0;
+  frameIndex = 0;
+  selectedEvent = "";
+  liveActionCount = 0;
+  document.querySelectorAll(".anomaly").forEach(item => item.style.display = "none");
+  setText(".count-badge", "0 open");
+  setText("#alert-count", "0");
+  recording.events.forEach(ingestLiveEvent);
+  totalFrames = frames.length;
+  setText("#connection-label", "Recorded run");
+  setText("#run-id", runId.toUpperCase());
+  document.querySelector(".status-pill").title = `${recording.run.status} recording`;
+  if (frames.length) renderFrame(frames.length - 1);
+  if (events.length) selectEvent(events.at(-1).id);
+  setPlaying(false);
+  setText("#replay-state", `${recording.run.status} · ${recording.run.event_count} events`);
+}
+
+runSelect.addEventListener("change", event => loadRecordedRun(event.target.value));
 
 selectEvent(selectedEvent);
 renderFrame(frameIndex);

@@ -51,11 +51,15 @@ class SimulationDirector:
             self._thread.join(timeout=timeout)
 
     def _run(self) -> None:
-        adapter = self._adapter_factory()
         period = 1.0 / self.frequency_hz
         anomaly_reported = False
+        adapter: MujocoMicroduckAdapter | None = None
+        sim_time = 0.0
+        failed = False
         try:
+            adapter = self._adapter_factory()
             observation = adapter.reset(seed=self.seed)
+            sim_time = observation.timestamp
             self.journal.publish(
                 "RUN_STARTED",
                 sim_time=observation.timestamp,
@@ -77,6 +81,7 @@ class SimulationDirector:
                     "right_ankle_motor": 0.06 * math.sin(phase + 0.8),
                 }
                 observation = adapter.act(Action("set_joint_targets", targets))
+                sim_time = observation.timestamp
                 self.journal.publish(
                     "ACTION_SELECTED",
                     sim_time=observation.timestamp,
@@ -108,13 +113,21 @@ class SimulationDirector:
                 tick += 1
                 self._stop.wait(max(0.0, period - (monotonic() - started)))
         except Exception as error:  # noqa: BLE001 - emit failures into the trace
+            failed = True
             self.journal.publish(
                 "RUN_FAILED",
-                sim_time=0.0,
+                sim_time=sim_time,
                 payload={"error": type(error).__name__, "message": str(error)},
             )
         finally:
-            adapter.close()
+            if not failed:
+                self.journal.publish(
+                    "RUN_STOPPED",
+                    sim_time=sim_time,
+                    payload={"summary": "Simulation run stopped cleanly"},
+                )
+            if adapter is not None:
+                adapter.close()
 
     @staticmethod
     def _snapshot(

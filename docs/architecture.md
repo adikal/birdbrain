@@ -68,6 +68,11 @@ skill invocation, action, and outcome receives a run ID, monotonic sequence,
 wall-clock time, simulation time, and schema version. Large sensor payloads are
 stored as content-addressed artifacts referenced by events.
 
+The first recorder appends each envelope to a per-run JSONL log and maintains an
+atomic summary index. The local read-only bridge exposes live Server-Sent Events
+plus a run catalog and bounded historical replay API; recordings can therefore
+be reopened after the runtime restarts.
+
 ## Safety boundary
 
 The runtime validates actions against adapter capabilities, resource budgets,
@@ -86,4 +91,3 @@ satisfied.
 Technology choices for durable databases and the dashboard framework remain
 deliberately open until traces from the first simulator loop reveal their actual
 requirements.
-
