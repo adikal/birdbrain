@@ -66,11 +66,25 @@ invokes simulator skills. Completed runs receive a deterministic regression
 score, and the dashboard can compare two traces metric by metric. Durable memory
 is stored under `data/memory`.
 
-Cloud deliberation is optional. With `OPENAI_API_KEY` set, the default `auto`
-mode uses the OpenAI Responses API with strict structured output; without it,
-BirdBrain remains fully functional on the deterministic local baseline. The
-model may select only registered goals and skills—local code retains actuator
-control and falls back safely on any refusal, timeout, or invalid response.
+Cloud deliberation is optional. The currently implemented cloud adapter uses
+the OpenAI Responses API when `OPENAI_API_KEY` is set. AWS Bedrock is the next
+provider target, allowing BirdBrain to use an existing AWS account and a
+Bedrock model through the provider-neutral cognition boundary instead of
+requiring an OpenAI Platform key. Until that adapter lands, BirdBrain remains
+fully functional on the deterministic local baseline.
+
+The planned Bedrock adapter will use the Bedrock Runtime Converse API and the
+standard AWS credential chain (including AWS profiles, SSO sessions, temporary
+credentials, IAM roles, or `AWS_BEARER_TOKEN_BEDROCK`). Its AWS identity will
+need `bedrock:InvokeModel`, access to the selected model, and a configured AWS
+region. Never commit AWS credentials or Bedrock API keys to this repository;
+AWS usage is billed separately through the AWS account. See
+[the architecture](docs/architecture.md#aws-bedrock-provider) for the intended
+configuration and safety boundary.
+
+For every cloud provider, the model may select only registered goals and
+skills—local code retains actuator control and falls back safely on any refusal,
+timeout, unavailable credential, or invalid response.
 
 Install the cloud extra once with `pip install -e '.[cloud]'` before enabling
 the adapter.
@@ -86,7 +100,7 @@ consolidation stores sourced observation profiles and flags incompatible object
 positions instead of silently overwriting them.
 
 See [the architecture](docs/architecture.md) and [roadmap](docs/roadmap.md) for
-the planned system.
+the planned system and Bedrock integration milestone.
 
 ## Status
 

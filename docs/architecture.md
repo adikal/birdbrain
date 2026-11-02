@@ -35,6 +35,30 @@ events. The runtime must remain functional when cloud cognition is unavailable.
 Wraps cloud LLM calls behind a provider-neutral interface. Inputs and outputs are
 structured and traceable. Secrets never enter event logs or prompts by default.
 
+#### AWS Bedrock provider
+
+AWS Bedrock is the next cloud provider target. The adapter will call the
+Bedrock Runtime Converse API through `boto3`, translate BirdBrain's bounded
+cognition request into the common message format, and validate the result
+against the same goal-and-skill schema used by other providers. Model and region
+selection will remain configuration rather than runtime policy.
+
+Local development will use the standard AWS credential chain so existing AWS
+profiles, SSO sessions, temporary credentials, IAM roles, and Bedrock bearer
+tokens can work without credentials appearing in source code. The runtime
+identity requires `bedrock:InvokeModel`; streaming will additionally require
+`bedrock:InvokeModelWithResponseStream`. The selected model must be available in
+the configured region and enabled for the AWS account. Some third-party models
+can require AWS Marketplace permissions or a one-time provider use-case form.
+
+The adapter will record provider, model, region, request latency, token usage,
+and sanitized error categories for dashboard inspection. It will never record
+credentials or raw authentication metadata. AWS charges remain external to
+BirdBrain, so per-run budgets and cost telemetry will be enforced before the
+provider becomes the default. Authentication failures, throttling, unavailable
+models, timeouts, or malformed responses immediately return control to the
+deterministic local cognition baseline.
+
 ### Memory service
 
 Maintains three distinct stores:
@@ -70,10 +94,11 @@ named skill. Each boundary emits an event so a future cloud LLM provider can
 replace deliberation without changing memory, execution, evaluation, or the
 dashboard contract.
 
-The optional cloud implementation calls the OpenAI Responses API with a strict
-JSON schema. It can select only a candidate goal and a registered skill; it
-cannot emit actuator values. API keys stay in process environment variables,
-requests are not stored by the provider, failures emit a trace event, and the
+The implemented optional cloud provider calls the OpenAI Responses API with a
+strict JSON schema. AWS Bedrock will implement the same bounded contract through
+the Converse API. A cloud model can select only a candidate goal and a
+registered skill; it cannot emit actuator values. Provider credentials stay
+outside source and event data, failures emit a trace event, and the
 deterministic policy immediately takes over.
 
 Episodic records are periodically consolidated into semantic observation

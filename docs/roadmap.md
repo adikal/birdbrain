@@ -22,9 +22,12 @@
 retrieval traces, and a provider-neutral deterministic cognition boundary are
 implemented. An optional structured-output Responses API adapter, sourced
 consolidation, and contradiction tracking are now present; richer reflection
-and long-term retention policy remain.
+and long-term retention policy remain. AWS Bedrock support is the next provider
+milestone and will use the Converse API with the standard AWS credential chain.
 
 - add structured provider-neutral LLM requests with budgets and trace capture;
+- add an AWS Bedrock provider with model/region configuration, IAM-aware
+  authentication, cost telemetry, and deterministic fallback;
 - implement append-only episodic memory and provenance-aware semantic wiki;
 - build retrieval, reflection, consolidation, and contradiction handling.
 
