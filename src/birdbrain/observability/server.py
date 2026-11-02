@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,6 +29,12 @@ class ObservabilityServer(ThreadingHTTPServer):
         super().__init__(server_address, ObservabilityHandler)
         self.journal = journal
         self.dashboard_dir = dashboard_dir.resolve()
+
+    def handle_error(self, request: object, client_address: object) -> None:
+        error = sys.exc_info()[1]
+        if isinstance(error, (BrokenPipeError, ConnectionResetError)):
+            return
+        super().handle_error(request, client_address)
 
 
 class ObservabilityHandler(BaseHTTPRequestHandler):
