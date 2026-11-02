@@ -1,0 +1,48 @@
+# BirdBrain
+
+**Small duck. Big thoughts.**
+
+BirdBrain is a research platform for a persistent autonomous embodied agent. It
+combines cloud-LLM cognition, durable semantic and episodic memory,
+self-generated goals, learned skills, and an inspectable dashboard. Development
+starts in a MuJoCo-based Microduck simulator and is designed to transfer to
+physical hardware later.
+
+## Principles
+
+- **Persistent:** identity, memory, goals, and learning survive process restarts.
+- **Embodied:** cognition is grounded in observations and actions through a
+  simulator-or-hardware adapter.
+- **Inspectable:** every decision can be traced in the BirdBrain dashboard.
+- **Safe by construction:** actions are bounded, interruptible, and auditable.
+- **Adapter-first:** cognition does not depend on a specific simulator or robot.
+
+## Repository layout
+
+```text
+src/birdbrain/       Core Python package
+tests/               Minimal unit tests
+docs/architecture.md System boundaries and data flow
+docs/roadmap.md      Staged development plan
+```
+
+## Quick start
+
+Requires Python 3.11 or newer.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+pytest
+```
+
+The initial package defines the core agent state and environment-adapter
+contract. See [the architecture](docs/architecture.md) and
+[roadmap](docs/roadmap.md) for the planned system.
+
+## Status
+
+Phase 0: foundations. Interfaces are intentionally small while the research
+questions and simulator integration are validated.
+
