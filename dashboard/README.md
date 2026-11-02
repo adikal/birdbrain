@@ -14,6 +14,10 @@ It includes:
 - timeline scrubbing and replay ("Rewind the Quack");
 - scored run selection and side-by-side metric comparison.
 
+The continuous-learning panel reports whether deliberation is local or cloud
+backed, model latency and fallback state, memory consolidation/conflicts, and
+the latest learned skill amplitude and success rate.
+
 To run it against the real MuJoCo simulator:
 
 ```bash

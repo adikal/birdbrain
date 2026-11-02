@@ -22,6 +22,9 @@ let liveMode = false;
 let runId = "SIM-0042";
 let liveActionCount = 0;
 let eventSource;
+let cloudCalls = 0;
+let memoryEpisodes = 0;
+let memoryConflicts = 0;
 
 let events = [
   { id:"boot", frame:2, kind:"body", icon:"↯", type:"RUN_STARTED", text:"MuJoCo adapter ready · seed 42", duration:"12ms", payload:{seed:42, model:"birdbrain_microduck_arena", mujoco:"3.17.0"} },
@@ -185,7 +188,7 @@ function liveFrame(snapshot, simTime) {
 }
 
 function liveEventView(envelope) {
-  const icons = {RUN_STARTED:"↯", RUN_STOPPED:"■", ACTION_SELECTED:"▶", ANOMALY:"!", RUN_FAILED:"×", MEMORY_RETRIEVED:"◇", WIKI_UPDATED:"✎", GOAL_PROPOSED:"◎", PLAN_CREATED:"⌁", SKILL_INVOKED:"✦"};
+  const icons = {RUN_STARTED:"↯", RUN_STOPPED:"■", ACTION_SELECTED:"▶", ANOMALY:"!", RUN_FAILED:"×", MEMORY_RETRIEVED:"◇", MEMORY_CONSOLIDATED:"◆", BELIEF_CONFLICT:"?", WIKI_UPDATED:"✎", GOAL_PROPOSED:"◎", PLAN_CREATED:"⌁", SKILL_INVOKED:"✦", SKILL_UPDATED:"↗", MODEL_REQUESTED:"☁", MODEL_RESPONDED:"✓", MODEL_FALLBACK:"↘"};
   const kind = ["ACTION_SELECTED", "ANOMALY", "RUN_FAILED"].includes(envelope.type) ? "body" : "mind";
   return {
     id: `live-${envelope.sequence}`,
@@ -206,6 +209,10 @@ function renderLiveMind(snapshot) {
   setText("#rationale", snapshot.rationale);
   setText("#skill", snapshot.skill);
   setText("#attention-label", snapshot.attention);
+  if (snapshot.cognition) {
+    setText("#provider-name", snapshot.cognition.provider === "openai_responses" ? "OpenAI Responses" : "Local baseline");
+    setText("#learning-health", snapshot.cognition.provider === "openai_responses" ? "Cloud active" : "Local safe mode");
+  }
   const list = document.querySelector("#goal-list");
   list.innerHTML = snapshot.goals.map((goal, index) => `<li class="${index === 0 ? "active" : ""}"><b>${index + 1}</b><div><strong>${goal.name}</strong><span>${index === 0 ? "active objective" : "queued"}</span></div><code>${goal.utility.toFixed(2)}</code></li>`).join("");
 }
@@ -223,6 +230,7 @@ function ingestLiveEvent(envelope) {
     liveActionCount += 1;
     if (liveActionCount % 10 !== 0) return;
   }
+  updateLearningSystems(envelope);
   events.push(liveEventView(envelope));
   if (events.length > 120) events = events.slice(-120);
   if (!selectedEvent) {
@@ -231,6 +239,30 @@ function ingestLiveEvent(envelope) {
   }
   if (envelope.type === "ANOMALY") renderLiveAnomaly(envelope);
   renderEvents();
+}
+
+function updateLearningSystems(envelope) {
+  const payload = envelope.payload;
+  if (envelope.type === "MODEL_RESPONDED") {
+    cloudCalls += 1;
+    setText("#provider-name", "OpenAI Responses");
+    setText("#learning-health", "Cloud active");
+    setText("#model-stats", `${cloudCalls} calls · ${payload.latency_ms.toFixed(0)}ms last`);
+  } else if (envelope.type === "MODEL_FALLBACK") {
+    setText("#provider-name", "Local fallback");
+    setText("#learning-health", "Degraded safely");
+    setText("#model-stats", `${payload.error} · no unsafe action`);
+  } else if (envelope.type === "MEMORY_CONSOLIDATED") {
+    memoryEpisodes = payload.episodes;
+    setText("#memory-status", payload.status === "conflicted" ? "Conflict tracked" : "Consolidated");
+    setText("#memory-stats", `${memoryEpisodes} episodes · ${memoryConflicts} conflicts`);
+  } else if (envelope.type === "BELIEF_CONFLICT") {
+    memoryConflicts += 1;
+    setText("#memory-stats", `${memoryEpisodes} episodes · ${memoryConflicts} conflicts`);
+  } else if (envelope.type === "SKILL_UPDATED") {
+    setText("#skill-learning-name", payload.skill);
+    setText("#skill-stats", `amp ${payload.amplitude_after.toFixed(3)} · ${payload.attempts} attempts · ${Math.round(payload.success_rate * 100)}% success`);
+  }
 }
 
 function renderLiveAnomaly(envelope) {
@@ -259,6 +291,9 @@ async function connectLiveBridge() {
     frameIndex = 0;
     selectedEvent = "";
     liveActionCount = 0;
+    cloudCalls = 0;
+    memoryEpisodes = 0;
+    memoryConflicts = 0;
     clearInterval(timer);
     playing = true;
     document.querySelectorAll(".anomaly").forEach(item => item.style.display = "none");
@@ -325,6 +360,9 @@ async function loadRecordedRun(selectedRunId) {
   frameIndex = 0;
   selectedEvent = "";
   liveActionCount = 0;
+  cloudCalls = 0;
+  memoryEpisodes = 0;
+  memoryConflicts = 0;
   document.querySelectorAll(".anomaly").forEach(item => item.style.display = "none");
   setText(".count-badge", "0 open");
   setText("#alert-count", "0");

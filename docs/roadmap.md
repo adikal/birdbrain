@@ -20,8 +20,9 @@
 
 **Current baseline:** durable episodic memory, a provenance-aware semantic wiki,
 retrieval traces, and a provider-neutral deterministic cognition boundary are
-implemented. Cloud model adapters, consolidation, and contradiction handling
-remain.
+implemented. An optional structured-output Responses API adapter, sourced
+consolidation, and contradiction tracking are now present; richer reflection
+and long-term retention policy remain.
 
 - add structured provider-neutral LLM requests with budgets and trace capture;
 - implement append-only episodic memory and provenance-aware semantic wiki;
@@ -33,8 +34,9 @@ which memories influenced a decision.
 ## Phase 3 — Goals and skills
 
 **Current baseline:** ranked goal proposals, explicit plans, named skill
-invocations, and deterministic regression scoring run in MuJoCo. Learned skill
-parameters and multi-step task completion remain.
+invocations, deterministic regression scoring, and bounded outcome-driven skill
+parameters run in MuJoCo. Multi-step task completion and richer skill models
+remain.
 
 - implement competing goal selection (the "pecking order");
 - generate bounded goals from needs, novelty, and unresolved predictions;

@@ -66,6 +66,22 @@ invokes simulator skills. Completed runs receive a deterministic regression
 score, and the dashboard can compare two traces metric by metric. Durable memory
 is stored under `data/memory`.
 
+Cloud deliberation is optional. With `OPENAI_API_KEY` set, the default `auto`
+mode uses the OpenAI Responses API with strict structured output; without it,
+BirdBrain remains fully functional on the deterministic local baseline. The
+model may select only registered goals and skills—local code retains actuator
+control and falls back safely on any refusal, timeout, or invalid response.
+
+```bash
+export OPENAI_API_KEY="..."
+export BIRDBRAIN_OPENAI_MODEL="gpt-6-astra"  # optional override
+birdbrain-dashboard --cognition auto
+```
+
+Skill parameters and outcome statistics persist under `data/skills`. Memory
+consolidation stores sourced observation profiles and flags incompatible object
+positions instead of silently overwriting them.
+
 See [the architecture](docs/architecture.md) and [roadmap](docs/roadmap.md) for
 the planned system.
 

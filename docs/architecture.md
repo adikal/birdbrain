@@ -70,6 +70,17 @@ named skill. Each boundary emits an event so a future cloud LLM provider can
 replace deliberation without changing memory, execution, evaluation, or the
 dashboard contract.
 
+The optional cloud implementation calls the OpenAI Responses API with a strict
+JSON schema. It can select only a candidate goal and a registered skill; it
+cannot emit actuator values. API keys stay in process environment variables,
+requests are not stored by the provider, failures emit a trace event, and the
+deterministic policy immediately takes over.
+
+Episodic records are periodically consolidated into semantic observation
+profiles with source run IDs. Materially incompatible object positions become
+explicit belief conflicts. The skill library records attempts, outcomes, and
+bounded control amplitudes, making every parameter update replayable.
+
 ## Event model
 
 Every observation, state transition, model call, memory mutation, selected goal,

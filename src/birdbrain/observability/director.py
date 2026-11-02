@@ -8,7 +8,7 @@ from threading import Event, Thread
 from time import monotonic
 
 from birdbrain.adapters import Action, Observation
-from birdbrain.cognition import BaselineCognition, CognitiveDecision
+from birdbrain.cognition import Cognition, CognitiveDecision
 from birdbrain.observability.journal import EventJournal
 from birdbrain.sim import MujocoMicroduckAdapter
 
@@ -23,7 +23,7 @@ class SimulationDirector:
         seed: int = 42,
         frequency_hz: float = 10.0,
         adapter_factory: Callable[[], MujocoMicroduckAdapter] | None = None,
-        cognition: BaselineCognition | None = None,
+        cognition: Cognition | None = None,
     ) -> None:
         if frequency_hz <= 0:
             raise ValueError("frequency_hz must be positive")
@@ -70,6 +70,9 @@ class SimulationDirector:
                     "seed": self.seed,
                     "model": "birdbrain_microduck_arena",
                     "producer": "MujocoMicroduckAdapter",
+                    "cognition_provider": getattr(
+                        self.cognition, "provider", "fallback_controller"
+                    ),
                 },
             )
             tick = 0
@@ -170,6 +173,7 @@ class SimulationDirector:
             "joint_positions": values["joint_positions"],
             "contacts": values["contacts"],
             "goals": decision.goals,
+            "cognition": decision.metadata,
         }
 
     def _decision(self, observation: Observation, tick: int) -> CognitiveDecision:
@@ -191,6 +195,7 @@ class SimulationDirector:
             attention="blue_block",
             goals=[{"name": "Stabilize posture", "utility": 0.91}],
             trace=[],
+            metadata={"provider": "fallback_controller", "model": None},
         )
 
 

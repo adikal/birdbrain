@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import os
 import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -12,6 +13,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+from birdbrain.cloud_cognition import OpenAIResponsesCognition
 from birdbrain.cognition import BaselineCognition
 from birdbrain.evaluation import compare_runs, score_run
 from birdbrain.memory import LocalMemory
@@ -19,6 +21,7 @@ from birdbrain.observability.director import SimulationDirector
 from birdbrain.observability.events import SCHEMA_VERSION
 from birdbrain.observability.journal import EventJournal
 from birdbrain.observability.store import JsonlRunStore
+from birdbrain.skills import SkillLibrary
 
 
 class ObservabilityServer(ThreadingHTTPServer):
@@ -218,12 +221,31 @@ def main() -> None:
     parser.add_argument("--dashboard-dir", type=Path, default=_default_dashboard_dir())
     parser.add_argument("--data-dir", type=Path, default=Path("data/runs"))
     parser.add_argument("--memory-dir", type=Path, default=Path("data/memory"))
+    parser.add_argument("--skills-dir", type=Path, default=Path("data/skills"))
+    parser.add_argument(
+        "--cognition", choices=("auto", "local", "openai"), default="auto"
+    )
+    parser.add_argument(
+        "--openai-model",
+        default=os.environ.get("BIRDBRAIN_OPENAI_MODEL", "gpt-6-astra"),
+    )
     args = parser.parse_args()
 
     store = JsonlRunStore(args.data_dir)
     journal = EventJournal(store=store)
     memory = LocalMemory(args.memory_dir)
-    cognition = BaselineCognition(memory, run_id=journal.run_id)
+    skills = SkillLibrary(args.skills_dir)
+    baseline = BaselineCognition(memory, run_id=journal.run_id, skills=skills)
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if args.cognition == "openai" and not api_key:
+        parser.error("--cognition openai requires OPENAI_API_KEY")
+    cognition = (
+        OpenAIResponsesCognition(
+            baseline, api_key=api_key, model=args.openai_model
+        )
+        if api_key and args.cognition in {"auto", "openai"}
+        else baseline
+    )
     director = SimulationDirector(journal, seed=args.seed, cognition=cognition)
     server = build_server(
         host=args.host,

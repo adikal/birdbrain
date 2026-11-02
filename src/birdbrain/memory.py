@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from pathlib import Path
+from statistics import fmean
 from threading import Lock
 from typing import Any
 
@@ -59,6 +61,48 @@ class LocalMemory:
     def facts(self) -> dict[str, Any]:
         with self._lock:
             return self._read_wiki()
+
+    def consolidate(self, entity: str) -> dict[str, Any]:
+        """Summarize episodes into a sourced fact and surface contradictions."""
+        episodes = self.recall(entity, limit=100)
+        distances = [float(item["distance_m"]) for item in episodes if "distance_m" in item]
+        if not distances:
+            return {"entity": entity, "episodes": 0, "status": "empty"}
+        spread = max(distances) - min(distances)
+        positions = [
+            item["blue_block_position"]
+            for item in episodes
+            if "blue_block_position" in item
+        ]
+        position_spread = (
+            math.hypot(
+                max(point[0] for point in positions)
+                - min(point[0] for point in positions),
+                max(point[1] for point in positions)
+                - min(point[1] for point in positions),
+            )
+            if positions
+            else spread
+        )
+        profile = {
+            "entity": entity,
+            "episodes": len(distances),
+            "mean_distance_m": round(fmean(distances), 4),
+            "min_distance_m": round(min(distances), 4),
+            "max_distance_m": round(max(distances), 4),
+            "spread_m": round(spread, 4),
+            "position_spread_m": round(position_spread, 4),
+            "status": "conflicted" if position_spread > 0.15 else "stable",
+            "source_run_ids": sorted({str(item["run_id"]) for item in episodes}),
+        }
+        latest = episodes[-1]
+        self.update_fact(
+            f"{entity}.observation_profile",
+            profile,
+            source_run_id=str(latest["run_id"]),
+            sequence_hint=int(latest.get("sequence_hint", 0)),
+        )
+        return profile
 
     def _read_wiki(self) -> dict[str, Any]:
         path = self.root / "wiki.json"
