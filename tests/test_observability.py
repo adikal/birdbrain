@@ -49,9 +49,7 @@ def test_jsonl_store_survives_restart_and_indexes_terminal_run(tmp_path: Path) -
     store = JsonlRunStore(tmp_path / "runs")
     journal = EventJournal(run_id="durable-run", store=store)
     journal.publish("RUN_STARTED", sim_time=0.0, payload={"seed": 7})
-    stopped = journal.publish(
-        "RUN_STOPPED", sim_time=1.5, payload={"summary": "done"}
-    )
+    stopped = journal.publish("RUN_STOPPED", sim_time=1.5, payload={"summary": "done"})
 
     reopened = JsonlRunStore(tmp_path / "runs")
     summary = reopened.get_summary("durable-run")
@@ -59,9 +57,7 @@ def test_jsonl_store_survives_restart_and_indexes_terminal_run(tmp_path: Path) -
     assert summary["status"] == "completed"
     assert summary["event_count"] == 2
     assert reopened.list_runs() == [summary]
-    assert reopened.read_events("durable-run", after_sequence=1) == [
-        stopped.to_dict()
-    ]
+    assert reopened.read_events("durable-run", after_sequence=1) == [stopped.to_dict()]
 
 
 def test_store_rejects_unsafe_run_ids(tmp_path: Path) -> None:
@@ -100,6 +96,40 @@ def test_bridge_lists_and_replays_persisted_runs(tmp_path: Path) -> None:
         assert catalog["current_run_id"] == "bridge-history"
         assert catalog["runs"][0]["event_count"] == 1
         assert replay["events"] == [event.to_dict()]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=1)
+
+
+def test_bridge_compares_two_runs(tmp_path: Path) -> None:
+    store = JsonlRunStore(tmp_path / "runs")
+    left = EventJournal(run_id="left-run", store=store)
+    right = EventJournal(run_id="right-run", store=store)
+    left.publish("ANOMALY", sim_time=0.1, payload={"code": "slip"})
+    left.publish("RUN_STOPPED", sim_time=1.0, payload={})
+    right.publish("PLAN_CREATED", sim_time=0.2, payload={"steps": []})
+    right.publish("RUN_STOPPED", sim_time=1.0, payload={})
+
+    dashboard_dir = Path(__file__).resolve().parents[1] / "dashboard"
+    server = build_server(
+        host="127.0.0.1",
+        port=0,
+        journal=right,
+        dashboard_dir=dashboard_dir,
+        store=store,
+    )
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        url = (
+            f"http://127.0.0.1:{server.server_port}"
+            "/api/compare?left=left-run&right=right-run"
+        )
+        with urllib.request.urlopen(url) as response:
+            comparison = json.load(response)
+        assert comparison["winner"] == "right"
+        assert comparison["right_run_id"] == "right-run"
     finally:
         server.shutdown()
         server.server_close()

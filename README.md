@@ -60,6 +60,12 @@ recorded as JSONL under `data/runs`; the run selector can reopen and replay a
 completed session after a restart. The private hosted dashboard uses the same
 interface in sample-data mode.
 
+The baseline cognition loop records observations and episodes, updates a
+provenance-aware semantic wiki, ranks self-generated goals, creates plans, and
+invokes simulator skills. Completed runs receive a deterministic regression
+score, and the dashboard can compare two traces metric by metric. Durable memory
+is stored under `data/memory`.
+
 See [the architecture](docs/architecture.md) and [roadmap](docs/roadmap.md) for
 the planned system.
 

@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qs, unquote, urlparse
 
+from birdbrain.cognition import BaselineCognition
+from birdbrain.evaluation import compare_runs, score_run
+from birdbrain.memory import LocalMemory
 from birdbrain.observability.director import SimulationDirector
 from birdbrain.observability.events import SCHEMA_VERSION
 from birdbrain.observability.journal import EventJournal
@@ -60,7 +63,9 @@ class ObservabilityHandler(BaseHTTPRequestHandler):
             )
         elif route == "/api/snapshot":
             event = self.server.journal.latest("STATE_SNAPSHOT")
-            self._send_json(event.to_dict() if event else {}, status=200 if event else 204)
+            self._send_json(
+                event.to_dict() if event else {}, status=200 if event else 204
+            )
         elif route == "/api/events":
             self._stream_events()
         elif route == "/api/runs":
@@ -70,6 +75,8 @@ class ObservabilityHandler(BaseHTTPRequestHandler):
                     "runs": self.server.store.list_runs() if self.server.store else [],
                 }
             )
+        elif route == "/api/compare":
+            self._serve_comparison(parse_qs(parsed.query))
         elif route.startswith("/api/runs/"):
             self._serve_recorded_run(route, parse_qs(parsed.query))
         else:
@@ -121,9 +128,7 @@ class ObservabilityHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             return
 
-    def _serve_recorded_run(
-        self, route: str, query: dict[str, list[str]]
-    ) -> None:
+    def _serve_recorded_run(self, route: str, query: dict[str, list[str]]) -> None:
         if self.server.store is None:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
@@ -151,6 +156,28 @@ class ObservabilityHandler(BaseHTTPRequestHandler):
         except (ValueError, json.JSONDecodeError):
             self.send_error(HTTPStatus.BAD_REQUEST, "Invalid run request")
 
+    def _serve_comparison(self, query: dict[str, list[str]]) -> None:
+        if self.server.store is None:
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        try:
+            left_id = query["left"][0]
+            right_id = query["right"][0]
+            left_events = self.server.store.read_events(left_id, limit=10_000)
+            right_events = self.server.store.read_events(right_id, limit=10_000)
+            if not left_events or not right_events:
+                self.send_error(HTTPStatus.NOT_FOUND, "Run not found")
+                return
+            self._send_json(
+                {
+                    "left_run_id": left_id,
+                    "right_run_id": right_id,
+                    **compare_runs(score_run(left_events), score_run(right_events)),
+                }
+            )
+        except (KeyError, IndexError, ValueError, json.JSONDecodeError):
+            self.send_error(HTTPStatus.BAD_REQUEST, "Invalid comparison request")
+
     def _serve_static(self, route: str) -> None:
         relative = "index.html" if route == "/" else route.lstrip("/")
         candidate = (self.server.dashboard_dir / relative).resolve()
@@ -161,7 +188,9 @@ class ObservabilityHandler(BaseHTTPRequestHandler):
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         body = candidate.read_bytes()
-        content_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+        content_type = (
+            mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+        )
         self.send_response(HTTPStatus.OK)
         self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "no-store")
@@ -188,11 +217,14 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--dashboard-dir", type=Path, default=_default_dashboard_dir())
     parser.add_argument("--data-dir", type=Path, default=Path("data/runs"))
+    parser.add_argument("--memory-dir", type=Path, default=Path("data/memory"))
     args = parser.parse_args()
 
     store = JsonlRunStore(args.data_dir)
     journal = EventJournal(store=store)
-    director = SimulationDirector(journal, seed=args.seed)
+    memory = LocalMemory(args.memory_dir)
+    cognition = BaselineCognition(memory, run_id=journal.run_id)
+    director = SimulationDirector(journal, seed=args.seed, cognition=cognition)
     server = build_server(
         host=args.host,
         port=args.port,

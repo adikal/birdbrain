@@ -9,6 +9,7 @@ const pauseButton = document.querySelector("#pause-button");
 const playButton = document.querySelector("#play-button");
 const playbackRate = document.querySelector("#playback-rate");
 const runSelect = document.querySelector("#run-select");
+const compareSelect = document.querySelector("#compare-select");
 const eventList = document.querySelector("#event-list");
 const inspector = document.querySelector("#json-inspector");
 
@@ -184,7 +185,7 @@ function liveFrame(snapshot, simTime) {
 }
 
 function liveEventView(envelope) {
-  const icons = {RUN_STARTED:"↯", RUN_STOPPED:"■", ACTION_SELECTED:"▶", ANOMALY:"!", RUN_FAILED:"×"};
+  const icons = {RUN_STARTED:"↯", RUN_STOPPED:"■", ACTION_SELECTED:"▶", ANOMALY:"!", RUN_FAILED:"×", MEMORY_RETRIEVED:"◇", WIKI_UPDATED:"✎", GOAL_PROPOSED:"◎", PLAN_CREATED:"⌁", SKILL_INVOKED:"✦"};
   const kind = ["ACTION_SELECTED", "ANOMALY", "RUN_FAILED"].includes(envelope.type) ? "body" : "mind";
   return {
     id: `live-${envelope.sequence}`,
@@ -285,12 +286,20 @@ async function populateRuns() {
   if (!response.ok) return;
   const catalog = await response.json();
   runSelect.innerHTML = "";
+  compareSelect.innerHTML = '<option value="">Compare run…</option>';
   const liveOption = new Option(`Live · ${catalog.current_run_id}`, "live", true, true);
   runSelect.add(liveOption);
   catalog.runs.filter(run => run.run_id !== catalog.current_run_id).forEach(run => {
     const date = new Date(run.started_at).toLocaleString([], {month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"});
-    runSelect.add(new Option(`${date} · ${run.status} · ${run.event_count} events`, run.run_id));
+    const score = run.score == null ? "—" : run.score.toFixed(1);
+    const label = `${date} · score ${score} · ${run.status}`;
+    runSelect.add(new Option(label, run.run_id));
+    compareSelect.add(new Option(label, run.run_id));
   });
+  if (compareSelect.options.length > 1) {
+    compareSelect.selectedIndex = 1;
+    await compareWith(compareSelect.value);
+  }
 }
 
 async function loadRecordedRun(selectedRunId) {
@@ -331,6 +340,36 @@ async function loadRecordedRun(selectedRunId) {
 }
 
 runSelect.addEventListener("change", event => loadRecordedRun(event.target.value));
+compareSelect.addEventListener("change", event => compareWith(event.target.value));
+
+async function compareWith(otherRunId) {
+  if (!otherRunId) return;
+  const response = await fetch(`/api/compare?left=${encodeURIComponent(otherRunId)}&right=${encodeURIComponent(runId)}`, {cache:"no-store"});
+  if (!response.ok) {
+    setText("#comparison-verdict", "Comparison unavailable");
+    return;
+  }
+  renderComparison(await response.json());
+}
+
+function signed(value, suffix = "") {
+  return `${value > 0 ? "+" : ""}${value}${suffix}`;
+}
+
+function renderComparison(comparison) {
+  setText("#left-run-label", comparison.left_run_id.toUpperCase());
+  setText("#right-run-label", comparison.right_run_id.toUpperCase());
+  setText("#left-score", comparison.left.score.toFixed(1));
+  setText("#right-score", comparison.right.score.toFixed(1));
+  setText("#score-delta", signed(comparison.score_delta));
+  setText("#comparison-verdict", comparison.winner === "tie" ? "Tie" : `${comparison.winner} run leads`);
+  const deltas = comparison.metric_deltas;
+  document.querySelector("#metric-deltas").innerHTML = `
+    <span>Anomalies <b>${signed(deltas.anomalies)}</b></span>
+    <span>Confidence <b>${signed(Math.round(deltas.mean_confidence * 100), "%")}</b></span>
+    <span>Min height <b>${signed(deltas.min_body_height_m, "m")}</b></span>
+    <span>Cognitive cycles <b>${signed(deltas.cognitive_cycles)}</b></span>`;
+}
 
 selectEvent(selectedEvent);
 renderFrame(frameIndex);

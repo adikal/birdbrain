@@ -195,6 +195,21 @@
           <div class="inspector-meta"><span id="inspector-type">ACTION_SELECTED</span><code id="inspector-time">00:07.35</code></div>
           <pre id="json-inspector" tabindex="0"></pre>
         </section>
+
+        <section class="panel comparison-panel" id="comparison" aria-labelledby="comparison-title">
+          <div class="panel-heading compact">
+            <div><p class="eyebrow">Regression lab</p><h2 id="comparison-title">Run comparison</h2></div>
+            <span class="comparison-verdict" id="comparison-verdict">Demo baseline</span>
+          </div>
+          <div class="score-cards">
+            <div><span id="left-run-label">SIM-0041</span><strong id="left-score">82.0</strong><small>baseline score</small></div>
+            <b id="score-delta">+4.0</b>
+            <div><span id="right-run-label">SIM-0042</span><strong id="right-score">86.0</strong><small>candidate score</small></div>
+          </div>
+          <div class="metric-deltas" id="metric-deltas">
+            <span>Anomalies <b>−1</b></span><span>Confidence <b>+3%</b></span><span>Min height <b>+0.02m</b></span><span>Cognitive cycles <b>+2</b></span>
+          </div>
+        </section>
       </main>
 
       <footer class="rewind-bar">
@@ -208,6 +223,7 @@
         </div>
         <code id="timeline-time">00:11.90 / 00:11.90</code>
         <select id="run-select" aria-label="Recorded run"><option value="demo">Demo run</option></select>
+        <select id="compare-select" aria-label="Compare against"><option value="">Compare run…</option></select>
         <select id="playback-rate" aria-label="Playback rate"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
       </footer>
     </div>

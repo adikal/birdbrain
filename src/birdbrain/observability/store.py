@@ -9,6 +9,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+from birdbrain.evaluation import score_run
 from birdbrain.observability.events import EventEnvelope
 
 _RUN_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
@@ -45,6 +46,12 @@ class JsonlRunStore:
                 "last_sim_time": event.sim_time,
                 "status": _TERMINAL_STATUS.get(event.type, "running"),
             }
+            if event.type in _TERMINAL_STATUS:
+                recorded = [
+                    json.loads(line)
+                    for line in events_path.read_text(encoding="utf-8").splitlines()
+                ]
+                summary.update(score_run(recorded))
             self._write_summary(run_dir, summary)
 
     def list_runs(self) -> list[dict[str, Any]]:

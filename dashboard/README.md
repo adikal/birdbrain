@@ -11,7 +11,8 @@ It includes:
 - body telemetry and actuator targets;
 - filterable event trace and raw JSON inspection;
 - anomalies and belief conflicts;
-- timeline scrubbing and replay ("Rewind the Quack").
+- timeline scrubbing and replay ("Rewind the Quack");
+- scored run selection and side-by-side metric comparison.
 
 To run it against the real MuJoCo simulator:
 

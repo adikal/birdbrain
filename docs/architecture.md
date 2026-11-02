@@ -61,6 +61,15 @@ The dashboard is an observability client, not a second source of truth. It shows
 the world model, current mind state, goal pecking order, memories, experiments,
 failures, and replayable cognitive history.
 
+### Cognition baseline
+
+The first end-to-end policy is deliberately deterministic: it turns normalized
+observations into episodic records and sourced wiki facts, retrieves relevant
+episodes, ranks bounded candidate goals, constructs a short plan, and invokes a
+named skill. Each boundary emits an event so a future cloud LLM provider can
+replace deliberation without changing memory, execution, evaluation, or the
+dashboard contract.
+
 ## Event model
 
 Every observation, state transition, model call, memory mutation, selected goal,
@@ -72,6 +81,11 @@ The first recorder appends each envelope to a per-run JSONL log and maintains an
 atomic summary index. The local read-only bridge exposes live Server-Sent Events
 plus a run catalog and bounded historical replay API; recordings can therefore
 be reopened after the runtime restarts.
+
+The evaluator derives completion, anomaly, stability, confidence, and cognitive
+cycle metrics solely from immutable events. Its 0–100 score is a regression
+signal rather than a claim about general intelligence; comparisons retain every
+component delta so score changes remain explainable.
 
 ## Safety boundary
 

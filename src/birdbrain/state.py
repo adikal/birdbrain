@@ -33,4 +33,3 @@ class AgentState:
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-compatible snapshot."""
         return asdict(self)
-
