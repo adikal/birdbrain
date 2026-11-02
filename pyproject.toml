@@ -16,7 +16,7 @@ dev = [
   "ruff>=0.6",
 ]
 sim = [
-  "mujoco>=3.2",
+  "mujoco==3.17.0",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -29,4 +29,3 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
-

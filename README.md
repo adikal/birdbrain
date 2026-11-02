@@ -33,9 +33,13 @@ Requires Python 3.11 or newer.
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -e '.[dev]'
+python -m pip install -e '.[dev,sim]'
 pytest
 ```
+
+The `sim` extra installs the pinned MuJoCo engine and its canonical Python
+bindings. MuJoCo's native library is bundled in that package; no separate
+system-wide simulator installation is required.
 
 The initial package defines the core agent state and environment-adapter
 contract. See [the architecture](docs/architecture.md) and
@@ -45,4 +49,3 @@ contract. See [the architecture](docs/architecture.md) and
 
 Phase 0: foundations. Interfaces are intentionally small while the research
 questions and simulator integration are validated.
-
