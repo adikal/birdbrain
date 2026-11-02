@@ -1,8 +1,8 @@
 # BirdBrain dashboard
 
-The dashboard is a buildless, responsive debugging surface for the agent. The
-first version uses a deterministic sample run so the observability schema and
-interactions can evolve independently of the runtime transport.
+The dashboard is a buildless, responsive debugging surface for the agent. It
+automatically connects to the local read-only observability bridge when served
+by BirdBrain, and falls back to a deterministic sample run when hosted alone.
 
 It includes:
 
@@ -13,14 +13,15 @@ It includes:
 - anomalies and belief conflicts;
 - timeline scrubbing and replay ("Rewind the Quack").
 
-To preview locally:
+To run it against the real MuJoCo simulator:
 
 ```bash
-python -m http.server 4173 --directory dashboard
+source .venv/bin/activate
+birdbrain-dashboard
 ```
 
-Then open `http://127.0.0.1:4173`.
+Then open `http://127.0.0.1:8787`. The bridge binds only to localhost by
+default and exposes read-only status, snapshot, and Server-Sent Events routes.
 
-The next integration replaces the sample-frame generator in `app.js` with the
-same versioned event snapshots emitted by the Python runtime, using a local
-read-only HTTP and WebSocket bridge.
+The privately hosted Site cannot directly control the simulator. It remains a
+safe interactive demo unless a future authenticated relay is introduced.

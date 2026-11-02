@@ -66,6 +66,26 @@ class MujocoMicroduckAdapter:
                     name: float(self.data.ctrl[actuator_id])
                     for name, actuator_id in self._actuator_ids.items()
                 },
+                "joint_positions": {
+                    name: float(
+                        self.data.qpos[
+                            self.model.jnt_qposadr[
+                                mujoco.mj_name2id(
+                                    self.model, mujoco.mjtObj.mjOBJ_JOINT, name
+                                )
+                            ]
+                        ]
+                    )
+                    for name in (
+                        "neck_yaw",
+                        "left_hip",
+                        "left_ankle",
+                        "right_hip",
+                        "right_ankle",
+                    )
+                },
+                "root_velocity": self.data.qvel[:6].astype(float).tolist(),
+                "contacts": self._contacts(),
             },
         )
 
@@ -99,6 +119,18 @@ class MujocoMicroduckAdapter:
             raise ValueError(f"unknown actuator targets: {names}")
         for name, value in targets.items():
             self.data.ctrl[self._actuator_ids[name]] = float(value)
+
+    def _contacts(self) -> list[dict[str, str]]:
+        contacts = []
+        for contact in self.data.contact[: self.data.ncon]:
+            first = mujoco.mj_id2name(
+                self.model, mujoco.mjtObj.mjOBJ_GEOM, contact.geom1
+            )
+            second = mujoco.mj_id2name(
+                self.model, mujoco.mjtObj.mjOBJ_GEOM, contact.geom2
+            )
+            contacts.append({"first": first or "unnamed", "second": second or "unnamed"})
+        return contacts
 
     def _ensure_open(self) -> None:
         if self._closed:

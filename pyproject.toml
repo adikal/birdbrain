@@ -19,6 +19,9 @@ sim = [
   "mujoco==3.17.0",
 ]
 
+[project.scripts]
+birdbrain-dashboard = "birdbrain.observability.server:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/birdbrain"]
 

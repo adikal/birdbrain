@@ -48,6 +48,17 @@ position-controlled joints, proprioceptive sensors, movable toys, a charging
 zone, and a bounded test arena. It runs without a display through the
 `MujocoMicroduckAdapter`.
 
+Run the live debugging dashboard and simulator bridge with:
+
+```bash
+source .venv/bin/activate
+birdbrain-dashboard
+```
+
+Open `http://127.0.0.1:8787` to inspect versioned live events and rewind the
+current in-memory run. The private hosted dashboard uses the same interface in
+sample-data mode.
+
 See [the architecture](docs/architecture.md) and [roadmap](docs/roadmap.md) for
 the planned system.
 
