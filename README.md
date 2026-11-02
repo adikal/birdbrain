@@ -21,6 +21,7 @@ physical hardware later.
 
 ```text
 src/birdbrain/       Core Python package
+src/birdbrain/assets First Microduck MJCF arena
 tests/               Minimal unit tests
 docs/architecture.md System boundaries and data flow
 docs/roadmap.md      Staged development plan
@@ -41,9 +42,13 @@ The `sim` extra installs the pinned MuJoCo engine and its canonical Python
 bindings. MuJoCo's native library is bundled in that package; no separate
 system-wide simulator installation is required.
 
-The initial package defines the core agent state and environment-adapter
-contract. See [the architecture](docs/architecture.md) and
-[roadmap](docs/roadmap.md) for the planned system.
+The initial MuJoCo environment includes an articulated Microduck with five
+position-controlled joints, proprioceptive sensors, movable toys, a charging
+zone, and a bounded test arena. It runs without a display through the
+`MujocoMicroduckAdapter`.
+
+See [the architecture](docs/architecture.md) and [roadmap](docs/roadmap.md) for
+the planned system.
 
 ## Status
 
