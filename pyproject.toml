@@ -18,6 +18,9 @@ dev = [
 sim = [
   "mujoco==3.17.0",
 ]
+cloud = [
+  "certifi>=2024.0",
+]
 
 [project.scripts]
 birdbrain-dashboard = "birdbrain.observability.server:main"

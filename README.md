@@ -72,6 +72,9 @@ BirdBrain remains fully functional on the deterministic local baseline. The
 model may select only registered goals and skills—local code retains actuator
 control and falls back safely on any refusal, timeout, or invalid response.
 
+Install the cloud extra once with `pip install -e '.[cloud]'` before enabling
+the adapter.
+
 ```bash
 export OPENAI_API_KEY="..."
 export BIRDBRAIN_OPENAI_MODEL="gpt-6-astra"  # optional override

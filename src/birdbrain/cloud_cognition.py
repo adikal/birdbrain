@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -160,6 +161,8 @@ class OpenAIResponsesCognition:
         }
 
     def _request(self, payload: dict[str, Any]) -> dict[str, Any]:
+        import certifi
+
         request = urllib.request.Request(
             "https://api.openai.com/v1/responses",
             data=json.dumps(payload).encode(),
@@ -170,7 +173,10 @@ class OpenAIResponsesCognition:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            context = ssl.create_default_context(cafile=certifi.where())
+            with urllib.request.urlopen(
+                request, timeout=self.timeout, context=context
+            ) as response:
                 return json.load(response)
         except urllib.error.HTTPError as error:
             raise RuntimeError(f"Responses API returned HTTP {error.code}") from error
