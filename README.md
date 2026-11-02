@@ -22,6 +22,7 @@ physical hardware later.
 ```text
 src/birdbrain/       Core Python package
 src/birdbrain/assets First Microduck MJCF arena
+dashboard/            BirdBrain debugging dashboard
 tests/               Minimal unit tests
 docs/architecture.md System boundaries and data flow
 docs/roadmap.md      Staged development plan
