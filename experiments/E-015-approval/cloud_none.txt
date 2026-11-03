@@ -1,0 +1,12 @@
+seed 48 episode 1: 2/6 in basket · grasps 5/6 · falls 1 · decisions 27 · fallbacks 0 · 97.4 s wall
+seed 48 episode 2: 3/6 in basket · grasps 5/6 · falls 0 · decisions 25 · fallbacks 0 · 87.3 s wall
+seed 48 episode 3: 2/6 in basket · grasps 5/5 · falls 0 · decisions 26 · fallbacks 0 · 94.2 s wall
+seed 48 episode 4: 3/6 in basket · grasps 8/8 · falls 0 · decisions 27 · fallbacks 0 · 93.1 s wall
+seed 48 episode 5: 3/6 in basket · grasps 5/7 · falls 1 · decisions 24 · fallbacks 0 · 80.8 s wall
+seed 49 episode 1: 2/6 in basket · grasps 4/5 · falls 1 · decisions 27 · fallbacks 0 · 102.5 s wall
+seed 49 episode 2: 2/6 in basket · grasps 3/3 · falls 0 · decisions 23 · fallbacks 0 · 88.5 s wall
+seed 49 episode 3: 0/6 in basket · grasps 2/2 · falls 0 · decisions 28 · fallbacks 0 · 94.4 s wall
+seed 49 episode 4: 2/6 in basket · grasps 6/6 · falls 1 · decisions 28 · fallbacks 0 · 104.2 s wall
+seed 49 episode 5: 0/6 in basket · grasps 6/7 · falls 0 · decisions 27 · fallbacks 0 · 82.1 s wall
+seeds 10 · in basket 1.90 of 6 (sd 1.10, min 0, max 3) · falls 0.40/run
+grasps 49/55 · decisions 262 · fallbacks 0 · invalid 0 · provider errors 0

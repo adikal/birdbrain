@@ -219,6 +219,10 @@ def main() -> None:
     ap.add_argument("--seconds", type=float, default=300.0)
     ap.add_argument("--speed", type=float, default=1.0, help="simulated seconds per wall second")
     ap.add_argument("--provider", choices=["local", "bedrock"], default="local")
+    ap.add_argument("--needs", action="store_true", help="no task: the duck acts on its needs (Milestone 3)")
+    ap.add_argument("--room", choices=["messy", "tidy"], default="messy")
+    ap.add_argument("--owner", choices=["none", "basket", "wall", "leave"], default=None,
+                    help="Milestone 3b: a scripted owner with this hidden preference")
     ap.add_argument("--no-camera", action="store_true", help="do not render head-camera images")
     args = ap.parse_args()
     if not _is_loopback(args.host):
@@ -228,7 +232,7 @@ def main() -> None:
     if args.live:
         from birdbrain.run import PlayroomSession
         journal = EventJournal(run_id=f"live-s{args.seed}-{args.provider}-{int(time.time()) % 10**6}", store=store)
-        session = PlayroomSession(args.seed, provider=args.provider, journal=journal)
+        session = PlayroomSession(args.seed, provider=args.provider, journal=journal, needs=args.needs, room=args.room, owner=args.owner)
         camera = None
         if not args.no_camera:
             from birdbrain.observability.camera import HeadCamera

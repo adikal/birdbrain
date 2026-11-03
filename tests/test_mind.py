@@ -40,7 +40,7 @@ def test_valid_cloud_choice_is_executed_and_logged():
     observe(mind, 0.0)
     decision = next(p for k, p in log if k == "DECISION")
     assert decision["skill"] == "rest" and decision["fallback"] is None and decision["p_model"] == 0.9
-    assert mind.stats == {"decisions": 1, "fallbacks": 0, "invalid": 0, "provider_errors": 0}
+    assert mind.stats == {"decisions": 1, "fallbacks": 0, "invalid": 0, "provider_errors": 0, "falls_sensed": 0}
 
 
 def test_invalid_choices_never_reach_the_body():

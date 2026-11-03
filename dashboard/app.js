@@ -11,7 +11,7 @@ const state = {
 };
 
 const FILTERS = {
-  mind: new Set(["RUN_STARTED", "DECISION", "OUTCOME", "CHOICE_REJECTED", "FALL", "RUN_STOPPED", "RUN_FAILED"]),
+  mind: new Set(["RUN_STARTED", "DECISION", "OUTCOME", "CHOICE_REJECTED", "FALL", "HEARD", "RUN_STOPPED", "RUN_FAILED"]),
   skills: new Set(["SKILL_STEP_STARTED", "SKILL_STEP_ENDED", "SKILL_BIND", "EVENT_STARTED", "EVENT_ENDED", "GRASP_TRUTH"]),
   beliefs: new Set(["ENTITY_CREATED", "ASSERTION_OPENED", "ASSERTION_CLOSED"]),
 };
@@ -112,6 +112,7 @@ function render(i) {
   renderMind(snap.payload, upTo);
   renderDecisions(upTo);
   renderTables(snap.payload);
+  renderNeeds(snap.payload, upTo);
   renderTrace(upTo);
 }
 
@@ -273,6 +274,40 @@ function renderTables(p) {
     `<tr><td>${esc(name)}</td><td>${r.trials}</td><td>${r.effect_held}</td><td>${r.p.toFixed(2)}</td><td>${r.mean_s ?? "—"}</td></tr>`).join(""));
   setHTML($("#belief-rows"), (p.entities || []).filter((e) => e.cls !== "place").map((e) =>
     `<tr class="${e.conf >= 0.5 ? "" : "doubt"}"><td>${esc(e.id)}</td><td>${e.x.toFixed(2)}, ${e.y.toFixed(2)}</td><td>${e.sigma.toFixed(2)}</td><td>${e.conf.toFixed(2)}</td><td>${e.seen_ago.toFixed(0)} s</td></tr>`).join(""));
+}
+
+// Needs are pressures (0 satisfied, 1 urgent; tidiness is weighted and can reach 2).
+// The scorecard is the one the latest decision saw; the chosen goal is marked.
+function renderNeeds(p, upTo) {
+  const needs = p.needs;
+  if (!needs) {
+    setHTML($("#need-bars"), "");
+    setHTML($("#score-rows"), "");
+    setHTML($("#owner-rows"), "");
+    $("#owner-table").hidden = true;
+    text("#battery", "—");
+    text("#goal-now", "No needs in this run (it was given a task).");
+    return;
+  }
+  const bar = (name, value, max, cls = "") =>
+    `<span>${esc(name)}</span><span class="bar ${cls}"><i style="width:${Math.min(100, (100 * value) / max)}%"></i></span><code>${value.toFixed(2)}</code>`;
+  setHTML($("#need-bars"), Object.entries(needs.pressure).map(([k, v]) => bar(k, v, k === "tidiness" ? 2 : 1)).join("")
+    + bar("battery", needs.battery, 1, "battery"));
+  text("#battery", `battery ${Math.round(needs.battery * 100)}%`);
+  let decision = null;
+  for (let k = upTo.length - 1; k >= 0; k--) { if (upTo[k].type === "DECISION") { decision = upTo[k]; break; } }
+  const d = decision && decision.payload;
+  const goal = p.goal;
+  setHTML($("#goal-now"), goal
+    ? `Pursuing <b>${esc(goal.id)}</b> for ${esc(goal.source)}${d ? `, chosen by ${esc(d.provider)}${d.agrees_with_scorecard ? " (the scorecard's top goal)" : " (not the scorecard's top goal)"}` : ""}.`
+    : "No goal yet.");
+  setHTML($("#score-rows"), ((d && d.scorecard) || []).map((g) =>
+    `<tr class="${goal && g.id === goal.id ? "chosen" : ""}"><td>${esc(g.id)}</td><td>${g.U.toFixed(2)}</td><td>${g.dV.toFixed(2)}</td><td>${g.C.toFixed(2)}</td><td>${g.R.toFixed(2)}</td></tr>`).join(""));
+  // Milestone 3b: what the duck believes each kind of action earns from its owner.
+  const model = Object.entries(p.owner_model || {}).sort((a, b) => b[1].expected - a[1].expected);
+  setHTML($("#owner-rows"), model.map(([k, v]) =>
+    `<tr><td>${esc(k)}</td><td>${v.p_approve.toFixed(2)}</td><td>${v.p_disapprove.toFixed(2)}</td><td>${v.expected >= 0 ? "+" : ""}${v.expected.toFixed(2)}</td><td>${v.trials.toFixed(0)}</td></tr>`).join(""));
+  $("#owner-table").hidden = !model.length;
 }
 
 function summary(e) {

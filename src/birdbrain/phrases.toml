@@ -1,0 +1,34 @@
+# What the owner says, and how the duck reads it (docs/design.md section 4.3, Milestone 3b).
+#
+# Edit freely: one phrase per line, lower case. Punctuation and case are ignored when
+# matching, and a phrase matches only as the whole utterance ("nice" matches "Nice!",
+# not "nice try"). The scripted owner in the sim speaks phrases from these lists; the
+# duck reads any phrase it hears through the same lists. On the robot, these lists are
+# the vocabulary of the on-device keyword spotter.
+#
+# The phrases carry approval and disapproval only, never what the owner wants: the duck
+# must learn that from when they are said.
+#
+# To try another list without editing this file: BIRDBRAIN_PHRASES=/path/to/phrases.toml
+
+[positive]
+phrases = [
+  "nice",
+  "thanks",
+  "thank you",
+  "well done",
+  "good duck",
+  "good job",
+  "great",
+  "i like that",
+]
+
+[negative]
+phrases = [
+  "i dont like that",
+  "dont do that",
+  "no",
+  "stop",
+  "not that",
+  "bad duck",
+]

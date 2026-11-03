@@ -10,6 +10,7 @@ position is no longer asserted.
 
 from __future__ import annotations
 
+import itertools
 import math
 from collections import deque
 from dataclasses import dataclass
@@ -30,20 +31,32 @@ class PerceptionParams:
     elevation_sigma_still: float = 0.025
     elevation_sigma_moving: float = 0.035
     robust_chi2: float = 4.0         # beyond this innovation, a measurement is down-weighted (Huber)
+    # Sightings taken while moving are heavy-tailed (ledger E-011, H-013): about 2% are
+    # several standard deviations off. They are modelled as a second, wide component.
+    outlier_p: float = 0.03
+    outlier_scale: float = 16.0      # covariance multiplier of the outlier component (4x sigma)
     # How fast an unobserved estimate loses precision (m/s), by class. Baskets do
     # not move by themselves; toys move only when something acts on them.
     drift_per_s: tuple[tuple[str, float], ...] = (("basket", 0.0), ("toy", 0.005))
     default_drift_per_s: float = 0.01
     hold_radius: float = 0.15        # a toy believed this close to the beak tip is the one grasped
     min_sigma: float = 0.02          # successive sightings share errors; never trust a fix beyond this
-    new_conf: float = 0.2            # a first sighting is tentative: confident after three
-    hit_gain: float = 0.2
-    miss_decay: float = 0.7
-    forget_below: float = 0.05       # confidence floor: the entity stays, its position doubted
-    # Misses count only this close, where the class is reliably detected (a 2 cm toy is
-    # small at a metre; the basket marker is found across the room).
-    reliable_range: tuple[tuple[str, float], ...] = (("toy", 0.7), ("basket", 1.8))
-    default_reliable_range: float = 0.7
+    # Confidence is the probability that the object exists where believed, updated
+    # in log-odds from each frame (ledger E-013). A detection consistent with the
+    # entity counts log(p_d / p_false); a frame that should have shown it and did
+    # not counts log((1 - p_d) / (1 - p_false)), with p_d the measured detection
+    # rate at that range. The prior for a new entity needs two hits to confirm.
+    prior_logit: float = -3.0
+    p_false: float = 0.1             # a consistent detection without the object (ghosts, mis-association)
+    logit_limit: float = 5.0
+    # Measured detection rate by range (m), inside the field of view (ledger E-013).
+    # The last toy bin holds everything beyond 1.75 m; beyond the table the last value holds.
+    detection_rate: tuple[tuple[str, tuple[tuple[float, float], ...]], ...] = (
+        ("toy", ((0.25, 0.97), (0.5, 0.95), (0.625, 0.84), (0.875, 0.61), (1.125, 0.41),
+                 (1.375, 0.33), (1.625, 0.21), (1.875, 0.11))),
+        ("basket", ((0.5, 0.97), (2.0, 0.96))),
+    )
+    default_detection_rate: float = 0.5
     fov_margin: float = math.radians(8.0)
     min_width: float = math.radians(2.0)   # objects that would look smaller than this may go unseen
 
@@ -60,6 +73,7 @@ class Perception:
         self.last_view: dict | None = None
         #: Pairs of entities once seen in the same frame: provably distinct objects.
         self._distinct: set[frozenset[str]] = set()
+        self._gated: set[str] = set()
 
     # -- per tick ---------------------------------------------------------------
     def update(self, obs: Observation) -> None:
@@ -129,7 +143,8 @@ class Perception:
                 continue
             placed.append((sighting, located, seen))
         matched: set[str] = set()
-        for (sighting, located, seen), entity in zip(placed, self._assign(placed, frame.t), strict=True):
+        assignment, self._gated = self._assign(placed, frame.t)
+        for (sighting, located, seen), entity in zip(placed, assignment, strict=True):
             entity = entity or self.kb.new_entity(sighting.cls, frame.t)
             self._fuse(entity, located, frame.t, sighting)
             entity = self._merge_duplicates(entity, frame.t, matched)
@@ -137,7 +152,7 @@ class Perception:
             seen["as"] = entity
         same_frame = sorted(matched)
         self._distinct.update(frozenset((a, b)) for i, a in enumerate(same_frame) for b in same_frame[i + 1:])
-        self._register_misses(frame, pose, matched)
+        self._register_misses(frame, pose, matched | self._gated)
         self.last_view = {"t": round(frame.t, 3), "cam_yaw": round(frame.cam_yaw, 4),
                           "cam_pitch": round(frame.cam_pitch, 4), "sightings": view}
 
@@ -180,39 +195,52 @@ class Perception:
         vr, vc = s_range * s_range, s_cross * s_cross
         return Position(px, py, vr * c * c + vc * n * n, (vr - vc) * c * n, vr * n * n + vc * c * c)
 
-    def _assign(self, placed: list, t: float) -> list[str | None]:
+    def _assign(self, placed: list, t: float) -> tuple[list[str | None], set[str]]:
         """One-to-one association of a frame's sightings with known entities.
 
         Every sighting-entity pair of the same class inside the gate is a
-        candidate; pairs are taken best first (smallest Mahalanobis distance),
-        so no sighting can take an entity that another sighting fits better.
-        A sighting left without an entity is a new object.
+        candidate; pairs are taken best first (highest likelihood: Mahalanobis
+        distance plus the log-determinant of the combined covariance), so no
+        sighting can take an entity that another sighting fits better.
+        A sighting left without an entity is a new object. Also returns every
+        entity that some sighting fell inside the gate of: those were not missed,
+        even if another entity took the sighting.
         """
         pairs = []
+        still = self.still(t)
+        penalty = 2.0 * math.log((1.0 - self.p.outlier_p) / self.p.outlier_p)
         for k, (sighting, located, _) in enumerate(placed):
+            wide = located.scaled(self.p.outlier_scale)
             for entity in self.kb.of_class(sighting.cls):
                 if entity == self._held:
                     continue
                 known = self._predicted(entity, t)
                 if known is None:
                     continue
-                d2 = known.mahalanobis2(located, self.p.gate_floor)
-                if d2 <= self.p.gate_chi2:
-                    pairs.append((d2, k, entity))
+                # Ranked by likelihood under a two-component error model: a vague phantom
+                # cannot outbid a precise estimate that also fits, and a moving sighting
+                # may be an outlier of a confident entity rather than a new object.
+                costs = []
+                if known.mahalanobis2(located, self.p.gate_floor) <= self.p.gate_chi2:
+                    costs.append(known.association_cost(located, self.p.gate_floor))
+                if not still and known.mahalanobis2(wide, self.p.gate_floor) <= self.p.gate_chi2:
+                    costs.append(known.association_cost(wide, self.p.gate_floor) + penalty)
+                if costs:
+                    pairs.append((min(costs), k, entity))
         out: list[str | None] = [None] * len(placed)
         taken: set[str] = set()
         for _, k, entity in sorted(pairs):
             if out[k] is None and entity not in taken:
                 out[k] = entity
                 taken.add(entity)
-        return out
+        return out, {entity for _, _, entity in pairs}
 
     def _fuse(self, entity: str, m: Position, t: float, s: Sighting) -> None:
         kb = self.kb
         old = self._predicted(entity, t)
         current = kb.get("at", entity)
         if old is None:
-            fused, conf = m, self.p.new_conf
+            fused, conf = m, _prob(self.p.prior_logit + self._hit_logit(s.cls, m, t))
         else:
             # Robust update: a measurement far from a confident estimate is more likely
             # an outlier of the heavy-tailed sensor than a move, so it counts for less.
@@ -226,7 +254,8 @@ class Perception:
                 else:
                     old = old.scaled(d2 / self.p.robust_chi2)
             fused = old.fuse(m).floored(self.p.min_sigma)
-            conf = min(1.0, (current.conf if current else self.p.new_conf) + self.p.hit_gain)
+            prior = _logit(current.conf) if current else self.p.prior_logit
+            conf = self._clip(prior + self._hit_logit(s.cls, m, t))
         kb.tell("at", (entity,), fused, t=t, conf=conf, source="camera", same=same_place())
         if s.color:
             kb.tell("color", (entity,), s.color, t=t, source="camera")
@@ -268,7 +297,9 @@ class Perception:
             entity = assertion.args[0]
             if entity == SELF or entity in matched or not self._should_see(entity, frame, pose):
                 continue
-            assertion.conf = max(self.p.forget_below, assertion.conf * self.p.miss_decay)
+            p_d = self.detection_rate(kb.cls(entity), self._range_to(entity, pose))
+            miss = math.log(max(1.0 - p_d, 1e-3) / (1.0 - self.p.p_false))
+            assertion.conf = self._clip(_logit(assertion.conf) + miss)
 
     def _should_see(self, entity: str, frame: Frame, pose: tuple[float, float, float]) -> bool:
         """Would the camera have seen this entity, if it were where we believe?"""
@@ -282,15 +313,40 @@ class Perception:
         cx, cy = x + self.body.cam_ahead * math.cos(yaw), y + self.body.cam_ahead * math.sin(yaw)
         horizontal = math.hypot(where.x - cx, where.y - cy)
         radius = 0.02 if cls == "toy" else self.body.class_half_width.get(cls, 0.1)
-        reach = dict(self.p.reliable_range).get(cls, self.p.default_reliable_range)
-        if horizontal < 0.08 or horizontal > reach \
-                or 2 * math.atan2(radius, horizontal) < self.p.min_width:
+        if horizontal < 0.08 or 2 * math.atan2(radius, horizontal) < self.p.min_width:
             return False
         bearing = _wrap(math.atan2(where.y - cy, where.x - cx) - yaw - frame.cam_yaw)
         if abs(bearing) > self.body.fov_h / 2 - self.p.fov_margin:
             return False
         depression = math.atan2(frame.cam_z - self.body.class_height.get(cls, 0.0), horizontal)
         return abs(depression - frame.cam_pitch) < self.body.fov_v / 2 - self.p.fov_margin
+
+    def detection_rate(self, cls: str | None, rng: float) -> float:
+        """Measured probability that the detector reports an object of `cls` at `rng` m."""
+        table = dict(self.p.detection_rate).get(cls or "")
+        if table is None:
+            return self.p.default_detection_rate
+        if rng <= table[0][0]:
+            return table[0][1]
+        for (r0, p0), (r1, p1) in itertools.pairwise(table):
+            if rng <= r1:
+                return p0 + (p1 - p0) * (rng - r0) / (r1 - r0)
+        return table[-1][1]
+
+    def _hit_logit(self, cls: str, m: Position, t: float) -> float:
+        p_d = self.detection_rate(cls, self._range_to_point(m, self._pose_at(t)))
+        return math.log(max(p_d, self.p.p_false) / self.p.p_false)    # a sighting never counts against
+
+    def _range_to(self, entity: str, pose: tuple[float, float, float]) -> float:
+        where = self.kb.position(entity)
+        return math.inf if where is None else self._range_to_point(where, pose)
+
+    @staticmethod
+    def _range_to_point(p: Position, pose: tuple[float, float, float]) -> float:
+        return math.hypot(p.x - pose[0], p.y - pose[1])
+
+    def _clip(self, logit: float) -> float:
+        return _prob(max(-self.p.logit_limit, min(self.p.logit_limit, logit)))
 
     def _inside_basket(self, where: Position) -> bool:
         half = self.body.class_half_width["basket"]
@@ -318,6 +374,15 @@ class Perception:
             if abs(ts - t) < best_dt:
                 best, best_dt = pose, abs(ts - t)
         return best if best is not None and best_dt <= 0.5 else self._odom[-1][1]
+
+
+def _logit(p: float) -> float:
+    p = min(max(p, 1e-6), 1 - 1e-6)
+    return math.log(p / (1 - p))
+
+
+def _prob(logit: float) -> float:
+    return 1.0 / (1.0 + math.exp(-logit))
 
 
 def _entity_number(entity: str) -> int:

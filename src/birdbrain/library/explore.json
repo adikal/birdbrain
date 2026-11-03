@@ -1,14 +1,28 @@
 {
-  "doc": "Wander for a while, then look around.",
+  "doc": "Wander for a while, keeping clear of the basket, then look around.",
   "params": {},
   "budget": 30,
   "expect": "true",
   "body": [
     {
-      "call": "wander",
-      "args": {
-        "seconds": 6
-      }
+      "if": "known(basket)",
+      "then": [
+        {
+          "call": "wander",
+          "args": {
+            "seconds": 6,
+            "avoid": "basket"
+          }
+        }
+      ],
+      "else": [
+        {
+          "call": "wander",
+          "args": {
+            "seconds": 6
+          }
+        }
+      ]
     },
     {
       "call": "look_around"

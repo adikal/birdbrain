@@ -1,6 +1,6 @@
 """BirdBrain's knowledge representation: entities, assertions, and events.
 
-A small general core (docs/design.md section 7). Every fact is an assertion
+A small general core (docs/design.md section 3.4). Every fact is an assertion
 `relation(args) = value` that holds over a time interval and carries its
 sources. Facts are never overwritten: when one stops holding, its interval
 closes and a new assertion opens, so history stays queryable. Events record
@@ -112,6 +112,16 @@ class Position:
         det = a * c - b * b
         dx, dy = other.x - self.x, other.y - self.y
         return (c * dx * dx - 2 * b * dx * dy + a * dy * dy) / det if det > 1e-12 else math.inf
+
+    def association_cost(self, other: Position, floor: float = 0.0) -> float:
+        """Negative log-likelihood (up to a constant) that `other` measures this estimate:
+        Mahalanobis distance plus the log-determinant of the combined covariance. Unlike the
+        Mahalanobis distance alone, it does not favour the most uncertain candidate."""
+        a = self.sxx + other.sxx + floor * floor
+        b = self.sxy + other.sxy
+        c = self.syy + other.syy + floor * floor
+        det = a * c - b * b
+        return self.mahalanobis2(other, floor) + math.log(det) if det > 1e-12 else math.inf
 
     def fuse(self, other: Position) -> Position:
         """Kalman update of this estimate with an independent measurement `other`."""

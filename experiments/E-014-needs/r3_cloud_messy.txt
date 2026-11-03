@@ -1,0 +1,10 @@
+seed 32: 6/6 in basket · grasps 6/6 · falls 0 · decisions 21 · fallbacks 0 · 57.9 s wall
+seed 33: 4/6 in basket · grasps 4/5 · falls 0 · decisions 25 · fallbacks 0 · 98.1 s wall
+seed 34: 5/6 in basket · grasps 5/5 · falls 1 · decisions 24 · fallbacks 0 · 77.2 s wall
+seed 35: 5/6 in basket · grasps 6/6 · falls 1 · decisions 23 · fallbacks 0 · 82.5 s wall
+seed 36: 5/6 in basket · grasps 6/6 · falls 0 · decisions 24 · fallbacks 0 · 83.2 s wall
+seed 37: 6/6 in basket · grasps 6/6 · falls 0 · decisions 22 · fallbacks 0 · 77.3 s wall
+seed 38: 5/6 in basket · grasps 5/5 · falls 0 · decisions 29 · fallbacks 0 · 99.3 s wall
+seed 39: 5/6 in basket · grasps 6/6 · falls 0 · decisions 21 · fallbacks 0 · 65.9 s wall
+seeds 8 · in basket 5.12 of 6 (sd 0.64, min 4, max 6) · falls 0.25/run
+grasps 44/45 · decisions 189 · fallbacks 0 · invalid 0 · provider errors 0

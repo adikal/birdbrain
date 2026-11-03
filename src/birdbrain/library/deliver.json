@@ -2,7 +2,7 @@
   "doc": "Carry the held toy to the basket and drop it in.",
   "params": {},
   "budget": 75,
-  "expect": "inside(held, basket)",
+  "expect": "inside(held, basket, 0.03, 0)",
   "body": [
     {
       "call": "require",

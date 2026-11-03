@@ -1,6 +1,6 @@
 # Instructions for agents working on BirdBrain
 
-Read `README.md` for what BirdBrain is, `docs/design.md` for how it is built,
+Read `README.md` for what BirdBrain is, `docs/design.md` (the technical report) for how it is built,
 and `docs/ledger.md` for what has been tried and learned. Keep the ledger
 current: it is the project's memory of its own research.
 
@@ -75,9 +75,18 @@ uv run record-world playroom --brain d0=tidy --seconds 120 --seed 1 --stride 10 
 
 - **Experiments:** `.venv/bin/birdbrain-run --seeds 16 --seconds 300 --jobs 8 --out <rows.jsonl>`
   (add `--provider bedrock` for the cloud brain, `--latency real` to let the
-  world run while it thinks). Compare arms with `.venv/bin/birdbrain-compare A.jsonl B.jsonl`.
+  world run while it thinks). `--needs` gives no task: the duck acts on its
+  needs and self-generated goals; `--room tidy` starts every toy in the
+  basket. `--speculate` asks for the next decision while a skill runs (off by
+  default, ledger E-013). `--memory DIR` keeps skill records across runs
+  (forces `--jobs 1`). `--owner basket|wall|leave|none` (Milestone 3b) makes
+  the social need approval, with a scripted owner of that hidden preference;
+  `--episodes 10` runs each seed as a life of 10 rooms with memory under
+  `--memory` (default `data/lifetimes/<tag>`), and
+  `scripts/lifetimes.py` summarizes the rows. The owner's phrases are in
+  `src/birdbrain/phrases.toml` (or `BIRDBRAIN_PHRASES`). Compare arms with `.venv/bin/birdbrain-compare A.jsonl B.jsonl`.
   Event logs go to `data/runs/` (set `BIRDBRAIN_RUNS_DIR` to change it).
-- **The mind:** `.venv/bin/birdbrain-dashboard --live --seed 3`, then open
+- **The mind:** `.venv/bin/birdbrain-dashboard --live --seed 3 [--needs] [--room tidy] [--owner basket]`, then open
   `http://127.0.0.1:8790`. Without `--live` it replays recorded runs;
   `?run=<id>&t=<seconds>&truth=1` opens a run at a time with the truth
   overlay on. Live runs record the duck's head-camera image at 2 Hz; add

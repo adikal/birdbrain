@@ -13,6 +13,7 @@ lab's `attach_world` hands it nothing.
 from __future__ import annotations
 
 import os
+from dataclasses import replace
 from typing import Any
 
 from birdbrain.body import Command, Frame, Observation, RangeFrame, Sighting
@@ -68,8 +69,12 @@ class BirdBrainBrain:
     def state(self) -> str:
         return self.mind.state
 
-    def step(self, senses: Any) -> Any:
-        return intent(self.mind.step(observation(senses)))
+    def step(self, senses: Any, heard: tuple[str, ...] = (), petted: bool = False) -> Any:
+        """`heard` and `petted` come from the owner; the lab's senses have no microphone."""
+        obs = observation(senses)
+        if heard or petted:
+            obs = replace(obs, heard=tuple(heard), petted=petted)
+        return intent(self.mind.step(obs))
 
     def inputs(self) -> dict[str, Any]:
         action = self.mind._action

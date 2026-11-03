@@ -1,0 +1,12 @@
+seed 48 episode 1: 0/6 in basket · owner leave: liked 4 (start 6) · heard +1/-4 · grasps 3/3 · falls 0 · decisions 30 · fallbacks 0 · 108.8 s wall
+seed 48 episode 2: 0/6 in basket · owner leave: liked 6 (start 6) · heard +0/-0 · grasps 0/0 · falls 0 · decisions 27 · fallbacks 0 · 71.5 s wall
+seed 48 episode 3: 0/6 in basket · owner leave: liked 6 (start 6) · heard +0/-0 · grasps 0/0 · falls 0 · decisions 26 · fallbacks 0 · 81.7 s wall
+seed 48 episode 4: 0/6 in basket · owner leave: liked 6 (start 6) · heard +1/-1 · grasps 2/2 · falls 0 · decisions 27 · fallbacks 0 · 81.1 s wall
+seed 48 episode 5: 0/6 in basket · owner leave: liked 6 (start 6) · heard +0/-0 · grasps 0/0 · falls 0 · decisions 27 · fallbacks 0 · 74.4 s wall
+seed 49 episode 1: 2/6 in basket · owner leave: liked 3 (start 6) · heard +0/-1 · grasps 3/4 · falls 1 · decisions 24 · fallbacks 0 · 105.1 s wall
+seed 49 episode 2: 3/6 in basket · owner leave: liked 3 (start 6) · heard +1/-2 · grasps 3/3 · falls 0 · decisions 24 · fallbacks 0 · 88.8 s wall
+seed 49 episode 3: 0/6 in basket · owner leave: liked 6 (start 6) · heard +0/-0 · grasps 0/0 · falls 0 · decisions 27 · fallbacks 0 · 93.1 s wall
+seed 49 episode 4: 0/6 in basket · owner leave: liked 6 (start 6) · heard +0/-0 · grasps 0/0 · falls 0 · decisions 27 · fallbacks 0 · 76.3 s wall
+seed 49 episode 5: 0/6 in basket · owner leave: liked 6 (start 6) · heard +0/-0 · grasps 0/0 · falls 0 · decisions 27 · fallbacks 0 · 86.0 s wall
+seeds 10 · in basket 0.50 of 6 (sd 1.08, min 0, max 3) · falls 0.10/run
+grasps 11/12 · decisions 266 · fallbacks 0 · invalid 0 · provider errors 0

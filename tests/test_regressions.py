@@ -179,3 +179,131 @@ def test_server_rejects_foreign_host_headers(tmp_path):
         server.shutdown()
         server.server_close()
     assert math.isfinite(1.0)
+
+
+def test_skill_records_persist_across_episodes(tmp_path):
+    first = Mind(memory_dir=tmp_path)
+    t = 0.0
+    while first.records.get("look_around") is None or first.records["look_around"].trials < 1:
+        first.step(obs(t))
+        t += 0.02
+    first.close()
+    second = Mind(memory_dir=tmp_path)
+    assert second.records["look_around"].trials >= 1
+
+
+def test_speculation_is_used_only_when_the_expected_effect_held():
+    from birdbrain.mind import Choice
+
+    class Scripted:
+        name = "scripted"
+        def __init__(self):
+            self.calls = 0
+        def choose(self, request):
+            self.calls += 1
+            return Choice("rest", {}, "r", p=0.5, provider="scripted", latency_s=0.5)
+
+    provider = Scripted()
+    mind = Mind(provider=provider, latency="real", speculate=True)
+    t = 0.0
+    while mind.stats["decisions"] < 3:
+        mind.step(obs(t))
+        t += 0.02
+    assert mind.stats.get("speculation_hits", 0) >= 1          # rest's effect ("true") always holds
+    assert provider.calls == mind.stats["decisions"] + 1        # one fresh call, the rest speculative
+
+
+# ---- review of hardening and Milestone 3 (ledger E-014) ---------------------
+
+def test_a_fall_counts_toward_giving_up_on_the_target():
+    from birdbrain.mind import Choice
+    from birdbrain.relations import failures
+
+    class PickToy:
+        name = "s"
+        def choose(self, request):
+            return Choice("pick", {"x": "toy#1"}, "r", provider="s")
+
+    mind = Mind(provider=PickToy())
+    toy = mind.kb.new_entity("toy", 0.0)
+    mind.kb.tell("at", (toy,), Position.round(1.0, 0.0, 0.02), t=0.0, conf=0.99)
+    mind.step(obs(0.0))
+    mind.step(obs(0.02))
+    mind.step(obs(0.04, odom=(0.5, 0.5, 0.0)))                  # odometry jumps: a fall
+    assert mind.recent[-1]["reason"] == "fell"
+    assert failures(mind.kb, 0.04, "pick", toy) == 1
+
+
+def test_speculation_after_an_interrupted_skill_is_discarded_and_respects_the_budget():
+    from birdbrain.mind import Choice
+
+    class Scripted:
+        name = "scripted"
+        def __init__(self):
+            self.calls = 0
+        def choose(self, request):
+            self.calls += 1
+            return Choice("rest", {}, "r", p=0.5, provider="scripted", latency_s=0.5,
+                          usage={"input": 10, "output": 0})
+
+    provider = Scripted()
+    mind = Mind(provider=provider, speculate=True)
+    mind.step(obs(0.0))
+    mind.step(obs(0.02, odom=(0.5, 0.5, 0.0)))                  # the rest ends in a fall
+    mind.step(obs(0.04, odom=(0.5, 0.5, 0.0)))
+    assert mind.stats.get("speculation_hits", 0) == 0
+    budgeted = Mind(provider=Scripted(), speculate=True, token_budget=10)
+    budgeted.step(obs(0.0))                                     # the first call spends the budget
+    assert budgeted.stats.get("speculations", 0) == 0
+
+
+def test_speculation_waits_for_the_answer_it_follows():
+    from birdbrain.mind import Choice
+
+    class Slow:
+        name = "slow"
+        def choose(self, request):
+            return Choice("rest", {}, "r", provider="slow", latency_s=2.0)
+
+    mind = Mind(provider=Slow(), latency="real", speculate=True)
+    mind.step(obs(0.0))
+    assert abs(mind._next["ready_at"] - 4.0) < 1e-9              # sent once the first answer is in
+
+
+def test_scorecard_agreement_counts_only_cloud_choices():
+    from birdbrain.mind import ProviderError
+
+    class Failing:
+        name = "failing"
+        def choose(self, request):
+            raise ProviderError("throttled")
+
+    mind = Mind(provider=Failing(), needs=True)
+    mind.step(obs(0.0))
+    assert mind.stats["fallbacks"] == 1 and mind.stats.get("cloud_decisions", 0) == 0
+    assert mind.stats.get("cloud_agrees_with_scorecard", 0) == 0
+
+
+def test_a_far_sighting_never_lowers_existence_confidence():
+    p = Perception(KnowledgeBase())
+    for rng in (1.0, 2.0, 3.0, 4.0):
+        assert p.detection_rate("toy", rng) >= 0.1 and p.detection_rate("basket", rng) >= 0.9
+
+
+def test_deliver_is_judged_by_the_best_estimates():
+    from birdbrain.relations import inside
+    kb = KnowledgeBase()
+    basket = kb.new_entity("basket", 0.0)
+    kb.tell("at", (basket,), Position.round(0.0, 0.0, 0.03), t=0.0, conf=0.99)
+    toy = kb.new_entity("toy", 0.0)
+    kb.tell("at", (toy,), Position.round(0.25, 0.0, 0.04), t=0.0, conf=0.99)
+    assert inside(kb, 0.0, toy, basket)                         # might be inside: do not pick it out
+    assert not inside(kb, 0.0, toy, basket, 0.03, 0)            # but a delivery there did not land
+
+
+def test_an_unreadable_memory_file_is_an_error(tmp_path):
+    (tmp_path / "skill_records.json").write_text("{not json", encoding="utf-8")
+    with pytest.raises(ValueError, match="unreadable"):
+        Mind(memory_dir=tmp_path)
+    with pytest.raises(ValueError, match="needs mode"):
+        Mind(speculate=True, needs=True)

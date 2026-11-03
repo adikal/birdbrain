@@ -48,10 +48,10 @@ select { background: var(--surface); border: 1px solid var(--line); border-radiu
 .dashboard { max-width: 1640px; margin: 0 auto; padding: 18px; display: grid; grid-template-columns: minmax(460px, 1.3fr) minmax(330px, .85fr) minmax(320px, .85fr); gap: 16px; }
 .panel { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
 [hidden] { display: none !important; }
-.dashboard { grid-template-areas: "world mind decisions" "camera skills beliefs" "events events inspector"; }
+.dashboard { grid-template-areas: "world mind decisions" "camera skills beliefs" "needs events inspector"; }
 .world-panel { grid-area: world; } .mind-panel { grid-area: mind; } .decisions-panel { grid-area: decisions; }
 .camera-panel { grid-area: camera; } .skills-panel { grid-area: skills; } .beliefs-panel { grid-area: beliefs; }
-.events-panel { grid-area: events; } .inspector-panel { grid-area: inspector; }
+.events-panel { grid-area: events; } .needs-panel { grid-area: needs; } .inspector-panel { grid-area: inspector; }
 .panel-heading { padding: 16px 18px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line-soft); }
 .eyebrow { margin: 0 0 3px; text-transform: uppercase; color: var(--brand); letter-spacing: .12em; font-size: 11px; font-weight: 700; }
 h1, h2 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
@@ -67,7 +67,18 @@ h1 { font-size: 19px; }
 .skills-panel, .beliefs-panel, .camera-panel { height: 340px; display: flex; flex-direction: column; }
 .world-panel { height: 500px; }
 #world-map { min-height: 0; height: 370px; }
-.events-panel, .inspector-panel { height: 400px; display: flex; flex-direction: column; }
+.events-panel, .inspector-panel, .needs-panel { height: 400px; display: flex; flex-direction: column; }
+/* Needs: one hue for the bars (pressure, longer = more urgent); the chosen goal in bold. */
+.needs-body { padding: 12px 18px; display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; overflow-y: auto; }
+.need-bars { display: grid; grid-template-columns: 76px 1fr 44px; gap: 6px 10px; align-items: center; font-size: 13px; }
+.need-bars .bar { height: 10px; background: var(--line-soft); border-radius: 5px; overflow: hidden; }
+.need-bars .bar i { display: block; height: 100%; background: var(--blue); }
+.need-bars .bar.battery i { background: var(--orange); }
+.need-bars code { text-align: right; color: var(--muted); }
+.goal-now { margin: 0; color: var(--muted); font-size: 13px; height: 2.9em; overflow: hidden; }
+.goal-now b { color: var(--text); }
+.score-table tr.chosen td { font-weight: 700; }
+.score-table tr.chosen td:first-child::before { content: "▸ "; color: var(--orange); }
 .decision-list, .event-list, .table-wrap, .inspector-panel pre { flex: 1; min-height: 0; overflow-y: auto; }
 .facts > div { min-width: 0; }
 .thought { height: 268px; overflow: hidden; }
@@ -174,6 +185,6 @@ h1 { font-size: 19px; }
 
 @media (max-width: 1180px) {
   .topbar { grid-template-columns: 1fr auto; } .run-strip { display: none; }
-  .dashboard { grid-template-columns: 1fr 1fr; grid-template-areas: "world world" "camera camera" "mind decisions" "skills beliefs" "events events" "inspector inspector"; }
+  .dashboard { grid-template-columns: 1fr 1fr; grid-template-areas: "world world" "camera camera" "mind decisions" "skills beliefs" "needs needs" "events events" "inspector inspector"; }
 }
-@media (max-width: 760px) { .dashboard { grid-template-columns: 1fr; grid-template-areas: "world" "camera" "mind" "decisions" "skills" "beliefs" "events" "inspector"; padding: 10px; } .facts { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .dashboard { grid-template-columns: 1fr; grid-template-areas: "world" "camera" "mind" "decisions" "skills" "beliefs" "needs" "events" "inspector"; padding: 10px; } .facts { grid-template-columns: 1fr; } }

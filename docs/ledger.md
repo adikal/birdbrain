@@ -66,6 +66,34 @@ Entry ids: `E-###` experiments, `H-###` hypotheses, `L-###` lessons.
   shortcut that was locally reasonable and globally wrong.
 - **L-011. A fix that does not move the target metric is reverted.** The
   precision rule of E-012 sounded right and was rejected on the numbers.
+- **L-012. Each scorecard term must be the difference the goal makes.**
+  Rest was credited with relieving the safety need, but that need fades
+  whatever the duck does, so after one fall the duck rested for most of a
+  run. Uncertainty was credited to tidy goals, but tidying does not set out
+  to test beliefs, so it sent the duck to its least certain toys first.
+  (E-014)
+- **L-013. Small counts need a prior.** One fall in one trial read as a
+  33% fall rate and stopped all tidying. A prior from the base rate, worth
+  10 trials, fixed it. (E-014)
+- **L-014. Held-out seeds that informed a fix are spent.** E-014 round 1
+  failed on held-out seeds; the fixes it prompted were judged on fresh
+  seeds. (E-014)
+- **L-015. A need can smuggle in the answer.** Entering the owner's
+  preference as a tidiness need made "tidies with no task" true by
+  construction. A need should name what the creature wants (approval),
+  not the state of the world that satisfies it. (E-014, E-015)
+- **L-016. Exploration must be able to fade.** An uncertainty bonus kept
+  the duck experimenting with nobody there, and it fell picking toys it had
+  put by walls. Thompson sampling explores in proportion to how thin the
+  evidence is. It does not stop altogether: with nobody there the control
+  still makes about 5 picks an episode after 10 rooms, because the best of
+  several thinly known ways of putting a toy down always looks a little
+  good. The draws must last the whole pick and put, or the
+  plan contradicts itself. (E-015)
+- **L-017. Credit needs hindsight.** Splitting each reaction once, by what
+  the duck believed then, left coincident actions with lasting credit.
+  Re-explaining the whole history (EM) on each new reaction explains them
+  away. (E-015)
 
 ## Open hypotheses
 
@@ -86,26 +114,37 @@ Ordered by what to test next. Resolved ones keep their verdict.
   (Brier 0.167 against 0.206 with fewer than 3 prior trials) and the two
   converge by 10 trials (0.224 against 0.233, n = 27). Whether counts win
   later needs runs whose memory persists across episodes (E-010).
-- **H-010** (new). Asking for the next decision while the current skill is
-  still finishing recovers most of the time lost to real latency (L-008).
-  *Test:* real-latency runs with and without overlap, same seeds.
-- **H-011** (new). BirdBrain falls more often than the lab brain (0.81
-  against 0.38 per run on held-out seeds, p = 0.22) because of the
+- **H-010 Refuted for the playroom task.** Speculative decisions were used
+  78% of the time but added one decision per run and no toys, at 1.35
+  times the tokens (E-013). Revisit on hardware.
+- **H-012 Partly supported.** Range-aware existence confidence cut failed
+  pick decisions from 48% to 36% (E-013); the rest are unexplained.
+- **H-013 Supported.** Likelihood association with a second wide error
+  component left one confident basket in 14 of 16 runs, up from 11 (E-013).
+- **H-011** (open). BirdBrain falls more often than the lab brain (0.50
+  against 0.38 per run on held-out seeds after E-013, p = 0.81) because of the
   sidestep in `back_off` and standing near the rim. *Test:* attribute every
   fall to its skill step over 32 seeds, then change only that step.
-- **H-012** (new). Most failed pick decisions (74 of 80 in E-011) are
-  approaches abandoned because the target's confidence dropped below the
-  acting threshold mid-walk. Either the duck's feet move the toy, or
-  misses are counted for sightings the detector could not make (toys in
-  the lower edge of the frame while the head is down). *Test:* for each
-  such failure, compare the toy's true displacement during the approach
-  with the predicted visibility.
-- **H-013** (new). Sightings taken while walking have a heavy-tailed error
-  that a Gaussian gate cannot represent, which produces the remaining
-  phantom baskets. *Test:* fit a two-component error model on probe data
-  and compare phantom counts.
-- **H-003** (Milestone 3). Needs that include tidiness make the duck start
-  tidying with no task given, and in a tidy room it mostly rests or explores.
+- **H-003** (Milestone 3) **Supported, narrowly.** Given tidiness as a
+  need, the needs scorecard arbitrates well: with no task the duck tidied
+  5.25 toys, the same as the task-driven policy on fresh seeds; in a tidy
+  room it rested, looked around or explored for 98% of the run and took no
+  toy out of the basket; the cloud brain tidied 5.12 to 5.38 toys (E-014).
+  It does not show that tidying arises from anything more general, because
+  the preference was entered as the need (L-015). H-015 tests that.
+- **H-015** (Milestone 3b) **Supported, with the basket effect smaller
+  than predicted.** From phrases that carry only approval or disapproval,
+  the duck learned each of three hidden owner preferences (its beliefs
+  single out the right kind of action in 43 of 48 lives in round 2). Each
+  owner arm's own measure beat both other owner arms, and without an owner
+  it did not tidy. With the approval need acting as a need (round 2), the
+  results over the control were: wall +2.9, leave-it +1.35, basket +1.8.
+  The basket result missed its pre-registered thresholds in both rounds
+  (E-015).
+- **H-016** (new). Crediting a reaction to the actions under way when it
+  arrives over-credits the action that follows a change. This is why the
+  duck re-moves toys from walls (E-015). *Test:* credit only actions that
+  ended before the reaction, or learn the delay, then compare churn.
 - **H-004** (Milestone 4). Beliefs with evidence predict the outcome of actions
   on unfamiliar objects better than retrieval of similar past episodes.
 - **H-008** (Milestone 4). Without a confirmation step, missed or stale
@@ -117,6 +156,504 @@ Ordered by what to test next. Resolved ones keep their verdict.
   gains more competence per episode than choosing by novelty.
 
 ## Experiments
+
+### E-015 · 2026-11-03 · Milestone 3b: learning what the owner wants (pre-registered)
+
+**Question.** If the duck's only social need is its owner's approval, and
+the owner says only whether she approves, does the duck learn what she
+wants (H-015)?
+
+**Design** (docs/design.md section 4.3).
+- Needs: energy, curiosity, safety, and approval (the duck's estimate of
+  her mood). Tidiness is removed. The briefing never says what the room
+  should look like.
+- The owner's phrases come from `src/birdbrain/phrases.toml` (approval or
+  disapproval only). A scripted owner with a hidden preference reacts 1 to
+  5 s after a change she cares about, with probability 0.6, and 10% of
+  phrases are misheard as the opposite list.
+- Three ways of putting a toy down are offered side by side: `deliver`
+  (into the basket), `put_by_wall`, and `drop` (where the duck stands).
+- The duck credits each reaction to the actions under way 0.5 to 8 s
+  before it, or to nothing, and re-explains its whole history by EM
+  (`reactions.py`). It chooses by Thompson sampling from those beliefs.
+- A lifetime is 10 episodes of 300 s, each a different room, with skill
+  records and owner beliefs kept between episodes.
+
+**Arms**, 16 lifetimes each, the same rooms in every arm: no owner (the
+control); an owner who likes toys in the basket; one who likes toys
+against the walls (within 0.2 m, not in the basket); one who likes toys
+left where they were.
+
+**Development** (lifetimes 0 to 3, not used for the verdict).
+- *An exploration bonus never let go.* A first version scored each kind
+  of action by its expected reaction plus a bonus for uncertainty (the
+  scorecard's IG term). The duck made 10 to 14 picks an episode in every
+  arm, including the control, and fell 1 to 2.75 times an episode picking
+  toys it had put by walls. Replaced by Thompson sampling: each decision
+  values every kind by one draw from its posterior. The control's picks
+  fell to 3 to 6 an episode and its falls to 0 to 0.5.
+- *Draws must last a pick and its put.* Redrawing at every decision made
+  the duck pick a toy because one way of putting it down looked good, then
+  put it down another way. Draws are now kept while the duck holds a toy.
+- *Online credit is stuck with its first guesses.* Splitting each reaction
+  once, by the probabilities at the time, left an action that merely
+  followed deliveries with 0.17 expected approval. Re-explaining the whole
+  history by EM on every reaction fixed it in a synthetic test (below 0.1),
+  and the basket arm reached 5.5 toys gained by episode 10, against 3.75
+  without EM.
+- *Falls depend on where.* Picks by a wall fell often, so success and fall
+  rates are now counted per kind of action ("pick from wall"), not per
+  skill.
+- *Scale.* The approval weight is 4: with 2, one certain approval was worth
+  less than the time a pick and put take, and the basket arm hardly
+  delivered.
+- *Five episodes were too few.* The learning curves rise until episodes 6
+  to 8, so the lifetime is 10 episodes, and the verdict uses episodes 6 to
+  10.
+- *The leave-it owner approves putting a toy back.* She reacts to every
+  change, so a pick she dislikes followed by a drop on the same spot earns
+  "no" then "nice". Pick-and-drop is close to neutral for her, and picks
+  do not halve. The planned prediction 4 (picks halve) does not follow
+  from her preference as scripted; it is replaced below by her own measure.
+- Dev result (episodes 6 to 10, owner arm minus control, 4 lifetimes):
+  basket gain +3.7, at wall +3.45, unmoved +1.3. The duck's beliefs single
+  out the right kind of action in 12 of 12 owner lifetimes.
+
+**Predictions, final, written before the held-out runs** (lifetimes 48
+to 63, rooms 4801 to 6310; per lifetime, the mean over episodes 6 to 10;
+arms paired by lifetime):
+1. Control: on average at most 1.5 toys gained in the basket and at most
+   1.5 against walls per episode. Without an owner, the duck does not
+   tidy.
+2. Basket owner: at least 3.5 toys gained in the basket, and at least 2.0
+   more than the control (CI lower bound above 0).
+3. Wall owner: at least 3.0 toys against walls, and at least 2.0 more than
+   the control (CI lower bound above 0).
+4. Leave-it owner: at least 0.5 more toys unmoved than the control (CI
+   lower bound above 0).
+5. Specificity: each owner arm's own measure is higher than in both other
+   owner arms (CI lower bound above 0). The duck learns *her* preference,
+   not a generic busyness.
+6. Approvals per minute in the last two episodes exceed those in the first
+   two, in the basket and wall arms.
+7. At the end of life, the kind of action the duck believes most approved
+   is `deliver` in at least 12 of 16 basket lifetimes and `put_by_wall` in
+   at least 12 of 16 wall lifetimes. The kind it believes most disapproved
+   is a pick in at least 12 of 16 leave-it lifetimes.
+8. Reported, with no prediction: picks and falls per episode, the leave-it
+   arm's approval rate, and a small cloud-brain arm.
+
+**Method.** Commit `01798e7`. For each arm:
+`birdbrain-run --seeds 16 --seed0 48 --episodes 10 --seconds 300 --owner <arm> --jobs 4 --tag e015-<arm> --memory data/lifetimes/e015-<arm> --out experiments/E-015-approval/<arm>.jsonl`.
+Summary: `scripts/lifetimes.py experiments/E-015-approval/{none,basket,wall,leave}.jsonl`
+(saved as `summary.txt`). 640 episodes.
+
+**Result** (episodes 6 to 10, per lifetime, paired by lifetime; n = 16).
+
+| Prediction | Measure | Result | Verdict |
+|---|---|---|---|
+| 1 | control: toys gained in the basket; against walls | 0.75; 0.81 | met |
+| 2 | basket owner: toys gained in the basket | 3.49 | missed by 0.01 (≥ 3.5) |
+| 2 | ... minus control | +2.74 (CI +1.82 to +3.65), 14 of 16 higher | met |
+| 3 | wall owner: toys against walls | 3.83 | met |
+| 3 | ... minus control | +3.01 (CI +2.19 to +3.84), 14 of 16 higher | met |
+| 4 | leave-it owner: toys unmoved, minus control | +1.04 (CI +0.64 to +1.44), 14 of 16 higher, 2 equal | met |
+| 5 | own measure above both other owner arms | all six CIs above +1.9 | met |
+| 6 | approvals per minute, first two episodes to last two | basket 0.12 to 0.45; wall 0.11 to 0.90 | met |
+| 7 | belief singles out the right kind | `deliver` 16 of 16; `put_by_wall` 14 of 16; a pick most disapproved 12 of 16 | met (the last at the limit) |
+
+Learning curves (toys gained in the basket for the basket owner, against
+walls for the wall owner) rise from about 1 in episode 1 to 3.6 and 4.1
+by episode 8 (4.4 for the wall owner by episode 9), and level off. The
+leave-it arm has no such curve: its unmoved toys stay at 3.9 to 4.8, at or
+above the control in every episode. The control stays below 1 throughout. Late
+episodes: falls per episode 0.20 (control), 0.44 (basket), 0.05 (wall),
+0.10 (leave-it); picks per episode 4.95, 6.92, 10.29, 5.30.
+
+**Analysis.** From phrases that say only whether, and three neutral ways
+of putting a toy down, the duck learns the basket and wall owners'
+preferences within about 6 to 8 rooms (+2.7 and +3.0 toys over the
+control), and it does not tidy when nobody is there. Each owner arm's own
+measure beats both other owner arms by 2.8 to 3.6 toys, so this is her
+preference being learned, not a general urge to move toys. The leave-it
+effect is smaller (+1.0) and appears from the first room, which points to
+disapproval suppressing picks within a room more than to learning across
+rooms. Prediction 2 missed its absolute threshold (3.49 against 3.5);
+every comparison held.
+
+The review after these runs (below) found that the approval need did not
+yet act as a need: the duck's estimate of her mood was computed and
+logged, but the value of a reaction did not depend on it. So round 1
+shows learning a preference from approval, not that a need for approval
+drives it. H-015 is partly supported by round 1; round 2 tests the
+corrected need on fresh lifetimes.
+
+Two findings to follow up:
+- *Churn by the wall.* The wall arm makes about 10 picks an episode and
+  hears 0.39 disapprovals a minute late in life. It picks toys that are
+  already against a wall and puts them by a wall again. The owner
+  disapproves of the pick and approves of the put, which is net zero.
+  But at the end of life the duck believes `pick from wall` costs −0.24
+  and `put_by_wall` earns +0.31. The disapproval after a pick usually lands while the
+  following put is under way, so the put takes part of the blame and the
+  pick too little. The credit model does not know that her reaction
+  answers a change that has already happened. Candidate fix: credit a
+  reaction to actions whose *end* precedes it, or learn the reaction delay.
+- *The leave-it owner* is the hardest: a pick she dislikes followed by a
+  drop on the spot earns "no" then "nice", so the lesson is only half
+  there (the most disapproved kind is a pick in 12 of 16 lives).
+
+**Cloud brain** (exploratory, prediction 8; commit `499845d`, lifetimes 48
+and 49, 5 episodes, `--provider bedrock`; rows `cloud_*.jsonl`, summary
+`cloud_summary.txt`). Over 1,026 decisions there were no invalid choices
+and no fallbacks, at 82k to 95k tokens per episode. The cloud brain reads
+the same beliefs in its briefing and learns faster:
+- Basket owner: 3 toys gained in episode 1, 5 to 6 by episodes 3 and 4.
+  Its first delivery was framed as an experiment: "delivering it tests
+  whether my owner likes toys in the basket".
+- Leave-it owner: by episode 3 it had nearly stopped picking (0 to 1 picks
+  an episode), and all 6 toys stayed unmoved in episodes 3 to 5. Its
+  reasons: "picking toys from the open has so far drawn disapproval, so
+  I'll stay still and not risk annoying her". The local policy never got
+  there.
+- Wall owner: 3 toys against walls by episodes 4 and 5, about as fast as
+  the local policy.
+- Control: 1 to 2.5 toys gained in the basket per episode, against 0.75
+  for the local policy. With nobody there, the language model's prior
+  leans toward tidying into the basket. This is the bias the neutral skill
+  set was meant to keep out, and it came in with the model's priors.
+Two lifetimes per arm is too few for a verdict.
+
+**Review** (critic pass over `9707ce5..499845d`; fixes in `a939e38`). The
+reviewer found no truth reaching the mind and reproduced `summary.txt`
+from the rows. Its findings:
+- *The approval need was inert* (major). The value of a reaction did not
+  depend on the duck's estimate of her mood. Fixed: approval pressure is
+  now convex in the mood, like energy, so the same reaction is worth more
+  when she is displeased than when she is delighted, and her displeasure
+  weighs more than her pleasure. This is Bennett's point that valence
+  depends on the creature's state.
+- *The verdict text overstated the result* (major). Corrected above.
+- *Three wall distances* (major, likely): the owner used 0.2 m, the
+  duck's descriptions 0.25 m, and `put_by_wall`'s expected effect 0.3 m.
+  The duck now uses one distance (`relations.WALL_NEAR`, 0.25 m) for both,
+  and the owner keeps her own (`owner.OWNER_WALL_M`, 0.2 m), which the duck
+  does not know. Part of the wall churn may come from this gap; H-016 must
+  separate the two.
+- Minor:
+  - A pick was valued with the best put's value but the average put's
+    cost. It now uses the cost and risk of the put it leads to.
+  - Pets due in the same tick were merged but counted separately. Now the
+    owner gives one pet per tick.
+  - A quoted belief value, the reproduction command and L-016's claim were
+    wrong; all three are corrected.
+  - Tests now cover the mood-dependent value, held draws, per-kind record
+    persistence, and the analysis script.
+Development check (lifetimes 0 to 3) after the fixes, minus control:
+basket +3.1, wall +3.9, leave-it +1.3.
+
+**Round 2 predictions.** The fixes change the mechanism, so round 2 uses
+fresh lifetimes 64 to 79 (rooms 6401 to 7910), commit `a939e38`, with
+predictions 1 to 7 unchanged.
+
+**Round 2 result** (rows `r2_*.jsonl`, summary `r2_summary.txt`; tags
+`e015r2-<arm>`; 640 episodes).
+
+| Prediction | Measure | Round 1 | Round 2 | Verdict (round 2) |
+|---|---|---|---|---|
+| 1 | control: basket gain; at walls | 0.75; 0.81 | 0.45; 0.74 | met |
+| 2 | basket owner: basket gain | 3.49 | 2.26 | missed (≥ 3.5) |
+| 2 | ... minus control | +2.74 | +1.81 (CI +0.84 to +2.79) | missed (≥ 2.0); CI above 0 |
+| 3 | wall owner: at walls; minus control | 3.83; +3.01 | 3.64; +2.90 (CI +1.95 to +3.85) | met |
+| 4 | leave-it owner: unmoved minus control | +1.04 | +1.35 (CI +0.85 to +1.85) | met |
+| 5 | own measure above both other owner arms | all six | all six (CIs from +0.88) | met |
+| 6 | approvals per minute, first two to last two | basket 0.12→0.45, wall 0.11→0.90 | basket 0.09→0.31, wall 0.06→0.73 | met |
+| 7 | belief singles out the right kind | 16, 14, 12 of 16 | 14, 14, 15 of 16 | met |
+
+Late in life the wall arm heard half as many disapprovals as in round 1
+(0.19 against 0.39 a minute), and the leave-it arm picked less (2.6
+against 5.3 an episode).
+
+**Round 2 analysis.** With the need acting as a need, the duck still
+learns which owner it has: its beliefs single out the right kind of action
+in 43 of 48 lives, and each owner arm's measure beats the other arms. The
+wall and leave-it results hold or improve. The basket owner gets less: 2.3
+toys gained against 3.5. Round 2 changed two things that both lower the
+value of delivering: a reaction's value now depends on the duck's mood,
+and a pick now carries the fall risk of the put it leads to. Deliveries
+fall more often than other puts (0.2 to 0.4 falls an episode in the basket
+arm). On the development lifetimes, round 1's code gave 4.65, round 2's
+3.85, and round 2 without the put's risk 4.10. Four lifetimes cannot
+separate the two causes.
+
+**Verdict.** H-015 is supported for what it claims about learning: the
+duck learns a hidden preference from approval alone, specifically and in
+the right direction, and it does not tidy with nobody there. The size of
+the basket effect missed its pre-registered thresholds in both rounds,
+narrowly in round 1 and clearly in round 2. The corrected need is kept,
+because a need whose state does not matter is not a need. The pick's
+inherited risk is kept, because it is the honest cost. Next: separate the
+two causes, then work on deliveries that fall (H-011).
+
+### E-014 · 2026-11-03 · Milestone 3: needs and self-generated goals (pre-registered)
+
+**Question.** With no task given, does the duck tidy because one of its
+needs is the owner's preference for a tidy room, and in a room that is
+already tidy does it mostly rest or explore (H-003)?
+
+**Design.** Four needs, each a pressure in [0, 1] computed locally
+(`needs.py`): energy (a battery that drains while moving and recharges
+while resting; empty forces a rest reflex), tidiness (2 × the fraction of
+known toys outside the basket), curiosity (grows over 240 s without
+exploring) and safety (rises after a fall, fades over 60 s). Goals are
+generated from needs and beliefs (`goals.py`): deliver the held toy, tidy
+each toy believed outside the basket, explore, rest. Each is scored with
+the design's U(g) = dV + 0.5 LP + 0.3 IG − 0.5 C − R, every term from
+beliefs and counted outcomes. The local needs policy takes the top goal;
+the cloud brain sees the needs and the scorecard and must name the goal
+its action serves, and an action serving no candidate goal is rejected.
+
+**Development, seeds 0 to 15 (not used for the verdict).**
+- Curiosity first included a bonus for doubted beliefs. The duck then
+  looked around for most of the run, chasing detector noise. Replaced by
+  habituation: each way of exploring keeps a running average of the
+  objects it newly confirms, and curiosity's value is scaled by it. One
+  shared average for look_around and explore made the duck stop exploring
+  once looking around from the same spot found nothing (seed 3 rested from
+  140 s on with 4 toys never seen); a separate average per skill fixed it.
+- `inside()` became uncertainty-aware (half-width + 0.03 + 2σ): in the
+  tidy room the duck had been picking toys out of the basket whenever the
+  basket estimate was off by 0.2 m. Untidied toys fell to 0.
+- Wander walked into the basket rim in the tidy room (5 of 8 falls). It
+  now turns away from the known basket as walk_toward does; wander falls
+  went to 0.
+- Tidy goals had no distance in their cost, so the duck chose far,
+  uncertain toys. Adding the walk to the toy and on to the basket: +0.19
+  toys (CI −0.26 to +0.63), kept because it is the correct cost model.
+- **Rejected:** a floor on fused uncertainty proportional to the
+  sighting's own sigma (sightings from one viewpoint share their error:
+  the mean of about 90 still sightings at 1.0 to 1.5 m was off by 0.17σ,
+  where independent errors give 0.03σ). It made far-basket error p90
+  worse in the task runs (0.28 to 0.55 m, p < 0.001) and moved toys by
+  −0.38 (CI −0.89 to +0.14). Reverted.
+- Dev result: needs mode tidies 4.75 toys against 5.62 for the task-driven
+  local policy on the same seeds. The gap is the duck's other needs: about
+  10% of the run resting and 20% exploring or looking around.
+
+**Predictions, written before the held-out runs** (seeds 16 to 31, 300 s,
+local policy unless stated):
+1. Messy room, needs mode, no task: at least 4.5 toys in basket on
+   average, and no more than 1.0 below the task-driven local policy on the
+   same seeds (E-013's `local_32e15e4.jsonl`).
+2. Tidy room (all toys start in the basket): resting, exploring and
+   looking around take at least 70% of the run; no toy is taken out of the
+   basket in any run; falls at most 0.5 per run.
+3. Cloud brain (Bedrock, frozen latency, seeds 16 to 23), messy room,
+   needs mode: at least 4.5 toys, no invalid decisions above 5%, and the
+   chosen goal is reported against the scorecard's top goal (agreement
+   rate; no prediction on its value).
+
+**Round 1 result** (commit `8510c02`, rows in `experiments/E-014-needs/`).
+
+| Prediction | Measure | Result | Verdict |
+|---|---|---|---|
+| 1 | toys in basket, needs mode | 4.06 (sd 1.84, min 1) | missed (≥ 4.5) |
+| 1 | gap to task-driven policy (5.44, same commit) | −1.38 (CI −2.42 to −0.33) | missed (≤ 1.0) |
+| 2 | rest + explore + look share, tidy room | 99% (min 95%) | met |
+| 2 | toys taken out of the basket | 0 in 16 runs | met |
+| 2 | falls per run, tidy room | 0.25 | met |
+| 3 | toys in basket, cloud needs mode (seeds 16 to 23) | 5.00 (sd 1.31) | met |
+| 3 | invalid decisions | 3 of 179 (1.7%) | met |
+| 3 | cloud choices that took the scorecard's top goal | 100 of 162 (62%) | reported |
+
+The cloud brain tidied 5.00 toys with needs alone, close to its 5.38 with
+an explicit task in E-013. One cloud run (seed 20) lost 13 decisions to
+replies with no tool call. All of them came after a fall, and in 10 of the
+13 the scorecard's top goal was rest.
+
+**Round 1 analysis.** The local failures were three runs that tidied one
+toy (seeds 23, 25, 28). In each, the duck fell once during its first
+pick or delivery. Two scorecard faults followed from that one fall:
+1. The fall-rate estimate was falls / (trials + 2), so one fall in one
+   trial read as a 33% risk, and every tidy goal stayed negative for the
+   rest of the run.
+2. Rest scored half the safety pressure as relief. But the safety need
+   fades with time whatever the duck does, so resting does nothing for it.
+   The duck rested for most of the run.
+On development seeds a third fault showed: the information-gain term
+rewarded tidying the least certain toys first, which walked further and
+failed more. Removing it from tidy goals gave +0.56 toys on seeds 0 to 15
+(CI +0.09 to +1.04, p = 0.03).
+
+**Changes** (commit `da7ce7a`):
+- The fall rate has a prior from the base rate: 0.025 per trial, worth
+  10 trials.
+- R is the expected rise in the safety need, and it is weighed by
+  (1 + safety). A fall makes the duck cautious and does not make it rest.
+- Tidy goals carry no information-gain term.
+- Missing-tool-call errors now record the model's stop reason.
+Development seeds, needs mode: 5.31 toys against 5.62 for the task policy.
+
+**Round 2 predictions, written before running.** The round 1 held-out
+seeds informed these fixes, so round 2 uses fresh seeds: 32 to 47 local,
+32 to 39 cloud. The predictions are the same as round 1.
+
+**Round 2 result** (commit `da7ce7a`).
+
+| Prediction | Measure | Result | Verdict |
+|---|---|---|---|
+| 1 | toys in basket, needs mode | 5.25 (sd 0.58, min 4) | met |
+| 1 | gap to task-driven policy (5.25) | 0.00 (CI −0.48 to +0.48) | met |
+| 2 | rest + explore + look share, tidy room | 98% (min 95%) | met |
+| 2 | toys taken out of the basket | 0 in 16 runs | met |
+| 2 | falls per run, tidy room | 0.50 | met, at the limit |
+| 3 | toys in basket, cloud needs mode | 5.38 (sd 0.52, min 5) | met |
+| 3 | invalid decisions | 7 of 184 (3.8%) | met |
+| 3 | cloud choices that took the scorecard's top goal | 124 of 172 (72%) | reported |
+
+Falls per run in the messy room were 0.06 with needs and 0.06 with the
+task. Cloud runs used 65k tokens each.
+
+**Round 2 analysis.** With no task, the duck tidies as many toys as when
+it is told to tidy, and in a tidy room it spends 98% of its time resting,
+looking around or exploring. H-003 is supported. All 8 tidy-room falls
+happened during picks, and in that room every toy is in the basket, so
+each pick approaches the rim. In the two picks traced on development
+seeds (2 and 5), the basket estimate was 0.2 m off with a sigma of
+0.03 m, so a toy at the rim looked clearly outside. That is the same
+overconfident far-range basket estimate seen in E-008 and E-013. The
+rejected cloud decisions were picks of toys that had already failed 3
+times (seeds 37 and 38).
+
+Those picks served no candidate goal because the duck gives up on a toy
+after 3 failures. The cloud brain's other fallbacks were 5 replies that hit the 400-token cap before calling a
+tool. Two changes followed, both after the round 2 runs and not yet
+measured on the cloud: in needs mode the tools offered are only those, and
+only with the arguments, that serve some candidate goal; and the token cap
+is 1024. Local behaviour is identical (16 dev seeds, same toys and
+decisions).
+
+**Decision.** Milestone 3 is met. Keep the needs and scorecard design.
+Next: the far-range basket estimate (H-011, and the tidy-room rim picks),
+and a cloud rerun to measure the two fixes (done below).
+
+**Review** (critic pass over `53d870f..29a3cc1`, fixes in `f95a6cc`).
+Findings checked against the code and data, and fixed:
+- *Agreement was mis-measured.* It counted local fallbacks, which agree
+  with the scorecard by construction. Cloud choices alone: 62% in round 1
+  and 72% in round 2, against the 65% and 74% first reported. The tables
+  above are corrected. Rows now report `cloud_decisions`,
+  `cloud_agrees_with_scorecard`, and `cloud_goal_corrected` (a named goal
+  that the action does not serve).
+- *Falls did not count toward giving up.* E-013 said they did, but the
+  skill's action event closed as `interrupted`. A fall now ends the event
+  as failed.
+- *Speculation timing was optimistic.* An answer counted as ready from the
+  start of the decision it follows, not from when that decision's answer
+  arrived. Speculation also ignored the token budget, and it reused answers
+  after a fall whenever the expected effect was `true`. All three are
+  fixed. The bias favoured speculation, so E-013's refutation of H-010
+  stands; the −0.25 toy difference is not exact. Speculation is now refused
+  in needs mode, where it could only offer the goals of the state before
+  the action.
+- *Invented detection rates.* The tables ended at points that were never
+  measured (toys 0.0 at 2.5 m, basket 0.5 at 3 m), so far sightings of toys
+  lowered confidence. The last measured bin now holds beyond the table, and
+  a sighting never lowers confidence.
+- *Deliver's effect was judged leniently.* The uncertainty-aware `inside`
+  accepted a released toy up to 0.13 m past the rim. Deliver's expected
+  effect now uses the best estimates (`inside(held, basket, 0.03, 0)`);
+  the lenient test stays where it prevents untidying.
+- Minor: the briefing now says tidiness runs to 2; tidy goals require
+  `known()`, as tool arguments do; `--room tidy` rejects more than 6 toys;
+  an unreadable memory file is an error, not a crash.
+Not fixed: with real latency, the time spent waiting for the cloud counts
+as the next skill's time in `timeIn` and in the needs. All E-014 runs used
+frozen latency.
+
+**After the review** (commit `f95a6cc`, seeds 32 to 47 again):
+needs mode 5.25 toys, task 5.19 (difference +0.06, CI −0.47 to +0.59);
+tidy room 98% resting or exploring, no toy taken out, 0.44 falls per run.
+Cloud brain, seeds 32 to 39: 5.12 toys (against 5.38 before; −0.25, CI
+−0.84 to +0.34), no fallbacks, no invalid choices, and 0 mislabelled goals
+in 189 decisions. 127 of 189 (67%) took the scorecard's top goal. Tokens
+were 61k a run, against 65k.
+
+### E-013 · 2026-11-03 · Hardening before Milestone 3 (pre-registered)
+
+**Diagnosis, on development seeds.** Failed pick decisions (H-012) were not
+moved toys: in 24 traced failures on seeds 16 to 19, no target had moved
+more than 5 cm. In 14 the toy was detected and attributed to the target,
+and in 9 it was attributed to a duplicate entity; the target lost
+confidence anyway. The cause is the confidence rule: a fixed decay per
+"miss", while the detector's true rate falls with range (measured with
+`scripts/detection_rate_probe.py`: toys 0.97 within 0.5 m, 0.61 at 0.9 m,
+0.33 at 1.4 m, 0.11 at 1.9 m; the basket 0.96 at every range). Phantom
+baskets (H-013) took sightings from the real basket because association
+ranked by Mahalanobis distance, which favours the vaguest candidate. Falls
+(H-011) cluster on a few seeds where the duck re-attempts a toy after
+falling.
+
+**Changes.** Existence confidence is a Bayesian log-odds update using the
+measured detection rate at the object's range; association ranks pairs by
+likelihood (Mahalanobis distance plus log-determinant) and models moving
+sightings with a second, wide error component; an entity a sighting fell
+inside the gate of is never counted as missed; a fall ends the running
+skill as failed (meant to count toward giving up; the review after E-014
+found it did not, now fixed); skill records persist in
+a memory directory across episodes; and the mind can speculatively ask
+for its next decision when a skill starts (H-010).
+
+**Predictions, written before the held-out runs.**
+1. Local policy, seeds 16 to 31, against `965ce8c` (E-011): failed pick
+   decisions fall from 48% to under 30%; toy ids per run do not rise above
+   25; runs ending with one confident basket rise from 11 to at least 13
+   of 16; toys in basket do not drop (CI lower end above -0.4).
+2. Cloud brain with real latency, seeds 16 to 23: with speculation the duck
+   tidies at least as many toys as without (mean difference at least
+   +0.3), at most 1.6 times the tokens.
+
+**Method.** Prediction 1: `birdbrain-run --seeds 16 --seed0 16 --seconds
+300 --jobs 8` at `32e15e4`, paired against
+`experiments/E-011-review-fixes/after_965ce8c.jsonl`. Prediction 2:
+`--provider bedrock --latency real --seeds 8 --seed0 16`, with and without
+`--speculate`. Rows in `experiments/E-013-hardening/`.
+
+**Result.**
+
+| Prediction | Measure | Before | After | Verdict |
+|---|---|---|---|---|
+| 1 | failed pick decisions | 48% | 36% (p = 0.025) | missed (< 30%) |
+| 1 | toy ids per run | 16.7 | 13.6 | met |
+| 1 | runs with one confident basket | 11 of 16 | 14 of 16 | met |
+| 1 | toys in basket | 5.31 | 5.56 (+0.25, CI -0.28 to +0.78) | met |
+| 2 | toys in basket, cloud real latency | 5.38 | 5.12 with speculation (-0.25, CI -0.84 to +0.34) | missed |
+| 2 | tokens per run | 37.4k | 50.5k (1.35x) | met |
+
+The far-range basket error p90 fell from 0.43 m to 0.28 m. Against the lab
+tidy brain on the same held-out seeds BirdBrain is now +0.38 toys (CI
+-0.01 to +0.76, p = 0.11), and falls are 0.50 per run against 0.38
+(p = 0.81). Speculation answers were used 114 times of 146 (78%), but the
+duck made only one more decision per run (18.2 against 17.2).
+
+**Analysis.** The Bayesian existence rule removed a quarter of the failed
+picks and most phantom baskets; the remaining failures are not yet
+explained, so the H-012 diagnosis was right in direction and incomplete.
+Speculation works mechanically and buys nothing measurable: with skills
+lasting 12 to 25 s and cloud calls about 2 s, the time saved is about 10%
+of a run, spent on one extra decision that does not change how many toys
+end up tidied in 300 s. L-008's 15% idle share is real, but it was not the
+limit on this task. The review after E-014 found that the speculation
+model credited answers too early, a bias in speculation's favour, so the
+refutation holds. Caveat: the cloud runs started while Milestone 3 code
+was being edited in the same tree; `--needs` was off, so the task path is
+the one measured, but the build is not a clean commit.
+
+**Decision.** Keep the existence model, likelihood association and fall
+handling (all on by default). Keep `--speculate` as an opt-in flag, off by
+default, because it costs 35% more tokens for no measured gain; revisit on
+hardware, where calls are slower and skills shorter. H-010 is refuted for
+the playroom task at 300 s.
 
 ### E-011 · 2026-11-03 · Review fixes and perception identity (pre-registered)
 

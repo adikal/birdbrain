@@ -1,0 +1,47 @@
+{
+  "doc": "Put the held toy down where you stand.",
+  "params": {},
+  "budget": 15,
+  "expect": "not holding(self)",
+  "body": [
+    {
+      "call": "require",
+      "args": {
+        "condition": "holding(self)"
+      }
+    },
+    {
+      "call": "stand",
+      "args": {
+        "seconds": 0.5
+      }
+    },
+    {
+      "call": "beak",
+      "args": {
+        "state": "open"
+      }
+    },
+    {
+      "call": "stand",
+      "args": {
+        "seconds": 0.5
+      }
+    },
+    {
+      "call": "turn",
+      "args": {
+        "angle": 2.6
+      }
+    },
+    {
+      "call": "move",
+      "args": {
+        "vx": 0.3,
+        "vy": 0.0,
+        "wz": 0.0,
+        "seconds": 1.0
+      }
+    }
+  ]
+}

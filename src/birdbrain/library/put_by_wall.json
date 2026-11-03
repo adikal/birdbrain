@@ -1,0 +1,67 @@
+{
+  "doc": "Carry the held toy to the nearest wall (away from the basket) and put it down there.",
+  "params": {},
+  "budget": 60,
+  "expect": "near_wall(held)",
+  "body": [
+    {
+      "call": "require",
+      "args": {
+        "condition": "holding(self)"
+      }
+    },
+    {
+      "bind": "w",
+      "to": "wall_spot(self)"
+    },
+    {
+      "call": "require",
+      "args": {
+        "condition": "w is not none"
+      }
+    },
+    {
+      "call": "walk_toward",
+      "args": {
+        "x": "w",
+        "stop_at": 0.05,
+        "look": "'level'",
+        "avoid": "basket"
+      },
+      "timeout": 40
+    },
+    {
+      "call": "stand",
+      "args": {
+        "seconds": 0.8
+      }
+    },
+    {
+      "call": "beak",
+      "args": {
+        "state": "open"
+      }
+    },
+    {
+      "call": "stand",
+      "args": {
+        "seconds": 0.5
+      }
+    },
+    {
+      "call": "turn",
+      "args": {
+        "angle": 2.6
+      }
+    },
+    {
+      "call": "move",
+      "args": {
+        "vx": 0.3,
+        "vy": 0.0,
+        "wz": 0.0,
+        "seconds": 1.5
+      }
+    }
+  ]
+}

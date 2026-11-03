@@ -60,6 +60,8 @@ class Observation:
     bumped: bool                            # touching something (IMU and servo loads on the robot)
     frame: Frame | None = None
     range_frame: RangeFrame | None = None
+    heard: tuple[str, ...] = ()             # utterances heard this tick (keyword spotter on the robot)
+    petted: bool = False                    # head being scratched (pet-detect on the robot)
 
 
 @dataclass(frozen=True, slots=True)

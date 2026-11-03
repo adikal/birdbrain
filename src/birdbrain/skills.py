@@ -1,4 +1,4 @@
-"""Actions: primitives and compound skills (docs/design.md section 6).
+"""Actions: primitives and compound skills (docs/design.md section 3.5).
 
 Every skill, primitive or compound, runs as a generator: each control tick
 it yields one `Command` and it finally returns an `Outcome`. The driver
@@ -251,15 +251,23 @@ def walk_toward(ctx: Context, x: str, stop_at: float = 0.1, speed: float = 0.30,
                       note=f"walk to {x} ({dist:.2f} m)")
 
 
-@primitive({"seconds": "number"}, "Wander, turning away from obstacles.", budget=60.0)
-def wander(ctx: Context, seconds: float) -> SkillRun:
+@primitive({"seconds": "number", "avoid": "entity", "avoid_r": "number"},
+           "Wander, turning away from obstacles sensed ahead and from a known one.",
+           budget=60.0, avoid=None, avoid_r=0.45)
+def wander(ctx: Context, seconds: float, avoid: str | None = None, avoid_r: float = 0.45) -> SkillRun:
+    """`avoid`: a known obstacle the range sensor may see too late (a low basket rim);
+    the duck turns away while it is within `avoid_r` and ahead."""
     t0 = ctx.t
     while ctx.t - t0 < seconds:
         if ctx.clearance() < 0.4:
             yield ctx.turn_command(+1.0, "wander: turn away")
-        else:
-            yield Command(twist=(ctx.body.walk_speed, 0.0, 0.0), head=ctx.body.head_level,
-                          note="wander")
+            continue
+        if avoid is not None and ctx.kb.position(avoid) is not None and ctx.kb.position(SELF) is not None:
+            b = bearing(ctx.kb, ctx.t, avoid)
+            if abs(b) < math.pi / 2 and ctx.kb.position(SELF).distance(ctx.kb.position(avoid)) < avoid_r:
+                yield ctx.turn_command(-b or 1.0, f"wander: turn away from {avoid}")
+                continue
+        yield Command(twist=(ctx.body.walk_speed, 0.0, 0.0), head=ctx.body.head_level, note="wander")
     return Outcome(DONE)
 
 
@@ -360,6 +368,11 @@ def check_program(body: list[Any], bound: set[str], library: Library | None = No
             known_names.add(step["bind"])
 
 
+class Abort(Exception):
+    """Thrown into a running skill to end it as failed, for example by a fall: the
+    action event records the failure, so it counts toward giving up (ledger E-013)."""
+
+
 def start(ctx: Context, library: Library, name: str, args: Mapping[str, Any],
           depth: int = 0, path: str = "") -> SkillRun:
     """Run skill `name` with resolved `args` within its time budget."""
@@ -381,6 +394,9 @@ def start(ctx: Context, library: Library, name: str, args: Mapping[str, Any],
     outcome = Outcome(INTERRUPTED, "stopped by its caller", here)
     try:
         outcome = yield from limit(ctx, child, skill.budget, here)
+    except Abort as abort:
+        outcome = Outcome(FAILED, str(abort), here)
+        raise
     finally:
         ctx.kb.end(event, ctx.t, outcome=outcome.status, reason=outcome.reason)
     return outcome

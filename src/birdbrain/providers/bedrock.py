@@ -23,6 +23,7 @@ DEFAULT_MODEL = "us.anthropic.claude-sonnet-5-5"
 DEFAULT_REGION = "us-west-2"
 
 SYSTEM = """You are the mind of BirdBrain, a small duck robot (25 cm tall) living in a room.
+Read the goal statement at the top of each briefing: it says whether you have a task.
 You act only by calling exactly one of the tools you are given; each tool is a skill the duck
 already knows. Arguments must be ids from the tool's list; never invent objects.
 Your senses are a forward camera that reports object classes and a short-range depth sensor.
@@ -36,7 +37,7 @@ class BedrockProvider:
     name = "bedrock"
 
     def __init__(self, *, model: str = DEFAULT_MODEL, region: str = DEFAULT_REGION,
-                 client: Any = None, max_tokens: int = 400, read_timeout: float = 30.0) -> None:
+                 client: Any = None, max_tokens: int = 1024, read_timeout: float = 30.0) -> None:
         # Sonnet 5.5 on Bedrock accepts neither a forced tool choice nor `temperature`
         # (ledger E-009), so the tool call is requested with toolChoice "auto" and
         # a reply without one is a provider error that falls back.
@@ -60,7 +61,7 @@ class BedrockProvider:
                 modelId=self.model,
                 system=[{"text": SYSTEM}],
                 messages=[{"role": "user", "content": [{"text": request.briefing + "\n\nChoose the next action."}]}],
-                toolConfig={"tools": [tool_spec(t) for t in request.tools], "toolChoice": {"auto": {}}},
+                toolConfig={"tools": [tool_spec(t, request.goals) for t in request.tools], "toolChoice": {"auto": {}}},
                 inferenceConfig={"maxTokens": self.max_tokens},
             )
         except Exception as error:  # noqa: BLE001 - reduced to a category below
@@ -71,18 +72,20 @@ class BedrockProvider:
         call = next((block["toolUse"] for block in response.get("output", {}).get("message", {}).get("content", [])
                      if "toolUse" in block), None)
         if call is None:
-            raise ProviderError("no_tool_call", latency, tokens)
+            raise ProviderError(f"no_tool_call ({response.get('stopReason', 'unknown')})", latency, tokens)
         given = dict(call.get("input") or {})
         p, reason = given.pop("p", None), str(given.pop("reason", ""))[:300]
+        goal = given.pop("goal", None)
         try:
             p = None if p is None else float(p)
         except (TypeError, ValueError):
             raise ProviderError("malformed_p", latency, tokens) from None
         return Choice(skill=str(call.get("name", "")), args=given, reason=reason, p=p,
-                      provider=self.name, model=self.model, latency_s=latency, usage=tokens)
+                      provider=self.name, model=self.model, latency_s=latency, usage=tokens,
+                      goal=None if goal is None else str(goal))
 
 
-def tool_spec(tool: ToolSpec) -> dict[str, Any]:
+def tool_spec(tool: ToolSpec, goals: tuple = ()) -> dict[str, Any]:
     properties: dict[str, Any] = {
         param: {"type": "string", "enum": ids, "description": f"which object ({len(ids)} known)"}
         for param, ids in tool.params.items()
@@ -90,13 +93,16 @@ def tool_spec(tool: ToolSpec) -> dict[str, Any]:
     properties["p"] = {"type": "number", "minimum": 0, "maximum": 1,
                        "description": f"probability that `{tool.expect}` holds when this ends"}
     properties["reason"] = {"type": "string", "description": "one sentence"}
+    served = [g.id for g in goals if any(name == tool.name for name, _ in g.tools)]
+    if served:
+        properties["goal"] = {"type": "string", "enum": served, "description": "the goal this action serves"}
     record = (f" So far: {tool.trials} tries, effect held with estimated probability {tool.p_rule:.2f}."
               if tool.trials else " Not tried yet.")
     return {"toolSpec": {
         "name": tool.name,
         "description": f"{tool.doc} Expected effect: {tool.expect}.{record}",
         "inputSchema": {"json": {"type": "object", "properties": properties,
-                                 "required": [*tool.params, "p", "reason"]}},
+                                 "required": [*tool.params, "p", "reason", *(["goal"] if served else [])]}},
     }}
 
 

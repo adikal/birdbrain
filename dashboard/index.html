@@ -88,6 +88,21 @@
           <div class="table-wrap"><table class="skill-table"><colgroup><col style="width:24%"><col style="width:30%"><col><col><col></colgroup><thead><tr><th>Entity</th><th>x, y (m)</th><th>±</th><th>Conf</th><th>Seen</th></tr></thead><tbody id="belief-rows"></tbody></table></div>
         </section>
 
+        <section class="panel needs-panel" aria-labelledby="needs-title">
+          <div class="panel-heading">
+            <div><p class="eyebrow">What I want</p><h2 id="needs-title">Needs and goals</h2></div>
+            <code id="battery">—</code>
+          </div>
+          <div class="needs-body">
+            <div class="need-bars" id="need-bars"></div>
+            <p class="goal-now" id="goal-now">No needs in this run (it was given a task).</p>
+            <table class="skill-table score-table"><colgroup><col style="width:38%"><col><col><col><col></colgroup>
+              <thead><tr><th>Goal (scorecard)</th><th>U</th><th>dV</th><th>C</th><th>R</th></tr></thead><tbody id="score-rows"></tbody></table>
+            <table class="skill-table score-table" id="owner-table" hidden><colgroup><col style="width:38%"><col><col><col><col></colgroup>
+              <thead><tr><th>After… (her reactions)</th><th>approve</th><th>disapprove</th><th>expected</th><th>tries</th></tr></thead><tbody id="owner-rows"></tbody></table>
+          </div>
+        </section>
+
         <section class="panel events-panel" aria-labelledby="events-title">
           <div class="panel-heading">
             <div><p class="eyebrow">Trace</p><h2 id="events-title">Thought stream</h2></div>

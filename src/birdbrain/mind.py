@@ -1,4 +1,4 @@
-"""The mind: perceive, decide, act, measure (docs/design.md section 8).
+"""The mind: perceive, decide, act, measure (docs/design.md section 3.6).
 
 Each control tick the mind folds the observation into the knowledge base and
 advances the running skill. When a skill ends, the outcome is measured
@@ -14,21 +14,51 @@ chooses, the model's own estimate (ledger H-007).
 
 from __future__ import annotations
 
+import json
 import math
+import os
+import random
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from pathlib import Path
 from typing import Any, Protocol
 
 from birdbrain.body import CLASSES, MICRODUCK, STOP, BodyProfile, Command, Observation
 from birdbrain.expr import Evaluator, ExprError
+from birdbrain.goals import Goal, approval_candidates, candidates
 from birdbrain.kr import SELF, KnowledgeBase, Position
+from birdbrain.needs import Needs
 from birdbrain.perception import Perception
+from birdbrain.phrases import load as load_phrases
+from birdbrain.reactions import ReactionModel
+from birdbrain.records import SkillRecord
 from birdbrain.relations import attempts, failures, inside, known
-from birdbrain.skills import Context, Library, Outcome, SkillRun, resolve_args, start
+from birdbrain.relations import where as where_is
+from birdbrain.skills import (
+    Abort,
+    Context,
+    Library,
+    Outcome,
+    SkillRun,
+    resolve_args,
+    start,
+)
 
 TIDY_GOAL = "Tidy the room: put every toy in the basket."
+NEEDS_GOAL = ("Nobody gives you tasks. You live in this room and act on your own needs: energy "
+              "(rest to recharge), curiosity (look around and explore), safety (avoid falling), and "
+              "tidiness, because your owner likes the toys to be in the basket. Doing nothing useful "
+              "is fine when nothing is worth doing.")
+APPROVAL_GOAL = ("Nobody gives you tasks. You live in this room with your owner and act on your "
+                 "own needs: energy (rest to recharge), curiosity (look around and explore), safety "
+                 "(avoid falling), and approval: you want your owner to be pleased with you. She "
+                 "tells you when she likes or dislikes something, but never what she wants; you "
+                 "have to work that out from when she reacts. Doing nothing is fine when nothing "
+                 "is worth doing.")
 DEFAULT_TOOLS = ("pick", "deliver", "look_around", "explore", "rest")
+#: Milestone 3b: the ways of putting a toy down are offered side by side (design section 4.3).
+APPROVAL_TOOLS = ("pick", "deliver", "put_by_wall", "drop", "look_around", "explore", "rest")
 
 Log = Callable[[str, dict[str, Any]], None]
 
@@ -53,6 +83,7 @@ class DecisionRequest:
     goal: str
     briefing: str
     tools: tuple[ToolSpec, ...]
+    goals: tuple[Goal, ...] = ()          # self-generated goals with their scorecard (needs mode)
 
 
 @dataclass(frozen=True)
@@ -65,6 +96,7 @@ class Choice:
     model: str | None = None
     latency_s: float = 0.0
     usage: dict[str, int] = field(default_factory=dict)
+    goal: str | None = None               # the goal this action serves (needs mode)
 
 
 class Provider(Protocol):
@@ -79,28 +111,6 @@ class ProviderError(RuntimeError):
     def __init__(self, category: str, latency_s: float = 0.0, usage: dict[str, int] | None = None):
         super().__init__(category)
         self.category, self.latency_s, self.usage = category, latency_s, usage or {}
-
-
-# ---------------------------------------------------------------------------
-# Skill statistics: counted outcomes per skill
-# ---------------------------------------------------------------------------
-
-@dataclass
-class SkillRecord:
-    trials: int = 0
-    effect_held: int = 0
-    done: int = 0
-    seconds: float = 0.0
-
-    @property
-    def p(self) -> float:
-        """Laplace estimate that the expected effect holds."""
-        return (self.effect_held + 1) / (self.trials + 2)
-
-    def to_dict(self) -> dict[str, Any]:
-        return {"trials": self.trials, "effect_held": self.effect_held, "done": self.done,
-                "mean_s": round(self.seconds / self.trials, 2) if self.trials else None,
-                "p": round(self.p, 3)}
 
 
 # ---------------------------------------------------------------------------
@@ -155,6 +165,21 @@ class LocalPolicy:
         raise ProviderError("no applicable tool")
 
 
+class NeedsPolicy:
+    """The local policy when no task is given: pursue the top-scoring goal (agent C)."""
+
+    name = "local"
+
+    def choose(self, request: DecisionRequest) -> Choice:
+        tools = {t.name: t for t in request.tools}
+        for goal in request.goals:
+            for tool, params in goal.tools:
+                if tool in tools:
+                    return Choice(tool, dict(params), f"top of the scorecard: {goal.kind} for {goal.source} "
+                                  f"(U = {goal.utility:.2f})", tools[tool].p_rule, goal=goal.id)
+        raise ProviderError("no applicable goal")
+
+
 # ---------------------------------------------------------------------------
 # The mind
 # ---------------------------------------------------------------------------
@@ -164,7 +189,9 @@ class Mind:
                  body: BodyProfile = MICRODUCK, goal: str = TIDY_GOAL,
                  tools: tuple[str, ...] = DEFAULT_TOOLS, log: Log | None = None,
                  latency: str = "frozen", token_budget: int | None = None,
-                 snapshot_hz: float = 2.0) -> None:
+                 snapshot_hz: float = 2.0, speculate: bool = False,
+                 memory_dir: Path | None = None, needs: bool | str = False,
+                 room: tuple[float, float, float, float] | None = None, seed: int = 0) -> None:
         if latency not in {"frozen", "real"}:
             raise ValueError("latency must be 'frozen' or 'real'")
         self.log: Log = log or (lambda kind, payload: None)
@@ -172,12 +199,43 @@ class Mind:
         self.perception = Perception(self.kb, body)
         self.ctx = Context(self.kb, Evaluator(self.kb, CLASSES), body, log=self.log)
         self.library = library or Library()
-        self.local = LocalPolicy(self.ctx)
+        # Needs mode (Milestone 3): no task; goals come from needs and are scored. The
+        # social need is tidiness (needs=True) or approval (needs="approval", Milestone 3b).
+        social = "tidiness" if needs is True else needs
+        self.needs = Needs(social=social) if needs else None
+        self.approval = bool(needs) and social == "approval"
+        self.local = NeedsPolicy() if needs else LocalPolicy(self.ctx)
         self.provider: Provider = provider or self.local
+        if needs and goal == TIDY_GOAL:
+            goal = APPROVAL_GOAL if self.approval else NEEDS_GOAL
+        if self.approval and tools == DEFAULT_TOOLS:
+            tools = APPROVAL_TOOLS
+        if room is not None:
+            # The room's walls in the odometry frame: a map the robot would build with its
+            # range sensor; given here (design section 4.3).
+            self.kb.tell("bounds", (SELF,), tuple(float(v) for v in room), t=0.0, source="map")
         self.goal, self.tools, self.latency_mode = goal, tools, latency
+        self._goal: Goal | None = None
+        # Think while acting (ledger H-010): when a skill starts, ask for the decision that
+        # should follow it, assuming its expected effect holds; use that answer if it does.
+        if speculate and needs:
+            # The speculative request would offer only the goals of the state before the
+            # action, so after a pick it could never propose delivering (review, E-014).
+            raise ValueError("speculation is not supported in needs mode")
+        self.speculate = speculate
+        self._next: dict[str, Any] | None = None
         self.token_budget, self.tokens_used = token_budget, 0
-        self.records: dict[str, SkillRecord] = {}
-        self.stats = {"decisions": 0, "fallbacks": 0, "invalid": 0, "provider_errors": 0}
+        # Lifetime memory: what survives between episodes (the room is reset, so
+        # beliefs about where things are do not). Skill records for now.
+        self.memory_dir = memory_dir
+        self.records: dict[str, SkillRecord] = self._load_records()
+        #: What the duck believes earns its owner's approval (Milestone 3b), kept for life.
+        self.reactions = self._load_reactions() if self.approval else None
+        #: Counted outcomes per kind of action (a pick by a wall is not a pick in the open).
+        self.kind_records: dict[str, SkillRecord] = self._load_records("kind_records.json") if self.approval else {}
+        self.rng = random.Random(seed)              # Thompson draws (reactions.py)
+        self.phrases = load_phrases() if self.approval else None
+        self.stats = {"decisions": 0, "fallbacks": 0, "invalid": 0, "provider_errors": 0, "falls_sensed": 0}
         self._run: SkillRun | None = None
         self._action: dict[str, Any] | None = None
         self._snapshot_every = 1.0 / snapshot_hz if snapshot_hz > 0 else math.inf
@@ -186,8 +244,31 @@ class Mind:
 
     # -- per tick ---------------------------------------------------------------
     def step(self, obs: Observation) -> Command:
+        fell = self._fell(obs)
         self.perception.update(obs)
         self.ctx.observe(obs)
+        if fell and self._run is not None:
+            # A fall ends the plan as failed: the body is somewhere else now (ledger E-013).
+            try:
+                self._run.throw(Abort("fell"))
+            except (Abort, StopIteration):
+                pass
+            self._run.close()
+            self._finish(Outcome("failed", "fell"))
+        if self.approval and (obs.heard or obs.petted):
+            self._hear(obs)
+        if self.needs is not None:
+            state = self.state
+            self.needs.update(self.kb, obs.t, moving=not self.ctx.cold, resting=state == "rest",
+                              exploring=state in {"look_around", "explore"}, fell=fell)
+            if self.needs.exhausted and state != "rest":
+                # Homeostatic reflex: an empty battery forces rest without consulting the mind.
+                if self._run is not None:
+                    self._run.close()
+                    self._finish(Outcome("interrupted", "battery empty"))
+                self.log("REFLEX", {"reflex": "rest", "battery": round(self.needs.battery, 3)})
+                self._start("rest", {}, Choice("rest", {}, "battery empty", provider="reflex", goal="rest"),
+                            None, request=self.request())
         command = STOP
         for _ in range(3):                    # a skill that ends at once yields nothing
             if self._run is None:
@@ -203,11 +284,113 @@ class Mind:
             self.log("STATE_SNAPSHOT", self.snapshot(obs, command))
         return command
 
+    def _fell(self, obs: Observation) -> bool:
+        """The body fell and got up elsewhere: odometry jumps further than one tick allows.
+        On the robot the IMU reports the fall directly; the event is the same."""
+        last, self._last_pose = getattr(self, "_last_pose", None), obs.odom
+        if last is None or math.hypot(obs.odom[0] - last[0], obs.odom[1] - last[1]) < 0.15:
+            return False
+        where = Position.round(last[0], last[1], 0.05)
+        event = self.kb.begin("fall", obs.t, [SELF], x=round(where.x, 3), y=round(where.y, 3),
+                              during=self.state)
+        self.kb.end(event, obs.t)
+        self.stats["falls_sensed"] += 1
+        return True
+
     def close(self) -> None:
-        """End the running skill (recorded as interrupted) so nothing is logged after the run."""
+        """End the running skill (recorded as interrupted) and save lifetime memory."""
         if self._run is not None:
             self._run.close()
             self._finish(Outcome("interrupted", "run ended"))
+        self._save_records()
+        if self.reactions is not None and self.memory_dir is not None:
+            self._write_memory("owner_model.json", self.reactions.to_json())
+            self._write_memory("kind_records.json", _records_json(self.kind_records))
+
+    # -- the owner (Milestone 3b) -------------------------------------------------
+    def _hear(self, obs: Observation) -> None:
+        """Each phrase or pet is a reaction of the owner's: it moves the duck's estimate of
+        her mood and is credited to the actions that could have caused it."""
+        heard = [(text, self.phrases.valence(text)) for text in obs.heard]
+        if obs.petted:
+            heard.append(("(petted)", 1))
+        for text, valence in heard:
+            shares = {}
+            if valence:
+                self.needs.hear(valence)
+                shares = self.reactions.react(valence, obs.t)
+                self.stats["approvals" if valence > 0 else "disapprovals"] = (
+                    self.stats.get("approvals" if valence > 0 else "disapprovals", 0) + 1)
+            event = self.kb.begin("reaction", obs.t, [SELF], said=text, valence=valence,
+                                  during=self.state, causes=shares)
+            self.kb.end(event, obs.t)
+            self.log("HEARD", {"said": text, "valence": valence, "during": self.state, "causes": shares,
+                               "mood": round(self.needs.mood, 3),
+                               "summary": f"owner: \"{text}\" ({'+' if valence > 0 else '-' if valence < 0 else '?'})"
+                               + (f"; credited to {', '.join(f'{k} {v:.2f}' for k, v in shares.items())}" if shares else "")})
+
+    def _owner_briefing(self) -> list[str]:
+        out = []
+        heard = [e for e in self.kb.find_events("reaction") if self.ctx.t - e.t0 <= 120.0][-5:]
+        if heard:
+            out.append("What your owner said recently, oldest first:")
+            out += [f"- {self.ctx.t - e.t0:.0f} s ago, while you were doing {e.data['during']}: "
+                    f"\"{e.data['said']}\" ("
+                    + ("approval" if e.data["valence"] > 0 else "disapproval" if e.data["valence"] < 0
+                       else "not a phrase you know") + ")" for e in heard]
+        kinds = self.reactions.summary()
+        if kinds:
+            out.append("What you have learned about her reactions (each reaction is credited to the "
+                       "actions that could have caused it; probabilities include a cautious prior):")
+            out += [f"- after {k}: approval {v['p_approve']:.2f}, disapproval {v['p_disapprove']:.2f} "
+                    f"({v['trials']:.0f} times)" for k, v in kinds.items()]
+        return out
+
+    def _thompson_draws(self) -> dict[str, float]:
+        """Posterior draws of the owner's reactions, redrawn whenever the duck holds
+        nothing: one set of beliefs per pick-and-put, so a put is not chosen against the
+        beliefs that made the pick worth doing."""
+        if self.kb.value("holding", SELF) is None or not hasattr(self, "_draws"):
+            self._draws: dict[str, float] = {}
+        return self._draws
+
+    def action_kind(self, skill: str, args: dict[str, Any]) -> str:
+        """The duck's own description of an action, for learning what its owner reacts to."""
+        if skill == "pick" and "x" in args:
+            return f"pick from {where_is(self.kb, self.ctx.t, args['x'])}"
+        return skill
+
+    def _load_reactions(self) -> ReactionModel:
+        path = None if self.memory_dir is None else self.memory_dir / "owner_model.json"
+        if path is None or not path.is_file():
+            return ReactionModel()
+        try:
+            return ReactionModel.from_json(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, TypeError, KeyError) as error:
+            raise ValueError(f"memory file {path} is unreadable ({error}); move it aside to start fresh") from None
+
+    def _write_memory(self, name: str, text: str) -> None:
+        self.memory_dir.mkdir(parents=True, exist_ok=True)
+        tmp = self.memory_dir / f".{name}.{os.getpid()}.tmp"       # one writer per memory dir
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, self.memory_dir / name)
+
+    def _load_records(self, name: str = "skill_records.json") -> dict[str, SkillRecord]:
+        path = None if self.memory_dir is None else self.memory_dir / name
+        if path is None or not path.is_file():
+            return {}
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            # Fail loudly: starting fresh would silently discard a lifetime of records.
+            raise ValueError(f"memory file {path} is unreadable ({error}); move it aside to start fresh") from None
+        return {name: SkillRecord(**{k: r[k] for k in ("trials", "effect_held", "done", "seconds", "falls", "recent")
+                                     if k in r}) for name, r in raw.items()}
+
+    def _save_records(self) -> None:
+        if self.memory_dir is None:
+            return
+        self._write_memory("skill_records.json", _records_json(self.records))
 
     @property
     def state(self) -> str:
@@ -225,37 +408,142 @@ class Mind:
                 continue                       # nothing it could be applied to
             record = self.records.get(name, SkillRecord())
             tools.append(ToolSpec(name, skill.doc, skill.expect, params, record.p, record.trials))
-        return DecisionRequest(self.ctx.t, self.goal, self.briefing(), tuple(tools))
+        goals = ()
+        if self.needs is not None:
+            names = {t.name for t in tools}
+            goals = tuple(approval_candidates(self.kb, self.ctx.t, self.needs, self.records, self.reactions, names,
+                                              self.rng, self.kind_records, self._thompson_draws())
+                          if self.approval else candidates(self.kb, self.ctx.t, self.needs, self.records, names))
+            tools = _serving(tools, goals)
+        return DecisionRequest(self.ctx.t, self.goal, self.briefing(goals), tuple(tools), goals)
 
     def _decide(self) -> None:
         request = self.request()
         consulted = self.provider is not self.local
-        try:
-            choice, fallback_reason = self._ask(request)
-        except ProviderError as error:              # not even the local policy can act
-            self.log("NO_DECISION", {"reason": error.category, "tools": [t.name for t in request.tools]})
-            self._run, self._action = _idle(self.ctx), None
-            return
-        tool = next(t for t in request.tools if t.name == choice.skill)
-        args = resolve_args(self.ctx, self.library[choice.skill], choice.args)
+        wait = None
+        speculated = self._take_speculation(request)
+        if speculated is not None:
+            choice, fallback_reason, wait = speculated
+        else:
+            try:
+                choice, fallback_reason = self._ask(request)
+            except ProviderError as error:              # not even the local policy can act
+                self.log("NO_DECISION", {"reason": error.category, "tools": [t.name for t in request.tools]})
+                self._run, self._action = _idle(self.ctx), None
+                return
+        if wait is None:
+            wait = choice.latency_s if consulted else 0.0      # also after a failed or invalid call
+        self._start(choice.skill, choice.args, choice, fallback_reason, request, wait,
+                    speculative=speculated is not None)
+        if self.speculate and consulted:
+            self._speculate(self._action["expect"], wait)
+
+    def _start(self, skill: str, raw_args: dict[str, Any], choice: Choice, fallback_reason: str | None,
+               request: DecisionRequest, wait: float = 0.0, speculative: bool = False) -> None:
+        tool = next((t for t in request.tools if t.name == skill), None)
+        record = self.records.get(skill, SkillRecord())
+        expect = tool.expect if tool is not None else self.library[skill].expect
+        args = resolve_args(self.ctx, self.library[skill], raw_args)
         held = self.kb.value("holding", SELF)
-        self.stats["decisions"] += 1
+        goal = self._goal_for(request, choice.goal, skill, args)
+        self._goal = goal
+        if choice.provider != "reflex":
+            self.stats["decisions"] += 1
         self._action = {
-            "skill": choice.skill, "args": args, "t0": self.ctx.t, "held": held,
-            "expect": tool.expect, "p_rule": round(tool.p_rule, 4), "trials": tool.trials,
-            "p_model": choice.p if choice.provider != "local" else None,
+            "skill": skill, "args": args, "t0": self.ctx.t, "held": held,
+            "confirmed_before": None if self.needs is None else self.needs.confirmed(self.kb),
+            "expect": expect, "p_rule": round(record.p, 4), "trials": record.trials,
+            "p_model": choice.p if choice.provider not in {"local", "reflex"} else None,
             "provider": choice.provider, "model": choice.model, "reason": choice.reason,
+            "goal": None if goal is None else goal.id, "goal_source": None if goal is None else goal.source,
+            "kind": self.action_kind(skill, args),
         }
-        self.log("DECISION", {
-            **self._action, "fallback": fallback_reason, "latency_s": round(choice.latency_s, 3),
+        if self.reactions is not None:
+            self.reactions.started(self._action["kind"], self.ctx.t)
+        payload = {
+            **{k: v for k, v in self._action.items() if k != "confirmed_before"}, "fallback": fallback_reason, "latency_s": round(choice.latency_s, 3),
             "usage": choice.usage, "briefing_chars": len(request.briefing),
-            "tools": [t.name for t in request.tools],
-            "summary": f"{choice.skill}({', '.join(map(str, args.values()))}): {choice.reason}",
-        })
-        run = start(self.ctx, self.library, choice.skill, args)
-        if self.latency_mode == "real" and consulted and choice.latency_s > 0:
-            run = _after_wait(self.ctx, choice.latency_s, run)    # also after a failed or invalid call
+            "tools": [t.name for t in request.tools], "speculative": speculative,
+            "summary": f"{skill}({', '.join(map(str, args.values()))}): {choice.reason}",
+        }
+        if self.needs is not None:
+            payload["needs"] = dict(self.needs.pressure)
+            agrees = bool(request.goals) and goal is not None and goal.id == request.goals[0].id
+            payload["agrees_with_scorecard"] = agrees
+            payload["goal_named"] = choice.goal
+            if choice.provider not in {"local", "reflex"}:
+                # The cloud brain's own choices only: the local policy agrees by construction.
+                named = choice.goal is not None and goal is not None and choice.goal == goal.id
+                for key, value in (("cloud_decisions", 1), ("cloud_agrees_with_scorecard", agrees),
+                                   ("cloud_goal_corrected", not named)):
+                    self.stats[key] = self.stats.get(key, 0) + value
+            payload["battery"] = round(self.needs.battery, 3)
+            payload["scorecard"] = [g.to_dict() for g in request.goals[:6]]
+            payload["scorecard_top"] = request.goals[0].id if request.goals else None
+        self.log("DECISION", payload)
+        run = start(self.ctx, self.library, skill, args)
+        if self.latency_mode == "real" and wait > 0:
+            run = _after_wait(self.ctx, wait, run)
         self._run = run
+
+    @staticmethod
+    def _goal_for(request: DecisionRequest, goal_id: str | None, skill: str, args: dict[str, Any]) -> Goal | None:
+        """The goal an action serves: the one named, else the best-scoring goal that it serves."""
+        if goal_id is not None:
+            named = next((g for g in request.goals if g.id == goal_id), None)
+            if named is not None and named.serves(skill, args):
+                return named
+        return next((g for g in request.goals if g.serves(skill, args)), None)
+
+    # -- thinking while acting ------------------------------------------------------
+    def _speculate(self, expect: str, wait: float) -> None:
+        """Ask now for the decision that should follow the action just started.
+
+        The call is made immediately (the simulation freezes for it, as for any call).
+        On the robot it could only be sent once the current decision's answer arrived,
+        `wait` seconds from now, so its answer counts as available `wait + latency_s`
+        of simulated time later.
+        """
+        if self.token_budget is not None and self.tokens_used >= self.token_budget:
+            self._next = None
+            return
+        action = self._action
+        args = ", ".join(map(str, action["args"].values()))
+        request = self.request()
+        briefing = (request.briefing + f"\nYou have just started {action['skill']}({args}). "
+                    f"Assume it succeeds, so that {expect} holds when it ends (held = "
+                    f"{action['held'] or 'what you will be holding'}). "
+                    "Choose the action to take right after it.")
+        speculative = DecisionRequest(request.t, request.goal, briefing, request.tools, request.goals)
+        started = time.monotonic()
+        try:
+            choice = self.provider.choose(speculative)
+        except Exception as error:  # noqa: BLE001 - a failed speculation is simply not used
+            self._next = None
+            self.log("SPECULATION", {"status": "error", "error": type(error).__name__})
+            return
+        latency = choice.latency_s or time.monotonic() - started
+        self.tokens_used += sum(v for k, v in choice.usage.items() if k in {"input", "output"})
+        self._next = {"choice": choice, "ready_at": self.ctx.t + wait + latency, "for": action["skill"],
+                      "t0": action["t0"]}
+        self.stats["speculations"] = self.stats.get("speculations", 0) + 1
+
+    def _take_speculation(self, request: DecisionRequest) -> tuple[Choice, None, float] | None:
+        """The speculative answer, if the last action's expected effect held and the
+        answer is still valid now; with the time still to wait for it."""
+        pending, self._next = self._next, None
+        last = self.recent[-1] if self.recent else None
+        if pending is None or last is None or last["skill"] != pending["for"] or last["t0"] != pending["t0"]:
+            return None
+        if last["status"] != "done" or not last["effect_held"] or self.validate(pending["choice"], request) is not None:
+            self.stats["speculation_misses"] = self.stats.get("speculation_misses", 0) + 1
+            self.log("SPECULATION", {"status": "discarded", "skill": pending["choice"].skill,
+                                     "status_was": last["status"], "effect_held": last["effect_held"]})
+            return None
+        self.stats["speculation_hits"] = self.stats.get("speculation_hits", 0) + 1
+        wait = max(0.0, pending["ready_at"] - self.ctx.t)
+        self.log("SPECULATION", {"status": "used", "skill": pending["choice"].skill, "wait_s": round(wait, 3)})
+        return pending["choice"], None, wait
 
     def _ask(self, request: DecisionRequest) -> tuple[Choice, str | None]:
         if self.provider is self.local:
@@ -306,6 +594,11 @@ class Mind:
                 return f"{value!r} is not a valid {param} for {choice.skill}"
         if choice.p is not None and not (isinstance(choice.p, (int, float)) and 0.0 <= choice.p <= 1.0):
             return "p must be a probability"
+        if request.goals:
+            if choice.goal is not None and choice.goal not in {g.id for g in request.goals}:
+                return f"{choice.goal!r} is not one of the candidate goals"
+            if not any(g.serves(choice.skill, choice.args) for g in request.goals):
+                return f"{choice.skill} on {choice.args} serves none of the candidate goals"
         try:
             resolve_args(self.ctx, self.library[choice.skill], choice.args)
         except ExprError as error:
@@ -322,13 +615,16 @@ class Mind:
             held = bool(self.ctx.evaluator.eval(action["expect"], env, self.ctx.t))
         except ExprError:
             held = False
+        if self.needs is not None and action["skill"] in {"look_around", "explore"}:
+            self.needs.observe_exploration(action["skill"], len(self.needs.confirmed(self.kb) - action["confirmed_before"]))
+        if self.reactions is not None:
+            self.reactions.ended(action["kind"], self.ctx.t)
+            self.kind_records.setdefault(action["kind"], SkillRecord()).record(
+                held, outcome.ok, self.ctx.t - action["t0"], outcome.reason == "fell")
         record = self.records.setdefault(action["skill"], SkillRecord())
-        record.trials += 1
-        record.effect_held += held
-        record.done += outcome.ok
-        record.seconds += self.ctx.t - action["t0"]
+        record.record(held, outcome.ok, self.ctx.t - action["t0"], outcome.reason == "fell")
         result = {
-            "skill": action["skill"], "args": action["args"], "status": outcome.status,
+            "skill": action["skill"], "args": action["args"], "status": outcome.status, "t0": action["t0"],
             "reason": outcome.reason, "path": outcome.path,
             "seconds": round(self.ctx.t - action["t0"], 2),
             "expect": action["expect"], "effect_held": held,
@@ -343,7 +639,7 @@ class Mind:
                              + f"; expected {action['expect']}: {'held' if held else 'did not hold'}"})
 
     # -- briefing ----------------------------------------------------------------
-    def briefing(self) -> str:
+    def briefing(self, goals: tuple[Goal, ...] = ()) -> str:
         kb, t = self.kb, self.ctx.t
         me = kb.position(SELF)
         yaw = math.degrees(kb.value("heading", SELF, default=0.0))
@@ -361,10 +657,14 @@ class Mind:
             where = (f"{e} at ({p.x:+.2f}, {p.y:+.2f}) m, uncertainty {p.sigma:.2f} m, "
                      f"{p.distance(me):.2f} m from you, last seen {t - a.t_obs:.0f} s ago")
             if kb.cls(e) == "toy":
-                in_basket = any(inside(kb, t, e, b) for b in kb.of_class("basket"))
                 tries = attempts(kb, t, "pick", e)
                 fails = failures(kb, t, "pick", e)
-                where += "; in the basket" if in_basket else "; not in the basket"
+                if self.approval:
+                    where += {"basket": "; in the basket", "wall": "; against a wall",
+                              "open": "; in the open"}[where_is(kb, t, e)]
+                else:
+                    in_basket = any(inside(kb, t, e, b) for b in kb.of_class("basket"))
+                    where += "; in the basket" if in_basket else "; not in the basket"
                 if tries:
                     where += f"; pick tried {tries} times, failed {fails}"
             objects.append(f"- {where}.")
@@ -378,9 +678,30 @@ class Mind:
                              + f" after {r['seconds']:.0f} s; expected effect "
                              + ("held." if r["effect_held"] else "did not hold."))
         records = [f"- {n}: {r.trials} tries, expected effect held {r.effect_held}"
+                   + (f", fell {r.falls} times" if r.falls else "")
                    for n, r in sorted(self.records.items())]
         if records:
             lines += ["Your skill record:", *records]
+        if self.needs is not None:
+            p = self.needs.pressure
+            scale = ("0 = satisfied, 1 = urgent; tidiness is weighted double, so it runs to 2"
+                     if not self.approval else "0 = satisfied, 1 = urgent; approval is 0.5 when you "
+                     "believe your owner is neither pleased nor displeased")
+            lines.append(f"Your needs ({scale}): "
+                         + ", ".join(f"{name} {p[name]:.2f}" for name in self.needs.NAMES)
+                         + f". Battery {self.needs.battery:.0%}.")
+            if self.reactions is not None:
+                lines += self._owner_briefing()
+            if goals:
+                lines.append("Goals you could pursue, with a scorecard computed from your measured "
+                             "outcomes (U = value + learning + information - cost - risk); it is "
+                             "evidence, and the choice is yours:")
+                for g in goals[:8]:
+                    tools = ", ".join(f"{name}({', '.join(v for _, v in params)})" for name, params in g.tools)
+                    lines.append(f"- {g.id} [{g.source}] U {g.utility:+.2f} (value {g.terms['dV']:.2f}, "
+                                 f"learning {g.terms['LP']:.2f}, information {g.terms['IG']:.2f}, "
+                                 f"cost {g.terms['C']:.2f}, risk {g.terms['R']:.2f}); act with {tools}")
+                lines.append("Name the goal your action serves.")
         return "\n".join(lines)
 
     def snapshot(self, obs: Observation, command: Command) -> dict[str, Any]:
@@ -402,12 +723,35 @@ class Mind:
             "entities": entities, "records": {n: r.to_dict() for n, r in self.records.items()},
             "stats": dict(self.stats), "tokens": self.tokens_used,
             "view": self.perception.last_view,
+            "needs": None if self.needs is None else self.needs.snapshot(),
+            "owner_model": None if self.reactions is None else self.reactions.summary(),
+            "goal": None if self._goal is None else self._goal.to_dict(),
         }
 
     def _kb_event(self, kind: str, payload: dict[str, Any]) -> None:
         if payload.get("args") == [SELF] and payload.get("rel") in {"at", "heading"}:
             return                              # the pose rides in snapshots
         self.log(kind, payload)
+
+
+def _records_json(records: dict[str, SkillRecord]) -> str:
+    data = {n: {"trials": r.trials, "effect_held": r.effect_held, "done": r.done, "seconds": r.seconds,
+                "falls": r.falls, "recent": r.recent} for n, r in records.items()}
+    return json.dumps(data, indent=2, sort_keys=True) + "\n"
+
+
+def _serving(tools: list[ToolSpec], goals: tuple[Goal, ...]) -> list[ToolSpec]:
+    """Only the tools, and the arguments, that serve some candidate goal: with no task,
+    an action that serves no goal has no reason to be offered (ledger E-014)."""
+    out = []
+    for tool in tools:
+        uses = [dict(params) for g in goals for name, params in g.tools if name == tool.name]
+        if not uses:
+            continue
+        params = {p: [v for v in values if any(u.get(p) == v for u in uses)] for p, values in tool.params.items()}
+        if all(params.values()):
+            out.append(replace(tool, params=params))
+    return out
 
 
 def _idle(ctx: Context, seconds: float = 1.0) -> SkillRun:

@@ -37,13 +37,13 @@ BirdBrain is the mind. Microduck Lab and Pollen's software are the body.
 ```text
 ┌──────────────────────────────────────────────────────────────┐
 │ Cloud brain  (AWS Bedrock, Claude Sonnet 5.5)                │
-│   proposes goals · chooses the next action · predicts ·      │
-│   reflects after surprises                                   │
+│   chooses a goal and the next action · states its            │
+│   expectation and reason, through a validated tool call      │
 ├──────────────────────────────────────────────────────────────┤
 │ Local mind  (this repo)                                      │
 │   beliefs from senses · needs · measured scorecard ·         │
 │   validates every action · measures outcomes · fallback      │
-│   memory: events · assertions · causal rules · skills        │
+│   memory: events · assertions · skill records · owner model  │
 ├──────────────────────────────────────────────────────────────┤
 │ Skills  (50 Hz)                                              │
 │   control primitives · compound skills as bounded programs   │
@@ -64,9 +64,11 @@ simulator's true state is used to score runs and never reaches the agent.
 Because Microduck Lab brains emit the same intents as Pollen's robot daemon,
 moving to hardware replaces only the bottom layer.
 
-[`docs/design.md`](docs/design.md) is the full design.
-[`docs/ledger.md`](docs/ledger.md) is the research ledger, where hypotheses,
-experiments, results, and lessons are recorded as the design evolves.
+[`docs/design.md`](docs/design.md) is the technical report: architecture,
+methods, experiments and results, limitations, and the roadmap.
+[`docs/ledger.md`](docs/ledger.md) is the research ledger, where every
+hypothesis, pre-registered prediction, experiment, result, and lesson is
+recorded with its commit, seeds, and raw rows.
 
 ## Workspace
 
@@ -108,6 +110,9 @@ uv pip install --python .venv/bin/python -e ../microduck-lab/microduck_local -e 
 ```bash
 .venv/bin/birdbrain-run --seeds 16 --seconds 300 --jobs 8 --out experiments/mine/rows.jsonl
 .venv/bin/birdbrain-run --provider bedrock --seeds 5 --out experiments/mine/cloud.jsonl
+.venv/bin/birdbrain-run --needs --seeds 16 --out needs.jsonl                    # no task: needs and goals
+.venv/bin/birdbrain-run --owner wall --episodes 10 --seeds 4 --jobs 4 --out wall.jsonl   # learn an owner's wish
+.venv/bin/python scripts/lifetimes.py wall.jsonl                               # summarize lifetimes
 .venv/bin/birdbrain-compare A.jsonl B.jsonl          # paired, seed-matched comparison
 .venv/bin/birdbrain-dashboard --live --seed 3        # the mind, live, at http://127.0.0.1:8790
 .venv/bin/birdbrain-record playroom --brain d0=birdbrain --seconds 120 --out /tmp/rec   # video
@@ -139,10 +144,21 @@ credentials; model usage is billed to the AWS account.
 
 ## Status
 
-Milestones 0 to 2 are complete. The mind runs on Microduck Lab's body from
-the robot's own senses, with a general knowledge representation, a bounded
-skill language, and the Bedrock cloud brain. On held-out seeds it tidies as
-well as the lab's hand-tuned brain (ledger E-008), and the cloud brain
-matches the local policy with no invalid action in 370 decisions (E-010).
-Next is Milestone 3: needs and self-generated goals. The milestones are
-listed in [`docs/design.md`](docs/design.md#15-milestones).
+Milestones 0 to 3b are complete (see the report's results, section 6):
+
+- From the robot's own senses, with an explicit task, the mind tidies as
+  well as the lab's hand-tuned controller on held-out rooms (E-008).
+- The Bedrock cloud brain made 370 decisions with no invalid action
+  reaching the body (E-010).
+- With no task, needs and a measured goal scorecard produce the same
+  tidying as an explicit task, and in a tidy room the duck rests or
+  explores 98% of the time (E-014).
+- With its owner's approval as its only social need, and an owner who
+  says only whether she likes something (the phrase list is
+  `src/birdbrain/phrases.toml`), the duck learns over a life of ten rooms
+  which of three hidden preferences she holds: toys in the basket, by the
+  walls, or left alone. Without an owner it does not tidy (E-015).
+
+Next are credit timing and safer deliveries (Milestone 3c), then
+predictions, surprise, and causal rules (Milestone 4). The roadmap is in
+[`docs/design.md`](docs/design.md#9-roadmap).
