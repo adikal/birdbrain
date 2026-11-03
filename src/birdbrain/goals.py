@@ -31,6 +31,7 @@ policy takes the top-scoring goal.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -68,8 +69,13 @@ class Goal:
                 "U": round(self.utility, 3), **{k: round(v, 3) for k, v in self.terms.items()}}
 
 
+#: predict(skill, args) -> (probability the expected effect holds, probability of a fall),
+#: from causal rules learned under conditions (Milestone 4, `rules.py`).
+Predict = Callable[[str, dict[str, Any]], tuple[float, float]]
+
+
 def candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
-               tools: set[str], give_up_after: int = 3) -> list[Goal]:
+               tools: set[str], give_up_after: int = 3, predict: Predict | None = None) -> list[Goal]:
     """Every goal the duck could pursue now, scored."""
     pressure = needs.pressure
     _, doubted = needs.beliefs(kb, t)
@@ -89,12 +95,13 @@ def candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
             last = p if p is not None else last
         return path / MICRODUCK.walk_speed / HORIZON_S
 
-    def stats(skill: str) -> tuple[float, float, float, float]:
+    def stats(skill: str, args: dict[str, Any] | None = None) -> tuple[float, float, float, float]:
         r = records.get(skill)
         if r is None:
             r = SkillRecord()
-        return (r.p, r.progress, (r.seconds / r.trials if r.trials else 30.0) / HORIZON_S,
-                r.fall_rate * needs.p.safety_per_fall * (1.0 + pressure["safety"]))
+        p, fall = predict(skill, args or {}) if predict is not None else (r.p, r.fall_rate)
+        return (p, r.progress, (r.seconds / r.trials if r.trials else 30.0) / HORIZON_S,
+                fall * needs.p.safety_per_fall * (1.0 + pressure["safety"]))
 
     if held is not None and "deliver" in tools:
         p, lp, c, risk = stats("deliver")
@@ -102,7 +109,6 @@ def candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
                         (("deliver", ()),),
                         {"dV": relief * p, "LP": lp, "IG": 0.0, "C": c, "R": risk}))
     if held is None and "pick" in tools:
-        p_pick, lp_pick, c_pick, r_pick = stats("pick")
         p_del, lp_del, c_del, r_del = stats("deliver")
         for e in kb.of_class("toy"):
             a = kb.get("at", e)
@@ -110,6 +116,7 @@ def candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
                 continue
             if failures(kb, t, "pick", e) >= give_up_after:
                 continue
+            p_pick, lp_pick, c_pick, r_pick = stats("pick", {"x": e})
             travel = walk(a.value, kb.position(basket) if basket else None)
             out.append(Goal(f"tidy:{e}", "tidy", "tidiness", f"inside({e!r}, basket)",
                             (("pick", (("x", e),)),),
@@ -144,7 +151,8 @@ PUTS = ("deliver", "put_by_wall", "drop")
 
 def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
                         reactions: Any, tools: set[str], rng: Any, kind_records: dict[str, Any] | None = None,
-                        draws: dict[str, float] | None = None, give_up_after: int = 3) -> list[Goal]:
+                        draws: dict[str, float] | None = None, give_up_after: int = 3,
+                        predict: Predict | None = None) -> list[Goal]:
     """Goals when the social need is approval (Milestone 3b, design section 4.3).
 
     No goal names a state of the room. Each goal is a way of acting, valued by what the
@@ -165,8 +173,13 @@ def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[s
     here = kb.position(SELF)
     out: list[Goal] = []
 
-    def stats(skill: str) -> tuple[float, float, float, float]:
+    def stats(skill: str, args: dict[str, Any] | None = None) -> tuple[float, float, float, float]:
         r = kind_records.get(skill) or records.get(skill) or SkillRecord()
+        if predict is not None:
+            p, fall = predict(skill, args or {})
+            r = records.get(skill) or SkillRecord()
+            return (p, r.progress, (r.seconds / r.trials if r.trials else 30.0) / HORIZON_S,
+                    fall * needs.p.safety_per_fall * (1.0 + pressure["safety"]))
         return (r.p, r.progress, (r.seconds / r.trials if r.trials else 30.0) / HORIZON_S,
                 r.fall_rate * needs.p.safety_per_fall * (1.0 + pressure["safety"]))
 
@@ -177,7 +190,9 @@ def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[s
             draws[kind] = b.sample(rng)
         return needs.approval_value(*draws[kind]), b.uncertainty
 
-    def kind_stats(kind: str, skill: str) -> tuple[float, float, float, float]:
+    def kind_stats(kind: str, skill: str, args: dict[str, Any]) -> tuple[float, float, float, float]:
+        if predict is not None:
+            return stats(skill, args)
         return stats(kind) if kind in kind_records and kind_records[kind].trials else stats(skill)
 
     puts = [(name, *owner(name), *stats(name)) for name in PUTS if name in tools]
@@ -195,12 +210,12 @@ def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[s
                 continue
             kind = f"pick from {where(kb, t, e)}"
             value, unsure = owner(kind)
-            p_pick, lp_pick, c_pick, r_pick = kind_stats(kind, "pick")
+            p_pick, lp_pick, c_pick, r_pick = kind_stats(kind, "pick", {"x": e})
             travel = 0.0 if here is None else here.distance(a.value) / MICRODUCK.walk_speed / HORIZON_S
             out.append(Goal(f"approval:pick:{e}", "pick", "approval", "true", (("pick", (("x", e),)),),
                             {"dV": p_pick * (value + best_value), "LP": lp_pick, "IG": 0.0,
                              "C": c_pick + put_cost + travel, "R": r_pick + put_risk, "sd": unsure}))
-    for goal in candidates(kb, t, needs, records, tools & {"look_around", "explore", "rest"}):
+    for goal in candidates(kb, t, needs, records, tools & {"look_around", "explore", "rest"}, predict=predict):
         # Exploring and resting also carry whatever the owner has been seen to think of them.
         kinds = [name for name, _ in goal.tools]
         value = max(owner(k)[0] for k in kinds)

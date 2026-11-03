@@ -1,0 +1,63 @@
+== experiments/E-017-rules/rules_none.jsonl: owner none, 16 lifetimes
+  ep  basket+  wall  unmoved  picks  approve/min  disapprove/min  falls
+   1     0.56  0.50     3.81   3.38         0.00            0.00   0.44
+   2     0.25  0.50     3.94   3.56         0.00            0.00   0.31
+   3     0.31  0.25     4.31   3.38         0.00            0.00   0.00
+   4     0.56  0.44     3.88   3.75         0.00            0.00   0.31
+   5     0.50  0.38     3.88   4.00         0.00            0.00   0.12
+   6     0.50  0.62     3.69   4.88         0.00            0.00   0.12
+   7     0.44  0.50     3.81   4.19         0.00            0.00   0.19
+   8     0.62  0.44     4.12   4.06         0.00            0.00   0.19
+   9     0.56  0.56     3.88   3.31         0.00            0.00   0.06
+  10     0.31  0.25     4.31   2.88         0.00            0.00   0.19
+== experiments/E-017-rules/rules_basket.jsonl: owner basket, 16 lifetimes
+  ep  basket+  wall  unmoved  picks  approve/min  disapprove/min  falls
+   1     0.50  0.50     4.12   3.25         0.06            0.00   0.31
+   2     0.88  0.31     4.06   3.25         0.12            0.00   0.38
+   3     1.19  0.38     3.50   5.12         0.11            0.01   0.44
+   4     0.81  0.25     3.81   4.50         0.10            0.01   0.44
+   5     1.25  0.12     3.62   3.50         0.14            0.01   0.31
+   6     1.44  0.31     3.31   5.38         0.16            0.00   0.31
+   7     2.00  0.25     2.75   5.19         0.33            0.00   0.12
+   8     1.81  0.19     3.19   5.19         0.25            0.01   0.38
+   9     2.38  0.12     2.75   5.00         0.38            0.01   0.31
+  10     2.00  0.12     3.00   5.19         0.20            0.00   0.56
+== experiments/E-017-rules/rules_wall.jsonl: owner wall, 16 lifetimes
+  ep  basket+  wall  unmoved  picks  approve/min  disapprove/min  falls
+   1     0.69  0.44     3.75   3.31         0.06            0.05   0.44
+   2     0.44  0.62     4.12   4.12         0.21            0.11   0.25
+   3     0.25  1.19     3.75   4.62         0.20            0.09   0.12
+   4     0.31  1.38     3.25   5.12         0.21            0.11   0.12
+   5     0.44  1.56     3.25   6.81         0.40            0.16   0.12
+   6     0.38  1.75     3.06   6.44         0.35            0.21   0.19
+   7     0.25  3.19     1.88   8.31         0.68            0.23   0.06
+   8     0.25  2.75     2.38   7.31         0.60            0.11   0.12
+   9     0.38  2.94     1.75   9.12         0.70            0.28   0.25
+  10     0.19  3.81     1.56   9.00         0.64            0.24   0.19
+== experiments/E-017-rules/rules_leave.jsonl: owner leave, 16 lifetimes
+  ep  basket+  wall  unmoved  picks  approve/min  disapprove/min  falls
+   1     0.56  0.38     4.19   2.88         0.00            0.24   0.44
+   2     0.31  0.50     4.88   2.38         0.04            0.18   0.19
+   3     0.06  0.19     4.94   2.94         0.18            0.20   0.00
+   4     0.50  0.38     4.62   4.94         0.09            0.33   0.19
+   5     0.06  0.06     5.12   3.06         0.09            0.24   0.12
+   6     0.06  0.06     5.00   2.50         0.11            0.20   0.12
+   7     0.25  0.12     5.00   3.12         0.11            0.21   0.38
+   8     0.25  0.06     4.94   3.94         0.10            0.29   0.06
+   9     0.25  0.25     5.00   4.06         0.16            0.36   0.12
+  10     0.19  0.06     5.50   1.62         0.07            0.12   0.12
+
+== late episodes (6 on), per lifetime, paired by lifetime seed
+  basket owner vs none: basket_gain: A 0.487 · B 1.925 · B-A +1.438 [95% CI +0.592, +2.283] · B higher 10, equal 3, lower 3 · sign-flip p = 0.004 · n = 16
+  basket owner vs wall: basket_gain: A 0.287 · B 1.925 · B-A +1.637 [95% CI +0.617, +2.658] · B higher 12, equal 2, lower 2 · sign-flip p = 0.005 · n = 16
+  basket owner vs leave: basket_gain: A 0.200 · B 1.925 · B-A +1.725 [95% CI +0.907, +2.543] · B higher 14, equal 1, lower 1 · sign-flip p = 0.000 · n = 16
+  basket owner: approvals/min, episodes 1-2 0.09 -> last two 0.29; belief singles out 'deliver' in 12 of 16 lifetimes
+  wall owner vs none: at_wall: A 0.475 · B 2.888 · B-A +2.413 [95% CI +1.545, +3.280] · B higher 15, equal 1, lower 0 · sign-flip p = 0.000 · n = 16
+  wall owner vs basket: at_wall: A 0.200 · B 2.888 · B-A +2.688 [95% CI +1.700, +3.675] · B higher 14, equal 1, lower 1 · sign-flip p = 0.000 · n = 16
+  wall owner vs leave: at_wall: A 0.113 · B 2.888 · B-A +2.775 [95% CI +1.852, +3.698] · B higher 15, equal 0, lower 1 · sign-flip p = 0.000 · n = 16
+  wall owner: approvals/min, episodes 1-2 0.14 -> last two 0.67; belief singles out 'put_by_wall' in 13 of 16 lifetimes
+  leave owner vs none: unmoved: A 3.962 · B 5.088 · B-A +1.125 [95% CI +0.750, +1.500] · B higher 15, equal 1, lower 0 · sign-flip p = 0.000 · n = 16
+  leave owner vs basket: unmoved: A 3.000 · B 5.088 · B-A +2.087 [95% CI +1.389, +2.786] · B higher 16, equal 0, lower 0 · sign-flip p = 0.000 · n = 16
+  leave owner vs wall: unmoved: A 2.125 · B 5.088 · B-A +2.962 [95% CI +2.226, +3.699] · B higher 15, equal 0, lower 1 · sign-flip p = 0.000 · n = 16
+  leave owner: approvals/min, episodes 1-2 0.02 -> last two 0.12; belief singles out 'pick from' in 16 of 16 lifetimes
+  control: late basket gain 0.49, at wall 0.47, unmoved 3.96, picks 3.86

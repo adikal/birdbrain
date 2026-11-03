@@ -188,3 +188,5 @@ h1 { font-size: 19px; }
   .dashboard { grid-template-columns: 1fr 1fr; grid-template-areas: "world world" "camera camera" "mind decisions" "skills beliefs" "needs needs" "events events" "inspector inspector"; }
 }
 @media (max-width: 760px) { .dashboard { grid-template-columns: 1fr; grid-template-areas: "world" "camera" "mind" "decisions" "skills" "beliefs" "needs" "events" "inspector"; padding: 10px; } .facts { grid-template-columns: 1fr; } }
+.rule-list { margin: 8px 16px 12px; padding-left: 18px; color: var(--muted); font-size: 12px; }
+.rule-list li { margin: 2px 0; }

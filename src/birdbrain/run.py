@@ -36,13 +36,18 @@ class PlayroomSession:
                  journal: EventJournal | None = None, token_budget: int | None = None,
                  model: str | None = None, speculate: bool = False,
                  memory_dir: Path | None = None, needs: bool | str = False, room: str = "messy",
-                 owner: str | None = None, episode: int | None = None, lifetime: int | None = None) -> None:
+                 owner: str | None = None, episode: int | None = None, lifetime: int | None = None,
+                 credit: str = "moments", rules: bool = False) -> None:
         from microduck_local.brain.brain_env import POLICIES_DIR, onnx_infer
         from microduck_local.world import World, make_playroom
 
         from birdbrain.lab import BirdBrainBrain
 
         self.seed, self.toys, self.latency = seed, toys, latency
+        self.owner = None
+        self._kinds: list[tuple[float, str | None]] = []     # (decision time, kind of action)
+        self._heard_changes: list[float] = []
+        self.credit_given: list[float] = []
         self.scenario = make_playroom(seed=seed, n=toys, brain=None)
         if room == "tidy":
             # Every toy starts in the basket: the test of doing nothing when nothing is worth doing.
@@ -81,7 +86,8 @@ class PlayroomSession:
                                position=(self.bounds[0] + 0.3, self.bounds[3] - 0.3))
         self.brain = BirdBrainBrain(provider=chooser, log=self._log, latency=latency, token_budget=token_budget,
                                     speculate=speculate, memory_dir=memory_dir, needs=needs,
-                                    room=self.bounds if needs == "approval" else None, seed=seed)
+                                    room=self.bounds if needs == "approval" else None, seed=seed,
+                                    credit=credit, rules=rules)
         self.mind = self.brain.mind
         self._falls = self._attempts = 0
         self.grasp_errors: list[float | None] = []
@@ -99,6 +105,15 @@ class PlayroomSession:
             "basket_size": list(self.scenario.basket.size) if self.scenario.basket else None})
 
     def _log(self, kind: str, payload: dict[str, Any]) -> None:
+        if kind == "DECISION":
+            self._kinds.append((self.world.t, payload.get("kind")))
+        elif kind == "HEARD" and self.owner is not None and self._heard_changes:
+            # Evaluation only: the share of credit the duck gave to the kind of action it was
+            # doing when the change she answered happened (ledger E-016).
+            changed = self._heard_changes.pop(0)
+            if payload.get("valence"):
+                cause = next((k for t0, k in reversed(self._kinds) if t0 <= changed), None)
+                self.credit_given.append(float(payload["causes"].get(cause, 0.0)))
         self.journal.publish(kind, sim_time=self.world.t, payload=payload)
 
     @property
@@ -124,6 +139,7 @@ class PlayroomSession:
                                for name, f in PREFERENCES.items()}
         if self.owner is not None:
             heard, petted = self.owner.step(world.t, self.owner_room(), tuple(duck.trunk_pos(world.data)[:2]))
+            self._heard_changes = list(self.owner.heard_changes)
         command = self.brain.step(senses, heard=heard, petted=petted)
         state = self.mind.state
         self.time_in[state] = self.time_in.get(state, 0.0) + 0.02
@@ -227,7 +243,15 @@ class PlayroomSession:
                 "ownerApprovals": sum(1 for _, v, _ in log if v > 0),
                 "ownerDisapprovals": sum(1 for _, v, _ in log if v < 0),
                 "ownerPets": sum(1 for *_, said in log if said == "pet"),
+                # Changes she disliked, by how they happened: the duck picked the toy up, or the
+                # toy moved while nobody held it (knocked, pushed, or put down where she dislikes).
+                "creditToCause": round(sum(self.credit_given), 3), "creditN": len(self.credit_given),
+                "lostByPick": sum(1 for _, _, now, held in self.owner.changes if not now and held)
+                if self.owner is not None else 0,
+                "lostOtherwise": sum(1 for _, _, now, held in self.owner.changes if not now and not held)
+                if self.owner is not None else 0,
                 "ownerModel": None if self.mind.reactions is None else self.mind.reactions.summary(),
+                "credit": None if self.mind.reactions is None else self.mind.reactions.credit,
                 "mood": None if self.mind.needs is None else round(self.mind.needs.mood, 3)}
 
     def close(self) -> None:
@@ -248,7 +272,7 @@ class PlayroomSession:
             "records": {name: r.to_dict() for name, r in mind.records.items()},
             **mind.stats, "tokens": mind.tokens_used, **self.perception_metrics(),
             "simSeconds": round(self.world.t, 1), "wallSeconds": round(wall_seconds, 1),
-            **self.owner_metrics(),
+            "rules": mind.use_rules, **self.owner_metrics(),
         }
 
 
@@ -257,7 +281,8 @@ def run_one(seed: int, *, toys: int = 6, seconds: float = 300.0, provider: str =
             token_budget: int | None = None, model: str | None = None,
             camera: bool = False, speculate: bool = False,
             memory_dir: Path | None = None, needs: bool = False, room: str = "messy",
-            owner: str | None = None, episode: int | None = None, lifetime: int | None = None) -> dict[str, Any]:
+            owner: str | None = None, episode: int | None = None, lifetime: int | None = None,
+            credit: str = "moments", rules: bool = False) -> dict[str, Any]:
     life = "" if episode is None else f"-L{lifetime}e{episode}"
     run_id = f"{tag or 'run'}{life}-s{seed}-{provider}-{int(time.time() * 1000) % 10**9}"
     store = JsonlRunStore(runs_dir) if runs_dir else None
@@ -265,7 +290,8 @@ def run_one(seed: int, *, toys: int = 6, seconds: float = 300.0, provider: str =
     session = PlayroomSession(seed, toys=toys, provider=provider, latency=latency, journal=journal,
                               token_budget=token_budget, model=model, speculate=speculate,
                               memory_dir=memory_dir, needs=needs, room=room,
-                              owner=owner, episode=episode, lifetime=lifetime)
+                              owner=owner, episode=episode, lifetime=lifetime, credit=credit,
+                              rules=rules)
     head = None
     if camera and store is not None:
         from birdbrain.observability.camera import HeadCamera
@@ -357,6 +383,12 @@ def main() -> None:
     ap.add_argument("--owner", choices=["none", "basket", "wall", "leave"], default=None,
                     help="Milestone 3b: the social need is approval; a scripted owner with this hidden "
                          "preference reacts with phrases (none: the control, nobody there)")
+    ap.add_argument("--credit", choices=["moments", "underway"], default="moments",
+                    help="Milestone 3b: credit the owner's reactions to the duck's own changes to the room "
+                         "(grasp, release, bump; E-016) or to any action under way (E-015)")
+    ap.add_argument("--rules", action="store_true",
+                    help="decide with causal rules (Milestone 4) instead of counts per skill; the rules are "
+                         "learned and scored either way")
     ap.add_argument("--episodes", type=int, default=None,
                     help="each seed is a lifetime of this many episodes (rooms), memory kept between them; "
                          "memory goes under --memory (default data/lifetimes/<tag>)")
@@ -375,7 +407,7 @@ def main() -> None:
               "latency": args.latency, "runs_dir": runs_dir, "tag": args.tag,
               "token_budget": args.token_budget, "model": args.model, "camera": args.camera,
               "speculate": args.speculate, "memory_dir": args.memory, "needs": args.needs, "room": args.room,
-              "owner": args.owner}
+              "owner": args.owner, "credit": args.credit, "rules": args.rules}
     memory_root = None
     if args.episodes is not None:
         memory_root = args.memory or Path("data/lifetimes") / (args.tag or "untagged")

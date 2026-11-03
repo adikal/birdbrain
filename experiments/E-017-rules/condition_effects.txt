@@ -1,0 +1,13 @@
+Effect on the log-odds that the expected effect holds, per life (64 lives; conditions seen in >= 32)
+  pick     target by the rim=yes            median -0.15  negative in 52 of 55 lives
+  pick     target by the rim=no             median +0.14  negative in 3 of 64 lives
+  pick     basket distance=near             median -0.13  negative in 49 of 64 lives
+  pick     target last seen=recently        median +0.13  negative in 12 of 63 lives
+  pick     target is=basket                 median -0.13  negative in 58 of 64 lives
+  pick     target last seen=a while ago     median -0.13  negative in 51 of 64 lives
+  deliver  basket distance=far              median -0.11  negative in 34 of 53 lives
+  put_by_wall self by a wall=yes               median -0.10  negative in 33 of 52 lives
+  pick     basket distance=mid              median +0.10  negative in 14 of 64 lives
+  pick     target tried before=yes          median -0.10  negative in 35 of 55 lives
+  pick     target position=vague            median -0.09  negative in 43 of 63 lives
+  pick     target position=precise          median +0.09  negative in 20 of 64 lives

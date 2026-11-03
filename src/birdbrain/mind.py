@@ -35,6 +35,7 @@ from birdbrain.reactions import ReactionModel
 from birdbrain.records import SkillRecord
 from birdbrain.relations import attempts, failures, inside, known
 from birdbrain.relations import where as where_is
+from birdbrain.rules import RuleLearner, features
 from birdbrain.skills import (
     Abort,
     Context,
@@ -59,6 +60,11 @@ APPROVAL_GOAL = ("Nobody gives you tasks. You live in this room with your owner 
 DEFAULT_TOOLS = ("pick", "deliver", "look_around", "explore", "rest")
 #: Milestone 3b: the ways of putting a toy down are offered side by side (design section 4.3).
 APPROVAL_TOOLS = ("pick", "deliver", "put_by_wall", "drop", "look_around", "explore", "rest")
+#: Outcomes the causal rules predict: (name, how a rule states it, prior base rate as Beta
+#: pseudo-counts, prior sd of the base log-odds). The fall prior is the base rate of E-014
+#: (0.025 per trial), held more firmly because falls are rare.
+RULE_OUTCOMES = (("effect", "its expected effect holds", (1.0, 1.0), 2.0),
+                 ("fell", "the duck falls", (0.25, 9.75), 1.0))
 
 Log = Callable[[str, dict[str, Any]], None]
 
@@ -191,7 +197,8 @@ class Mind:
                  latency: str = "frozen", token_budget: int | None = None,
                  snapshot_hz: float = 2.0, speculate: bool = False,
                  memory_dir: Path | None = None, needs: bool | str = False,
-                 room: tuple[float, float, float, float] | None = None, seed: int = 0) -> None:
+                 room: tuple[float, float, float, float] | None = None, seed: int = 0,
+                 credit: str = "moments", rules: bool = False) -> None:
         if latency not in {"frozen", "real"}:
             raise ValueError("latency must be 'frozen' or 'real'")
         self.log: Log = log or (lambda kind, payload: None)
@@ -231,9 +238,17 @@ class Mind:
         self.records: dict[str, SkillRecord] = self._load_records()
         #: What the duck believes earns its owner's approval (Milestone 3b), kept for life.
         self.reactions = self._load_reactions() if self.approval else None
+        if self.reactions is not None:
+            self.reactions.credit = credit
+        self._held_before, self._bumped_before = False, False
         #: Counted outcomes per kind of action (a pick by a wall is not a pick in the open).
         self.kind_records: dict[str, SkillRecord] = self._load_records("kind_records.json") if self.approval else {}
         self.rng = random.Random(seed)              # Thompson draws (reactions.py)
+        #: Causal rules (Milestone 4): how likely each skill's expected effect, and a fall, are
+        #: under the conditions the duck believes hold. Always learned and scored; used for
+        #: decisions when `rules` is set.
+        self.use_rules = rules
+        self.rules = {name: self._load_rules(name, outcome, prior, sd) for name, outcome, prior, sd in RULE_OUTCOMES}
         self.phrases = load_phrases() if self.approval else None
         self.stats = {"decisions": 0, "fallbacks": 0, "invalid": 0, "provider_errors": 0, "falls_sensed": 0}
         self._run: SkillRun | None = None
@@ -255,6 +270,11 @@ class Mind:
                 pass
             self._run.close()
             self._finish(Outcome("failed", "fell"))
+        if self.reactions is not None:
+            # The duck's own changes to the room, as its body senses them (E-016).
+            if obs.holding != self._held_before or (obs.bumped and not self._bumped_before):
+                self.reactions.moment(obs.t)
+            self._held_before, self._bumped_before = obs.holding, obs.bumped
         if self.approval and (obs.heard or obs.petted):
             self._hear(obs)
         if self.needs is not None:
@@ -303,6 +323,9 @@ class Mind:
             self._run.close()
             self._finish(Outcome("interrupted", "run ended"))
         self._save_records()
+        if self.memory_dir is not None:
+            for name, learner in self.rules.items():
+                self._write_memory(f"rules_{name}.json", learner.to_json())
         if self.reactions is not None and self.memory_dir is not None:
             self._write_memory("owner_model.json", self.reactions.to_json())
             self._write_memory("kind_records.json", _records_json(self.kind_records))
@@ -353,6 +376,49 @@ class Mind:
         if self.kb.value("holding", SELF) is None or not hasattr(self, "_draws"):
             self._draws: dict[str, float] = {}
         return self._draws
+
+    # -- causal rules (Milestone 4) -------------------------------------------------
+    def predict(self, skill: str, args: dict[str, Any]) -> tuple[float, float]:
+        """(p expected effect holds, p fall) for `skill` on `args` now, from the rules."""
+        f = features(self.kb, self.ctx.t, args)
+        return self.rules["effect"].predict(skill, f)[0], self.rules["fell"].predict(skill, f)[0]
+
+    def _predictions(self, skill: str, f: dict[str, str], record: SkillRecord) -> dict[str, Any]:
+        """Every predictor's forecast for this action, recorded before it runs, so each can
+        be scored on outcomes it has not seen (prequential evaluation, ledger E-017)."""
+        kind = self.kind_records.get(self.action_kind(skill, self._action["args"])) if self.kind_records else None
+        out: dict[str, Any] = {}
+        for name, *_ in RULE_OUTCOMES:
+            p_rules, n, when = self.rules[name].predict(skill, f)
+            skill_p = record.p if name == "effect" else record.fall_rate
+            kind_p = None if kind is None or not kind.trials else (kind.p if name == "effect" else kind.fall_rate)
+            out[name] = {"rules": round(p_rules, 4), "skill": round(skill_p, 4),
+                         "kind": None if kind_p is None else round(kind_p, 4),
+                         "when": [f"{k} {v}" for k, v in when], "n": round(n, 1)}
+        return out
+
+    def _score_predictions(self, predicted: dict[str, Any], outcome: dict[str, bool]) -> dict[str, Any]:
+        """Brier score of each predictor on this outcome; summed per run in `stats`."""
+        scores: dict[str, Any] = {}
+        for name, y in outcome.items():
+            p = predicted[name]
+            kind = p["kind"] if p["kind"] is not None else p["skill"]
+            scores[name] = {k: round((v - float(y)) ** 2, 4) for k, v in
+                            (("rules", p["rules"]), ("skill", p["skill"]), ("kind", kind))}
+            for k, v in scores[name].items():
+                key = f"brier_{name}_{k}"
+                self.stats[key] = round(self.stats.get(key, 0.0) + v, 4)
+            self.stats[f"brier_{name}_n"] = self.stats.get(f"brier_{name}_n", 0) + 1
+        return scores
+
+    def _load_rules(self, name: str, outcome: str, prior: tuple[float, float], sd_base: float) -> RuleLearner:
+        path = None if self.memory_dir is None else self.memory_dir / f"rules_{name}.json"
+        if path is None or not path.is_file():
+            return RuleLearner(outcome, prior=prior, sd_base=sd_base)
+        try:
+            return RuleLearner.from_json(path.read_text(encoding="utf-8"), prior=prior, sd_base=sd_base)
+        except (json.JSONDecodeError, KeyError, TypeError) as error:
+            raise ValueError(f"memory file {path} is unreadable ({error}); move it aside to start fresh") from None
 
     def action_kind(self, skill: str, args: dict[str, Any]) -> str:
         """The duck's own description of an action, for learning what its owner reacts to."""
@@ -411,9 +477,11 @@ class Mind:
         goals = ()
         if self.needs is not None:
             names = {t.name for t in tools}
+            predict = self.predict if self.use_rules else None
             goals = tuple(approval_candidates(self.kb, self.ctx.t, self.needs, self.records, self.reactions, names,
-                                              self.rng, self.kind_records, self._thompson_draws())
-                          if self.approval else candidates(self.kb, self.ctx.t, self.needs, self.records, names))
+                                              self.rng, self.kind_records, self._thompson_draws(), predict=predict)
+                          if self.approval else
+                          candidates(self.kb, self.ctx.t, self.needs, self.records, names, predict=predict))
             tools = _serving(tools, goals)
         return DecisionRequest(self.ctx.t, self.goal, self.briefing(goals), tuple(tools), goals)
 
@@ -457,7 +525,9 @@ class Mind:
             "provider": choice.provider, "model": choice.model, "reason": choice.reason,
             "goal": None if goal is None else goal.id, "goal_source": None if goal is None else goal.source,
             "kind": self.action_kind(skill, args),
+            "features": features(self.kb, self.ctx.t, args),
         }
+        self._action["predicted"] = self._predictions(skill, self._action["features"], record)
         if self.reactions is not None:
             self.reactions.started(self._action["kind"], self.ctx.t)
         payload = {
@@ -617,6 +687,16 @@ class Mind:
             held = False
         if self.needs is not None and action["skill"] in {"look_around", "explore"}:
             self.needs.observe_exploration(action["skill"], len(self.needs.confirmed(self.kb) - action["confirmed_before"]))
+        fell = outcome.reason == "fell"
+        # An action stopped from outside (the episode ended, the battery reflex) says nothing
+        # about the skill, and an effect of "true" cannot fail: neither is scored or learned
+        # as an outcome of the skill (review of E-017).
+        scores: dict[str, Any] = {}
+        if outcome.status != "interrupted":
+            scored = {"fell": fell} if action["expect"] == "true" else {"effect": held, "fell": fell}
+            scores = self._score_predictions(action["predicted"], scored)
+            for name, y in scored.items():
+                self.rules[name].add(action["skill"], action["features"], float(y))
         if self.reactions is not None:
             self.reactions.ended(action["kind"], self.ctx.t)
             self.kind_records.setdefault(action["kind"], SkillRecord()).record(
@@ -631,7 +711,7 @@ class Mind:
             "p_rule": action["p_rule"], "p_model": action["p_model"], "trials": action["trials"],
             "surprise_rule": _surprise(action["p_rule"], held),
             "surprise_model": _surprise(action["p_model"], held),
-            "provider": action["provider"],
+            "provider": action["provider"], "predicted": action["predicted"], "brier": scores,
         }
         self.recent = (self.recent + [result])[-8:]
         self.log("OUTCOME", {**result, "summary": f"{action['skill']} {outcome.status}"
@@ -682,6 +762,10 @@ class Mind:
                    for n, r in sorted(self.records.items())]
         if records:
             lines += ["Your skill record:", *records]
+        learned = [learner.text(r) for learner in self.rules.values() for r in learner.rules()][:8]
+        if learned:
+            lines += [("What you have learned about when your skills work (each rule is credible: at "
+                      "least three standard deviations from no effect):"), *(f"- {r}." for r in learned)]
         if self.needs is not None:
             p = self.needs.pressure
             scale = ("0 = satisfied, 1 = urgent; tidiness is weighted double, so it runs to 2"
@@ -725,6 +809,7 @@ class Mind:
             "view": self.perception.last_view,
             "needs": None if self.needs is None else self.needs.snapshot(),
             "owner_model": None if self.reactions is None else self.reactions.summary(),
+            "rules": [learner.text(r) for learner in self.rules.values() for r in learner.rules()][:12],
             "goal": None if self._goal is None else self._goal.to_dict(),
         }
 

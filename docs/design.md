@@ -30,8 +30,13 @@ expectation-maximization, and explores by Thompson sampling. Over a life of
 ten rooms it learns which of three hidden preferences its owner holds:
 toys in the basket, toys against the walls, or toys left where they were.
 Its beliefs single out the right kind of action in 43 of 48 lives, and
-with nobody there it does not tidy. All results come from simulation with
-a scripted owner. The report states the limits of that setting and the
+with nobody there it does not tidy. Finally, the duck learns causal rules:
+Bayesian logistic models of how the conditions it believes hold change the
+chance that a skill works or that it falls. Scored on outcomes they had not
+seen, the rules beat the counts the scorecard had used (Brier 0.128 against
+0.135 over 64 held-out lives), but choosing by their means made picks fail
+and the duck fall more often. All results come from simulation
+with a scripted owner. The report states the limits of that setting and the
 plan for hardware.
 
 ## 1. Introduction
@@ -70,10 +75,15 @@ This report makes the following contributions:
   (section 4).
 - **Learning a hidden preference from valence alone.** An approval need,
   a scripted owner who says only whether she approves, credit assignment by
-  expectation-maximization over the reaction history, and exploration by
-  Thompson sampling, with three neutral ways to put a toy down
-  (section 4.3).
-- **A pre-registered experimental record** of fifteen experiments,
+  expectation-maximization over the moments at which the duck changed the
+  room, and exploration by Thompson sampling, with three neutral ways to put
+  a toy down (section 4.3).
+- **Causal rules from a short life.** Bayesian logistic models over
+  conditions computed from beliefs, predicted before and scored after every
+  action, with the finding that additive effects learn from a few dozen
+  outcomes where rule trees cannot, and that better predictions do not by
+  themselves make better choices (section 4.4).
+- **A pre-registered experimental record** of seventeen experiments,
   including failed predictions and rejected changes, with paired
   comparisons on held-out rooms (sections 5 and 6).
 
@@ -369,9 +379,12 @@ nearest wall away from the basket), and `drop` (where the duck stands).
 probability that it is followed by approval and by disapproval, each
 starting at Beta(1, 2), so no kind is assumed to please her.
 
-**Credit by expectation-maximization.** A reaction of valence v at time t
-could have been caused by any action under way between t − 8 s and
-t − 0.5 s, or by nothing the duck did. Given the current beliefs, each
+**Credit by expectation-maximization.** A reaction answers a change in the
+room, and the duck changes the room at moments its body senses: a grasp, a
+release, or a bump. A reaction of valence v at time t could have been
+caused by an action with such a moment between t − 8 s and t − 0.5 s (each
+action counted once), by the end of an action that changed nothing, or by
+nothing the duck did. Given the current beliefs, each
 candidate c receives the share
 
 ```text
@@ -407,6 +420,37 @@ bonus kept the duck busy with nobody there (L-016).
 odometry frame; on the robot this map would come from the range sensor. It
 does not know the owner's threshold for "against a wall"; its own is
 0.25 m.
+
+### 4.4 Learning when skills work
+
+Before every action the mind describes the situation with coarse features
+computed from beliefs: where its target is (in the basket, against a wall,
+in the open), how far it is, whether its position is precise, how recently
+it was seen, whether a pick on it failed before, whether it is by the
+basket rim or a wall, whether the duck holds something, how precise and
+how far the basket is, and whether the duck is by a wall. For each skill
+and outcome (the expected effect holds; the duck falls), a Bayesian
+logistic model gives
+
+```text
+logit p(outcome | skill, f) = b_skill + Σ_c w_skill,c (1[c holds in f] − mean_c)
+b ~ N(logit(prior rate), sd_b²),   w ~ N(0, 0.5²)
+```
+
+It is fitted at its posterior mode by damped Newton steps after each
+outcome, with a Laplace approximation for each effect's uncertainty.
+Conditions are centred, so each effect is a deviation from the average
+situation and does not trade off against the base rate. A rule is
+*credible* when a condition's effect against the other values of its
+feature, computed with the full posterior covariance, is at least three
+posterior standard deviations from zero (three because a skill is tested
+against a dozen conditions at once); credible rules enter the briefing as
+sentences. Actions stopped from outside (the episode ended, the battery
+reflex) are neither scored nor learned. Every
+prediction is recorded before the action runs, next to the count per
+skill and per kind of action, and is scored by its Brier score when the
+action ends. The rules are learned and scored in every run; by default,
+decisions still use the counts (section 6.8).
 
 ## 5. Evaluation methodology
 
@@ -542,6 +586,65 @@ put 1 to 2.5 toys a room in the basket against 0.75 for the local policy:
 the language model's prior leans toward tidying, a bias the neutral skill
 set does not remove.
 
+### 6.7 Credit timing and rim falls (E-016)
+
+Two hypotheses about the owner experiments were tested on development
+lives, with truth measures added for the purpose. The first said the wall
+owner's duck loses toys because the action that follows a change takes
+the credit for her reaction. Measured directly, crediting actions under
+way already gave 79% of the credit to the action that caused the change,
+and the duck's own change moments gave 80%. A probe of individual picks
+found the real causes. The duck's category "by a wall" (0.25 m) is coarser
+than the owner's (0.2 m), so it picks toys it knows are by a wall, and
+some of its position estimates are 0.2 to 0.4 m wrong. The moment rule is
+kept because it is the correct definition of a reaction's possible causes.
+
+The second hypothesis said rim falls come from the delivery's sidestep.
+All 101 falls of E-015's second round happened within 0.3 m of the rim,
+spread over the sidestep, standing before a ground pick, the pick itself,
+and opening the beak. Stepping back instead of sideways barely changed the
+fall rate (3.7% of deliveries against 4.1%) and cost toys. Stopping 3 cm
+further out cut falls to 0.8% of deliveries, but toys missed the basket
+(−1.69 toys a run). Both were rejected.
+
+### 6.8 Causal rules (E-017)
+
+Rules were scored in the arm that decided with counts, so that the rules
+did not steer what they predicted, on 64 held-out lives per round (16 per
+owner arm, ten rooms each). Round 2 repeats round 1 on fresh lives after a
+review corrected the learner: an action cut off when an episode ended had
+been learned as a failure, and the credibility test could not pass for odds
+ratios below about 4.
+
+| Rooms 6 to 10, per life | Rules | Counts per skill | Counts per kind | Rules − counts per skill [95% CI] |
+|---|---|---|---|---|
+| Brier, expected effects, round 1 | 0.1523 | 0.1575 | 0.1580 | −0.0052 [−0.0083, −0.0022] |
+| Brier, expected effects, round 2 | 0.1284 | 0.1348 | 0.1335 | −0.0064 [−0.0095, −0.0033] |
+| Brier, falls, round 2 | 0.0049 | 0.0051 | 0.0047 | −0.00015 [−0.00040, +0.00009] |
+
+The rules predict whether a skill's expected effect holds better than both
+counts, in 42 of 64 lives in each round. For falls, which come about once
+in a hundred actions, they match the counts per skill and lose slightly to
+the counts per kind, which split picks by where the toy is.
+
+A first version used Bayesian rule trees that split on the condition with
+the largest Bayes factor. A life holds 30 to 70 picks, so the trees almost
+never split and predicted exactly as the counts did. The additive model
+uses every outcome for every condition. No condition reached three
+posterior standard deviations within one life, but the directions agree
+across lives. A pick's expected effect is less likely when the toy is by
+the basket rim (lower in 52 of 55 lives), in the basket (59 of 64), or
+last seen a while ago (48 of 64). A delivery from far away fails more often
+(41 of 49), and a pick by the rim is more likely to end in a fall (48 of
+55).
+
+Choosing with the rules' means made falls and failed picks rise in every
+arm in both rounds (wall arm, round 2: +0.13 falls a room, interval above
+zero), with no gain in any owner's measure. A likely reason is the
+optimizer's curse: choosing among up to six toys by predicted means picks
+the toy whose prediction is most optimistic, which is disproportionately
+one whose prediction is wrong. This is untested (H-018).
+
 ## 7. Discussion
 
 **Ground the beliefs before tuning the behavior.** The largest gains in
@@ -565,6 +668,16 @@ beliefs of the moment, left lasting credit on coincident actions;
 re-explaining the history removed it (L-017). Both choices are standard
 statistics, and both mattered more than any parameter.
 
+**Measure the mechanism before fixing it.** Both 3c hypotheses were
+plausible and wrong. A truth measure of credit and a probe of individual
+picks replaced them with the real causes (L-018).
+
+**Prediction and choice are different problems.** Rules that predict
+better made worse choices in both rounds (L-020). The likely reason is that
+choosing the best of several candidates by their predicted means selects
+the overrated ones. The owner model already decides by posterior draws; the
+same treatment for the rules is the next experiment (H-018).
+
 **The language model brings priors.** The cloud brain learns faster from
 the same evidence, and its prior helps when the owner's preference matches
 common human expectations and biases the duck when nobody is there. The
@@ -587,10 +700,12 @@ the architecture learns.
 - **Given knowledge.** The wall map is given; on the robot it would come
   from the range sensor. The duck's descriptions of actions (where a toy
   was picked from) are hand-chosen categories.
-- **Credit timing.** The duck credits actions under way when a reaction
-  arrives, so the action that follows a change takes part of the credit.
-  The wall-owner duck re-picks toys already at a wall for this reason
-  (H-016).
+- **Hand-chosen categories.** The kinds of action the owner model learns
+  over, and the features the rules use, are chosen by hand. The duck's
+  "by a wall" is coarser than the wall owner's, which costs her toys
+  (E-016).
+- **Rules do not yet steer.** The rules predict better but are not used
+  for decisions, which still rest on counts per skill (E-017).
 - **One room family and one model.** Every experiment uses the same
   playroom layout family and Claude Sonnet 5.5. The cloud owner arm has two
   lives per arm.
@@ -606,8 +721,9 @@ the architecture learns.
 | 2 | Cloud brain | At least 200 cloud decisions, no invalid call reaching the body, tidying within 0.5 toys of the local policy | met (E-010) |
 | 3 | Needs and self-generated goals | With no task the duck tidies on its own; in a tidy room it mostly rests or explores | met (E-014) |
 | 3b | Learning what the owner wants | With approval as its only social need and phrases that carry only valence, it learns each of several hidden preferences within a life, and without an owner it does not tidy | met, basket effect below its predicted size (E-015) |
-| 3c | Credit timing and safe deliveries | Credit reactions to actions that ended before them, or learn the delay, and cut churn at walls by half (H-016); halve falls at the basket rim (H-011) | next |
-| 4 | Predictions, surprise, causal rules | Generalize the credit and belief machinery of 3b from owner reactions to every action's outcome, with conditions ("a pick beside a wall falls"); the accuracy of predicted outcomes on held-out actions rises across a life and beats counted priors (H-007) | planned |
+| 3c | Credit timing and safe deliveries | Credit reactions to the changes they answer, and cut churn at walls by half (H-016); halve falls at the basket rim (H-011) | done: both hypotheses refuted, causes found (E-016) |
+| 4 | Predictions, surprise, causal rules | Rules over conditions, predicted before and scored after every action, beat counted priors on outcomes they had not seen | met (E-017) |
+| 4a | Rules that steer | Decide with posterior draws from the rules (H-018), and learn the owner's reactions over the same conditions in place of hand-chosen kinds (H-017); fewer failed picks and fewer toys lost to picks, paired by life | next |
 | 4b | One valence | Falls, an empty battery, new objects found, and the owner's reactions become valence events learned by one mechanism, replacing hand-set scorecard terms without losing the results of E-014 and E-015 | planned |
 | 5 | Skills composed by the cloud brain | A compound skill the cloud brain wrote is kept on measured merit and does something no hand-written skill does, or does it better | planned |
 | 6 | Lifetimes, agents A to D, changing owners | The developmental agent beats the proactive one on competence gained per room; after the owner's preference changes mid-life the duck recovers within a stated number of rooms | planned |
@@ -633,10 +749,11 @@ Open questions that the roadmap does not yet settle:
 A frozen language model becomes a usable mind for a small robot when local
 code gives it measured beliefs, bounded skills, needs, and a memory of
 outcomes. The same structure lets the creature learn something nobody told
-it: what its owner likes, from her approval and disapproval alone. The next
-steps are to make credit assignment respect when changes happen, to extend
-the same learning from reactions to every outcome, and to carry the mind
-onto the physical duck.
+it: what its owner likes, from her approval and disapproval alone. It also
+learns, from its own outcomes, which conditions make its skills work. The
+next steps are to let those rules steer its choices without being misled by
+their own optimism, to learn the owner's reactions over the same
+conditions, and to carry the mind onto the physical duck.
 
 ## Appendix A. Parameters
 
@@ -655,6 +772,8 @@ onto the physical duck.
 | Owner-belief prior | Beta(1, 2) for approval and for disapproval | E-015 |
 | Mood step / relaxation / approval weight | 0.3 / 120 s / 4 | E-015 |
 | Duck's "against a wall" / owner's | 0.25 m / 0.2 m | E-015 |
+| Rule effect prior sd / base sd (effects; falls) | 0.5 / 2.0; 1.0 | E-017 |
+| Credible rule | contrast at least 3 posterior sd from zero | E-017 |
 
 ## Appendix B. Reproduction
 
@@ -683,6 +802,7 @@ are under `experiments/`.
 | `mind.py` | The decision loop, briefing, validation, measurement, local policies |
 | `needs.py`, `goals.py` | Needs, candidate goals, and the scorecard |
 | `reactions.py` | Beliefs about the owner: credit by EM, choice by Thompson sampling |
+| `rules.py` | Causal rules: features of the situation, Bayesian logistic models per skill and outcome |
 | `phrases.py`, `phrases.toml` | The owner's phrase lists (editable) and their valence |
 | `owner.py` | The scripted owner (simulator side, reads truth) |
 | `records.py` | Counted outcomes per skill and per kind of action |

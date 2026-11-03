@@ -94,6 +94,16 @@ Entry ids: `E-###` experiments, `H-###` hypotheses, `L-###` lessons.
   the duck believed then, left coincident actions with lasting credit.
   Re-explaining the whole history (EM) on each new reaction explains them
   away. (E-015)
+- **L-018. Measure the mechanism before fixing it.** The churn by the wall
+  was attributed to credit timing; a truth measure of credit showed the
+  timing was already right, and a probe of individual picks found the real
+  causes. (E-016)
+- **L-019. Few data favour shared effects over splits.** A rule tree must
+  divide a short life's outcomes to find a condition; an additive model
+  uses all of them for every condition. (E-017)
+- **L-020. Better predictions are not better choices.** Rules that
+  predicted better made worse choices when the duck chose by their means.
+  The optimizer's curse is the likely reason (H-018). (E-017)
 
 ## Open hypotheses
 
@@ -141,10 +151,21 @@ Ordered by what to test next. Resolved ones keep their verdict.
   results over the control were: wall +2.9, leave-it +1.35, basket +1.8.
   The basket result missed its pre-registered thresholds in both rounds
   (E-015).
-- **H-016** (new). Crediting a reaction to the actions under way when it
-  arrives over-credits the action that follows a change. This is why the
-  duck re-moves toys from walls (E-015). *Test:* credit only actions that
-  ended before the reaction, or learn the delay, then compare churn.
+- **H-016 Refuted.** Crediting actions under way already gave 79% of the
+  credit to the true cause in the wall arm; crediting the duck's own changes
+  gave 80%. The duck loses toys she likes because its category "by a wall"
+  is coarser than hers, and because some positions are wrong (E-016).
+- **H-019** (Milestone 4) **Supported for expected effects.** Rules over
+  conditions predict whether a skill's expected effect holds better than
+  counts per skill or per kind, on outcomes they had not seen. For falls
+  they are worse than counts per kind (E-017).
+- **H-018** (new). Choosing by a posterior draw from the rules, in place
+  of their mean, removes the optimizer's curse and turns better
+  predictions into fewer failed picks and falls. *Test:* `--rules` with
+  draws against counts, paired by life.
+- **H-017** (new). Learning the conditions of the owner's reactions with
+  the rules of E-017, in place of hand-chosen kinds of action, reduces toys
+  lost to picks. *Test:* lost-by-pick and own measure, paired by life.
 - **H-004** (Milestone 4). Beliefs with evidence predict the outcome of actions
   on unfamiliar objects better than retrieval of similar past episodes.
 - **H-008** (Milestone 4). Without a confirmation step, missed or stale
@@ -156,6 +177,267 @@ Ordered by what to test next. Resolved ones keep their verdict.
   gains more competence per episode than choosing by novelty.
 
 ## Experiments
+
+### E-017 · 2026-11-03 · Milestone 4: causal rules predict outcomes (pre-registered)
+
+**Question.** Do rules learned from the duck's own outcomes, under conditions
+it believes hold, predict those outcomes better than the counts per skill
+that the scorecard has used since Milestone 1 (H-019)?
+
+**Design** (`rules.py`). Before every action the mind describes the
+situation with coarse features computed from beliefs: where the target is
+(basket, wall, open), its distance, whether its position is precise,
+how recently it was seen, whether a pick on it failed before, whether it
+is by the basket rim or a wall, whether the duck holds something, how
+precise and how far the basket is, and whether the duck is by a wall. For
+each skill and outcome (the expected effect holds; the duck falls), a
+Bayesian logistic model gives the log-odds as a base rate plus one effect
+per condition, each effect a deviation from the average situation with
+prior N(0, 0.5²). It is fitted at its posterior mode after each outcome. A
+rule is credible when its effect is at least two posterior standard
+deviations from zero; credible rules are listed in the briefing as
+sentences. Each prediction is recorded before the action runs and scored
+when it ends (prequential evaluation), next to the count per skill and,
+where it exists, the count per kind of action. Actions whose expected
+effect is `true` cannot fail and are not scored for effects.
+
+**Development** (lives 0 to 3, all four owner arms).
+- *Trees first.* A Bayesian decision tree that splits a rule on the
+  feature with the largest Bayes factor (at least 10) rarely split: a life
+  holds a few dozen picks, and splitting the data leaves too little per
+  branch. Its Brier score equalled the counts' (0.1703 against 0.1703 on
+  replayed outcomes). Pooled over 32 lives, the conditions do matter: picks
+  of a toy by the basket rim held 13% of the time against 78% elsewhere,
+  and deliveries from far 53% against 87%.
+- *Additive effects.* A logistic model estimates every condition's effect
+  from all of a skill's outcomes at once. Replayed on the same outcomes,
+  it scored 3.4% better than counts (0.1645 against 0.1703), and best with
+  an effect prior of 0.5 (0.3: −2.8%; 1.0: −1.2%). Newton's method needed
+  damping, and conditions are centred so that effects do not trade off
+  against the base rate.
+- In live development lives, late in life: rules 0.177 against counts
+  0.185 (paired difference −0.008, CI −0.014 to −0.003, 11 of 16 lives
+  better) and against counts per kind 0.187. For falls, the three were
+  equal to three decimals.
+- *Deciding with rules* (`--rules`) changed behaviour unevenly on four
+  lives per arm: the basket owner's toys gained +1.0, the wall owner's
+  −1.65, and falls in the basket arm rose from 0.2 to 0.6 a room. This is
+  not yet a basis for a prediction.
+
+**Predictions, written before the held-out runs** (lives 96 to 111, all
+four arms, 10 rooms; prediction scores from the arm that decides with
+counts, so the rules being scored do not steer what is predicted;
+late = rooms 6 to 10; paired by life, n = 64):
+1. The rules' Brier score on expected effects is lower than the counts per
+   skill (CI upper bound below 0).
+2. It is also lower than the counts per kind of action (CI upper bound
+   below 0).
+3. For falls, the rules are no worse than counts per skill (CI upper bound
+   at most +0.0005).
+4. Reported, with no prediction: the credible rules found in at least half
+   of the lives; deciding with rules against deciding with counts on the
+   same lives (each owner arm's own measure, falls).
+
+**Method.** Commit `8725cdf`. For each arm, two runs on lives 96 to 111:
+`birdbrain-run --owner <arm> --episodes 10 --seeds 16 --seed0 96 --tag e017-counts-<arm>`
+and the same with `--rules` (`e017-rules-<arm>`). 1,280 episodes. Scores:
+`scripts/predictions.py`; behaviour: `scripts/lifetimes.py`; rows and
+summaries in `experiments/E-017-rules/`.
+
+**Result** (prediction scores from the arm deciding with counts; late =
+rooms 6 to 10, per life, paired, n = 64).
+
+| Prediction | Measure | Rules | Counts | Rules minus counts [95% CI] | Verdict |
+|---|---|---|---|---|---|
+| 1 | Brier, expected effects, against counts per skill | 0.1523 | 0.1575 | −0.0052 [−0.0083, −0.0022], 42 of 64 lives better | met |
+| 2 | ... against counts per kind of action | 0.1523 | 0.1580 | −0.0057 [−0.0093, −0.0020], 44 of 64 better | met |
+| 3 | Brier, falls, against counts per skill | 0.0037 | 0.0037 | +0.00006 [+0.00001, +0.00011] | met (within +0.0005), slightly worse |
+
+On falls, the rules were worse than counts per kind of action (+0.00021
+[+0.00017, +0.00025], 62 of 64 lives worse). In the counts arm, the counts
+per kind also chose the approval arms' picks, which should handicap them,
+not the rules. In the arm that decided with rules, so that the rules
+steered and were scored, they again beat both counts on expected effects
+(against counts per skill −0.0061 [−0.0093, −0.0029]; per kind −0.0050
+[−0.0089, −0.0011]; n = 63), beat counts per skill on falls (−0.00024
+[−0.00036, −0.00011]), and lost to counts per kind on falls (+0.00021,
+50 of 64 lives worse).
+
+*Conditions.* No condition reached two posterior standard deviations in
+any single life: a life holds 30 to 70 picks, and the prior holds each
+effect near zero until the evidence is strong. The directions, though, were
+consistent across lives (`condition_effects.txt`). A pick's expected
+effect was less likely when the toy was by the basket rim (negative in 52
+of 55 lives), in the basket (58 of 64), or last seen a while ago (51 of
+64). A delivery was less likely to land from far away (34 of 53).
+
+*Deciding with rules* (exploratory, same lives, rules minus counts):
+
+| Owner | Own measure | Falls per room | Failed picks per room |
+|---|---|---|---|
+| None (basket gain) | +0.06 [−0.23, +0.35] | +0.11 [+0.02, +0.21] | +0.33 [+0.11, +0.54] |
+| Basket | −0.11 [−1.57, +1.35] | +0.14 [−0.02, +0.29] | +0.46 [−0.17, +1.10] |
+| Wall | −0.20 [−1.15, +0.75] | +0.13 [−0.02, +0.27] | +0.10 [−0.57, +0.77] |
+| Leave-it | +0.01 [−0.35, +0.37] | +0.06 [−0.05, +0.18] | +0.18 [−0.22, +0.57] |
+
+**Analysis.** The rules predict the duck's own outcomes better than the
+counts it has used since Milestone 1, on outcomes they had not seen, in two
+thirds of lives. The gain is small (3 to 4% of the Brier score) because a
+life is short and most conditions matter modestly, but it is consistent,
+and the conditions it finds are the ones the development diagnosis found
+by hand. Milestone 4's exit test, as written in the roadmap, is met.
+
+Deciding with the rules made things slightly worse: falls and failed picks
+rose in every arm, significantly in the control. A likely mechanism is the
+optimizer's curse: when the duck chooses among up to six toys by their
+predicted means, the most optimistic prediction is disproportionately the
+most wrong. Counts per skill give every toy the same probability (counts
+per kind differ only by where the toy is), so they offer less to be fooled
+by. This is a hypothesis (H-018), not a finding of this experiment.
+
+**Decision.** Keep the rules for prediction, surprise, and the briefing.
+Decisions keep the counts by default (`--rules` remains an option). Next:
+decide with posterior draws from the rules (H-018), and use the same rules
+for the owner's reactions (H-017).
+
+**Review** (critic pass over `e0c955d..61741e9`; fixes in the next commit).
+It reproduced the Brier numbers from the rows and found no leakage. It
+found these problems, now fixed:
+- *No condition could become credible.* Every value of a feature had its
+  own centred weight. Those weights sum to zero across a feature's values,
+  so the prior alone fixes one direction and each value's sd stayed at
+  least 0.5/√K whatever the data. An odds ratio below about 4 could never
+  pass. Credibility now tests a value's contrast against the other values
+  of its feature, using the full posterior covariance. The odds reported are
+  that contrast. The threshold is 3 sd, because a skill is tested against a
+  dozen conditions at once. "No credible rule in any life" above, and the
+  explanation given for it, are artifacts of the old test.
+- *Episode ends were learned as failures.* The action cut off when an
+  episode ended (or by the battery reflex) was scored and learned as a
+  failure of its skill. Far deliveries are cut off most often, so the rules
+  could partly learn the clock. Interrupted actions are no longer scored or
+  learned.
+- *Training and prediction encoded a missing feature differently.* Both
+  now treat it as average.
+- *Credit by moments counted an action once per moment.* It now counts
+  each action once.
+- *With `--rules`, `p_rule` changed meaning.* It no longer does; the
+  rules' forecast is in `predicted`.
+- *Claims:* falls against counts per kind, the counts arm's per-kind
+  steering, the untested optimizer's-curse explanation, and E-016's "costs
+  nothing" are corrected above.
+- *Reproducibility:* `scripts/rules_report.py` produces the condition
+  effects, credible rules, and deciding-with-rules comparisons; E-016's
+  development rows are committed.
+
+**Round 2 predictions.** The fixes change what is learned and scored, so
+round 2 uses fresh lives 112 to 127, with predictions 1 to 3 unchanged, and
+reports credible rules and deciding with rules as before.
+
+**Round 2 result** (commit `ec94ad4`; rows `r2_*.jsonl`, scores
+`r2_predictions_*.txt`, rules and decisions `r2_rules_report.txt`; 1,280
+episodes; late = rooms 6 to 10, per life, paired, n = 64).
+
+| Prediction | Measure | Rules | Counts | Rules minus counts [95% CI] | Verdict |
+|---|---|---|---|---|---|
+| 1 | Brier, expected effects, against counts per skill | 0.1284 | 0.1348 | −0.0064 [−0.0095, −0.0033], 42 of 64 better | met |
+| 2 | ... against counts per kind of action | 0.1284 | 0.1335 | −0.0052 [−0.0103, −0.0001], 44 of 64 better | met, narrowly |
+| 3 | Brier, falls, against counts per skill | 0.0049 | 0.0051 | −0.00015 [−0.00040, +0.00009] | met |
+
+Against counts per kind, the rules were again worse on falls (0.0049
+against 0.0047; +0.00020 [+0.00014, +0.00026], 57 of 64 lives worse). In
+the arm that decided with rules, they beat counts per skill on both
+outcomes and counts per kind on expected effects (−0.0053 [−0.0105,
+−0.0002]), and lost to counts per kind on falls (+0.00025).
+
+*Conditions.* Even with the corrected test, no condition reached 3
+posterior sds in any single life. The contrasts agree in direction across
+lives and are larger than round 1's, now that truncated actions are not
+counted as failures:
+- A pick's effect is less likely when the toy is by the rim (median −0.37
+  on the log-odds, lower in 52 of 55 lives), in the basket (−0.27, 59 of
+  64), or last seen a while ago (−0.23, 48 of 64).
+- A delivery from far away fails more often (−0.30, 41 of 49).
+- A pick by the rim is more likely to end in a fall (+0.46, higher in 48
+  of 55 lives).
+
+*Deciding with rules* (rules minus counts, same lives): own measures
+none +0.00, basket −0.50 [−1.44, +0.44], wall −0.28 [−1.69, +1.14],
+leave-it −0.28 [−0.67, +0.12]. Falls rose in every arm, significantly
+in the wall arm (+0.13 [+0.05, +0.20]). Failed picks rose in every arm.
+
+**Analysis (both rounds).** The prediction result replicates on fresh lives
+with the corrected learner: rules over conditions predict whether a skill's
+expected effect holds 4 to 5% better than counts, and the conditions they
+weigh are the ones the development diagnosis found by hand. Falls are rare
+(about one in a hundred actions). The rules match counts per skill on
+falls but lose slightly to counts per kind, which split picks by where the
+toy is, the one condition that matters most for falls. Effects within a
+single life stay below 3 sds: they are real across lives but modest within
+one. Choosing by the rules' means is worse in both rounds, consistent with
+H-018. Milestone 4's exit test is met for expected effects.
+
+### E-016 · 2026-11-03 · Milestone 3c: credit timing and rim falls (development, refuted)
+
+**Question.** H-016 said the wall-arm duck re-moves toys from walls because
+the action that follows a change takes the credit for her reaction. H-011
+said falls at the basket rim come from the delivery's sidestep.
+
+**Measuring the mechanism.** Two truth measures were added for evaluation:
+the share of credit the duck gives to the kind of action it was doing when
+the change she answered happened (`creditToCause`), and the toys she liked
+that were lost to a pick (`lostByPick`) or otherwise (`lostOtherwise`).
+
+**Credit timing.** A reaction answers a change, and the duck changes the
+room at moments its body senses: a grasp, a release, a bump. The new rule
+credits those moments in the window, or an action's end if it changed
+nothing (`--credit moments`); the old one credits any action under way
+(`--credit underway`). On lives 0 to 3:
+
+| Owner | Credit to the true cause, under way | Credit to the true cause, moments | Own measure, late (under way / moments) |
+|---|---|---|---|
+| Basket | 0.84 (51 reactions) | 0.86 (49) | 2.95 / 2.85 |
+| Wall | 0.79 (153) | 0.80 (147) | 5.20 / 5.20 |
+| Leave-it | 0.60 (83) | 0.64 (58) | 4.90 / 4.65 |
+
+The old rule already gave 79% of the credit to the true cause in the wall
+arm. On eight more lives (4 to 11) the wall owner's disapprovals fell
+from 1.45 to 0.80 a room with moments, but toys against walls fell too (4.13
+to 3.28, p = 0.055). Credit timing is not what drives the wall arm's lost
+toys.
+
+**What does.** A probe on four learned lives (`scripts/owner_pick_probe.py`) traced 35 picks, 8 of toys she liked. In 5
+the duck knew the toy was by a wall and picked it anyway: its category
+"pick from wall" (0.25 m) is coarser than hers (0.2 m), so on average the
+category is only mildly disliked (about −0.2), and the put that follows is
+liked (+0.43). In the other 3 the duck believed the toy 0.19 to 0.36 m
+from where it was. Widening the duck's "by a wall" by two standard
+deviations of the toy's position, as `inside` does for the basket, did
+not reduce toys lost to picks (+0.18, CI −1.16 to +1.51) and was reverted.
+
+**Rim falls.** All 101 falls in E-015 round 2 happened within 0.3 m of the
+basket rim (from the last pose snapshot before each): among them 27 in
+the delivery's sidestep, 26 standing before a ground pick, 13 in the
+ground pick, and 8 opening the beak to drop. Two changes to the
+delivery were tried on 32 rooms (1000 to 1031) with the task policy:
+- stepping back instead of sideways: 3.7% of deliveries fell against
+  4.1%, with 0.4 fewer toys;
+- stopping 3 cm further out: 0.8% fell, but toys missed the basket and
+  tidying fell by 1.69 toys a run (CI −2.11 to −1.26).
+Both were rejected. The lab's measured approach is the best available, and
+the rest of the risk is in which toys the duck chooses to pick, which
+Milestone 4's rules can see ("pick when target by the rim").
+
+**Decision.** H-016 is refuted. The moment rule is kept as the default
+because it is the correct definition of a reaction's possible causes and
+gave slightly more credit to the true cause in all three arms. Its effect
+on behaviour is unsettled: equal on lives 0 to 3 in the wall arm (5.20
+toys against walls either way), lower on lives 4 to 11 (3.28 against 4.13,
+p = 0.055). Rows are in `experiments/E-016-credit/`. H-011's
+sidestep diagnosis is refuted; rim falls are a property of the body and of
+the choice of target. Next: learn the reaction model's conditions instead
+of hand-chosen kinds (the same rules as E-017), so "by a wall" can be as
+fine as the owner's.
 
 ### E-015 · 2026-11-03 · Milestone 3b: learning what the owner wants (pre-registered)
 

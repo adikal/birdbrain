@@ -1,0 +1,30 @@
+== effect: mean Brier per episode (64 lifetimes)
+  ep    rules    skill     kind  actions/ep
+   1   0.2572   0.2503   0.2492         5.1
+   2   0.1614   0.1759   0.1747         5.5
+   3   0.1545   0.1633   0.1636         6.8
+   4   0.1611   0.1710   0.1686         7.7
+   5   0.1528   0.1552   0.1545         7.4
+   6   0.1586   0.1621   0.1608         8.2
+   7   0.1346   0.1450   0.1358         9.2
+   8   0.1667   0.1727   0.1713         8.6
+   9   0.1504   0.1531   0.1550         9.4
+  10   0.1266   0.1385   0.1502         8.0
+  late episodes, rules vs skill: x: A 0.166 · B 0.160 · B-A -0.006 [95% CI -0.009, -0.003] · B higher 18, equal 0, lower 45 · sign-flip p = 0.000 · n = 63 · diff -0.006131 [-0.009335, -0.002926]
+  late episodes, rules vs kind: x: A 0.165 · B 0.160 · B-A -0.005 [95% CI -0.009, -0.001] · B higher 24, equal 0, lower 39 · sign-flip p = 0.011 · n = 63 · diff -0.005019 [-0.008888, -0.001149]
+  rules, episodes 1-2 vs last two: x: A 0.214 · B 0.144 · B-A -0.071 [95% CI -0.092, -0.049] · B higher 15, equal 0, lower 45 · sign-flip p = 0.000 · n = 60
+== fell: mean Brier per episode (64 lifetimes)
+  ep    rules    skill     kind  actions/ep
+   1   0.0159   0.0159   0.0156        26.2
+   2   0.0109   0.0110   0.0107        26.5
+   3   0.0055   0.0056   0.0053        26.4
+   4   0.0102   0.0106   0.0098        26.3
+   5   0.0070   0.0072   0.0067        26.1
+   6   0.0070   0.0073   0.0068        26.6
+   7   0.0070   0.0074   0.0068        25.9
+   8   0.0072   0.0074   0.0067        26.3
+   9   0.0073   0.0075   0.0073        26.1
+  10   0.0100   0.0103   0.0099        26.3
+  late episodes, rules vs skill: x: A 0.008 · B 0.008 · B-A -0.000 [95% CI -0.000, -0.000] · B higher 26, equal 0, lower 38 · sign-flip p = 0.000 · n = 64 · diff -0.000236 [-0.000357, -0.000114]
+  late episodes, rules vs kind: x: A 0.007 · B 0.008 · B-A +0.000 [95% CI +0.000, +0.000] · B higher 50, equal 0, lower 14 · sign-flip p = 0.000 · n = 64 · diff +0.000205 [+0.000108, +0.000302]
+  rules, episodes 1-2 vs last two: x: A 0.013 · B 0.009 · B-A -0.004 [95% CI -0.010, +0.002] · B higher 20, equal 0, lower 44 · sign-flip p = 0.168 · n = 64

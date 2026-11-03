@@ -65,6 +65,7 @@ def test_credit_goes_to_the_kind_that_keeps_being_followed_by_approval():
     t = 0.0
     for _ in range(12):
         model.started("deliver", t)
+        model.moment(t + 8.0)                      # the toy drops into the basket
         model.ended("deliver", t + 10.0)
         model.started("look_around", t + 10.0)
         model.react(+1, t + 12.0)                  # her approval lands during the next action
@@ -79,13 +80,30 @@ def test_credit_goes_to_the_kind_that_keeps_being_followed_by_approval():
     assert model.belief("explore").expected < 0.05
 
 
-def test_a_reaction_before_the_minimum_delay_is_not_credited_to_what_just_started():
+def test_a_reaction_is_credited_to_the_change_it_answers():
+    """E-016: she disapproves of a grasp 2 s after it, while the put that follows is
+    under way. Crediting actions under way (E-015) blames the put too; crediting the
+    duck's own changes to the room blames only the pick."""
+    shares = {}
+    for credit in ("underway", "moments"):
+        model = ReactionModel(credit=credit)
+        model.started("pick from wall", 0.0)
+        model.moment(9.5)                          # grasped
+        model.ended("pick from wall", 10.0)
+        model.started("put_by_wall", 10.0)
+        shares[credit] = model.react(-1, 11.5)
+        model.moment(25.0)                         # released, long after
+        model.ended("put_by_wall", 28.0)
+    assert shares["underway"].get("put_by_wall", 0) > 0.3
+    assert "put_by_wall" not in shares["moments"] and shares["moments"]["pick from wall"] > 0.8
+
+
+def test_an_action_that_changed_nothing_is_a_candidate_at_its_end():
     model = ReactionModel()
-    model.started("pick from open", 0.0)
-    model.ended("pick from open", 10.0)
-    model.started("drop", 10.0)
-    shares = model.react(-1, 10.3)
-    assert "drop" not in shares and shares["pick from open"] > 0.8
+    model.started("rest", 0.0)
+    model.ended("rest", 10.0)
+    model.started("look_around", 10.0)
+    assert "rest" in model.react(+1, 12.0) and "look_around" not in model.react(+1, 12.5)
 
 
 def test_the_approval_need_moves_with_her_reactions_and_relaxes():

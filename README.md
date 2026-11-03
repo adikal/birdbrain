@@ -113,6 +113,7 @@ uv pip install --python .venv/bin/python -e ../microduck-lab/microduck_local -e 
 .venv/bin/birdbrain-run --needs --seeds 16 --out needs.jsonl                    # no task: needs and goals
 .venv/bin/birdbrain-run --owner wall --episodes 10 --seeds 4 --jobs 4 --out wall.jsonl   # learn an owner's wish
 .venv/bin/python scripts/lifetimes.py wall.jsonl                               # summarize lifetimes
+.venv/bin/python scripts/predictions.py wall.jsonl                             # score predictions
 .venv/bin/birdbrain-compare A.jsonl B.jsonl          # paired, seed-matched comparison
 .venv/bin/birdbrain-dashboard --live --seed 3        # the mind, live, at http://127.0.0.1:8790
 .venv/bin/birdbrain-record playroom --brain d0=birdbrain --seconds 120 --out /tmp/rec   # video
@@ -144,7 +145,7 @@ credentials; model usage is billed to the AWS account.
 
 ## Status
 
-Milestones 0 to 3b are complete (see the report's results, section 6):
+Milestones 0 to 4 are complete (see the report's results, section 6):
 
 - From the robot's own senses, with an explicit task, the mind tidies as
   well as the lab's hand-tuned controller on held-out rooms (E-008).
@@ -158,7 +159,13 @@ Milestones 0 to 3b are complete (see the report's results, section 6):
   `src/birdbrain/phrases.toml`), the duck learns over a life of ten rooms
   which of three hidden preferences she holds: toys in the basket, by the
   walls, or left alone. Without an owner it does not tidy (E-015).
+- Two plausible fixes for lost toys and rim falls were measured and refuted;
+  truth measures found the real causes (E-016).
+- Causal rules, Bayesian logistic models over conditions the duck believes
+  hold, predict its own outcomes better than counts on outcomes they had not
+  seen. Choosing by their means did worse, so decisions still use counts
+  (E-017).
 
-Next are credit timing and safer deliveries (Milestone 3c), then
-predictions, surprise, and causal rules (Milestone 4). The roadmap is in
+Next is letting the rules steer through posterior draws, and learning the
+owner's reactions over the same conditions (Milestone 4a). The roadmap is in
 [`docs/design.md`](docs/design.md#9-roadmap).

@@ -10,10 +10,13 @@ Kinds of action are the duck's own: the skill, and for a pick, where the toy was
 prior, Beta(1, 2) for each of approval and disapproval: no kind is assumed to
 please her.
 
-Credit assignment is a soft, Bayesian one. A reaction at time t could have been
-caused by any action that was under way in the window [t - window, t - min_delay]
-(she needs a moment to react, and the change she reacts to can happen mid-action),
-or by nothing the duck did. Each candidate is credited in proportion to its kind's
+Credit assignment is a soft, Bayesian one. A reaction answers a change in the
+room, and the duck changes the room at moments it senses itself: when it grasps a
+toy, releases one, or bumps into something. A reaction at time t could have been
+caused by any such moment in the window [t - window, t - min_delay] (she needs a
+moment to react), by the end of an action that changed nothing, or by nothing the
+duck did (ledger E-016). The earlier rule, any action under way in the window
+(E-015), is kept as `credit="underway"` for comparison. Each candidate is credited in proportion to its kind's
 probability of that reaction, and "nothing" in proportion to a small background
 rate. Credit and probabilities depend on each other, so every reaction keeps its
 candidates and the whole history is re-explained by expectation-maximization
@@ -81,20 +84,26 @@ class ReactionModel:
     #: Every reaction heard: (valence, the kinds of action that could have caused it).
     history: list[tuple[int, list[str]]] = field(default_factory=list)
     em_iterations: int = 20
-    _actions: list[tuple[str, float, float | None]] = field(default_factory=list)   # (kind, t0, t1)
+    credit: str = "moments"          # "moments" (E-016) or "underway" (E-015)
+    #: Recent actions: [kind, t0, t1 or None while running, effect moments].
+    _actions: list[list] = field(default_factory=list)
 
     def belief(self, kind: str) -> KindBelief:
         return self.kinds.get(kind, KindBelief())
 
     def started(self, kind: str, t: float) -> None:
-        self._actions.append((kind, t, None))
+        self._actions.append([kind, t, None, []])
+
+    def moment(self, t: float) -> None:
+        """The running action changed the room now (a grasp, a release, a bump)."""
+        if self._actions and self._actions[-1][2] is None:
+            self._actions[-1][3].append(t)
 
     def ended(self, kind: str, t: float) -> None:
         """The running action of `kind` ended: it is one more trial of its kind."""
-        for i in range(len(self._actions) - 1, -1, -1):
-            k, t0, t1 = self._actions[i]
-            if k == kind and t1 is None:
-                self._actions[i] = (k, t0, t)
+        for a in reversed(self._actions):
+            if a[0] == kind and a[2] is None:
+                a[2] = t
                 break
         self.kinds.setdefault(kind, KindBelief()).trials += 1
         horizon = t - self.window_s - 60.0
@@ -102,7 +111,14 @@ class ReactionModel:
 
     def candidates(self, t: float) -> list[str]:
         lo, hi = t - self.window_s, t - self.min_delay_s
-        return [k for k, t0, t1 in self._actions if t0 <= hi and (t1 is None or t1 >= lo)]
+        if self.credit == "underway":
+            return [k for k, t0, t1, _ in self._actions if t0 <= hi and (t1 is None or t1 >= lo)]
+        out = []
+        for kind, _, t1, moments in self._actions:
+            times = moments or ([t1] if t1 is not None else [])
+            if any(lo <= m <= hi for m in times):            # once per action, however many moments
+                out.append(kind)
+        return out
 
     def react(self, valence: int, t: float) -> dict[str, float]:
         """Credit one reaction to its possible causes; returns each cause's share."""

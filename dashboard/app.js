@@ -270,6 +270,8 @@ function renderDecisions(upTo) {
 }
 
 function renderTables(p) {
+  // Milestone 4: credible rules, as the cloud brain reads them.
+  setHTML($("#rule-list"), (p.rules || []).map((r) => `<li>${esc(r)}</li>`).join(""));
   setHTML($("#skill-rows"), Object.entries(p.records || {}).map(([name, r]) =>
     `<tr><td>${esc(name)}</td><td>${r.trials}</td><td>${r.effect_held}</td><td>${r.p.toFixed(2)}</td><td>${r.mean_s ?? "—"}</td></tr>`).join(""));
   setHTML($("#belief-rows"), (p.entities || []).filter((e) => e.cls !== "place").map((e) =>

@@ -83,7 +83,10 @@ uv run record-world playroom --brain d0=tidy --seconds 120 --seed 1 --stride 10 
   the social need approval, with a scripted owner of that hidden preference;
   `--episodes 10` runs each seed as a life of 10 rooms with memory under
   `--memory` (default `data/lifetimes/<tag>`), and
-  `scripts/lifetimes.py` summarizes the rows. The owner's phrases are in
+  `scripts/lifetimes.py` summarizes the rows. `--credit moments|underway`
+  chooses how reactions are credited (E-016). Causal rules are learned and
+  scored in every run (`scripts/predictions.py`); `--rules` also decides with
+  them (E-017). The owner's phrases are in
   `src/birdbrain/phrases.toml` (or `BIRDBRAIN_PHRASES`). Compare arms with `.venv/bin/birdbrain-compare A.jsonl B.jsonl`.
   Event logs go to `data/runs/` (set `BIRDBRAIN_RUNS_DIR` to change it).
 - **The mind:** `.venv/bin/birdbrain-dashboard --live --seed 3 [--needs] [--room tidy] [--owner basket]`, then open

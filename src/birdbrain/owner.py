@@ -84,10 +84,13 @@ class Owner:
         self._rng = random.Random(self.seed)
         self._start: dict[str, Point] | None = None
         self._state: dict[str, bool] = {}
-        self._pending: list[tuple[float, int]] = []          # (time to react, valence)
+        self._pending: list[tuple[float, int, float]] = []   # (time to react, valence, time of the change)
+        self.heard_changes: list[float] = []
         self._next_check = 0.0
-        #: Truth for evaluation: every reaction she made (t, valence meant, what she said or "pet").
+        #: Truth for evaluation: every reaction she made (t, valence meant, what she said or "pet"),
+        #: and every change she noticed (t, toy, now liked, the toy was held).
         self.log: list[tuple[float, int, str]] = []
+        self.changes: list[tuple[float, str, bool, bool]] = []
 
     def satisfied(self, room: Room) -> int:
         return sum(self._likes(room, toy, self._start or room.toys, self.wall_m) for toy in room.toys)
@@ -102,15 +105,19 @@ class Owner:
                 now = self._likes(room, toy, self._start, self.wall_m)
                 before = self._state.get(toy)
                 self._state[toy] = now
+                if before is not None and now != before:
+                    self.changes.append((t, toy, now, toy == room.held))
                 if before is not None and now != before and self._rng.random() < self.react_p:
-                    self._pending.append((t + self._rng.uniform(*self.delay_s), 1 if now else -1))
+                    self._pending.append((t + self._rng.uniform(*self.delay_s), 1 if now else -1, t))
         heard: list[str] = []
         petted = False
+        #: Truth for evaluation: when the change behind each phrase heard this tick happened.
+        self.heard_changes: list[float] = []
         due = sorted(p for p in self._pending if p[0] <= t)
         self._pending = [p for p in self._pending if p[0] > t]
-        for when, valence in due:
+        for when, valence, changed in due:
             if petted and valence > 0 and self.position is not None:
-                self._pending.append((when, valence))          # one pet at a time: the rest wait
+                self._pending.append((when, valence, changed))  # one pet at a time: the rest wait
                 continue
             if (valence > 0 and self.position is not None and math.dist(duck, self.position) <= self.pet_radius
                     and self._rng.random() < self.pet_p):
@@ -120,5 +127,6 @@ class Owner:
             said = valence if self._rng.random() >= self.mishear_p else -valence
             phrase = self._rng.choice(self.phrases.positive if said > 0 else self.phrases.negative)
             heard.append(phrase)
+            self.heard_changes.append(changed)
             self.log.append((t, valence, phrase))
         return tuple(heard), petted

@@ -1,0 +1,45 @@
+== effect (its expected effect holds): conditions seen in at least half of 64 lives, by median effect
+  pick         target by the rim=yes              median -0.37  lowers the odds in 52 of 55 lives
+  pick         target by the rim=no               median +0.35  lowers the odds in 3 of 64 lives
+  deliver      basket distance=far                median -0.30  lowers the odds in 41 of 49 lives
+  pick         target is=basket                   median -0.27  lowers the odds in 59 of 64 lives
+  pick         target last seen=recently          median +0.25  lowers the odds in 13 of 61 lives
+  pick         target last seen=a while ago       median -0.23  lowers the odds in 48 of 64 lives
+  deliver      basket distance=mid                median +0.20  lowers the odds in 12 of 59 lives
+  pick         target is=open                     median +0.19  lowers the odds in 11 of 64 lives
+  pick         target position=vague              median -0.17  lowers the odds in 40 of 59 lives
+  pick         target distance=near               median +0.16  lowers the odds in 19 of 64 lives
+  pick         target distance=mid                median -0.16  lowers the odds in 42 of 64 lives
+  pick         target tried before=yes            median -0.16  lowers the odds in 31 of 50 lives
+  credible rules (3 sd), lives in which each appears: none
+== fell (the duck falls): conditions seen in at least half of 64 lives, by median effect
+  pick         target by the rim=yes              median +0.46  lowers the odds in 7 of 55 lives
+  pick         target by the rim=no               median -0.45  lowers the odds in 48 of 64 lives
+  pick         target is=basket                   median +0.40  lowers the odds in 8 of 64 lives
+  pick         target is=open                     median -0.25  lowers the odds in 56 of 64 lives
+  pick         target last seen=recently          median -0.13  lowers the odds in 51 of 61 lives
+  pick         target last seen=a while ago       median +0.13  lowers the odds in 10 of 64 lives
+  pick         target is=wall                     median +0.12  lowers the odds in 10 of 60 lives
+  pick         target by a wall=yes               median -0.05  lowers the odds in 47 of 62 lives
+  pick         target by a wall=no                median +0.05  lowers the odds in 15 of 64 lives
+  pick         basket=vague                       median -0.04  lowers the odds in 51 of 61 lives
+  pick         basket=precise                     median +0.04  lowers the odds in 10 of 64 lives
+  pick         target position=vague              median -0.04  lowers the odds in 45 of 59 lives
+  credible rules (3 sd), lives in which each appears: none
+== deciding with rules minus deciding with counts, rooms 6 on, paired by life
+  none    own: A 0.450 · B 0.450 · B-A +0.000 [95% CI -0.202, +0.202] · B higher 4, equal 3, lower 9 · sign-flip p = 1.000 · n = 16
+  none    falls: A 0.075 · B 0.087 · B-A +0.012 [95% CI -0.060, +0.085] · B higher 4, equal 9, lower 3 · sign-flip p = 1.000 · n = 16
+  none    failed picks: A 0.537 · B 0.763 · B-A +0.225 [95% CI -0.050, +0.500] · B higher 8, equal 2, lower 6 · sign-flip p = 0.124 · n = 16
+  none    lost by pick: A 0.000 · B 0.000 · B-A +0.000 [95% CI +0.000, +0.000] · B higher 0, equal 16, lower 0 · sign-flip p = 1.000 · n = 16
+  basket  own: A 3.012 · B 2.513 · B-A -0.500 [95% CI -1.437, +0.437] · B higher 5, equal 0, lower 11 · sign-flip p = 0.285 · n = 16
+  basket  falls: A 0.288 · B 0.413 · B-A +0.125 [95% CI -0.048, +0.298] · B higher 12, equal 2, lower 2 · sign-flip p = 0.193 · n = 16
+  basket  failed picks: A 1.175 · B 1.350 · B-A +0.175 [95% CI -0.382, +0.732] · B higher 10, equal 0, lower 6 · sign-flip p = 0.538 · n = 16
+  basket  lost by pick: A 0.013 · B 0.000 · B-A -0.013 [95% CI -0.039, +0.014] · B higher 0, equal 15, lower 1 · sign-flip p = 1.000 · n = 16
+  wall    own: A 3.112 · B 2.837 · B-A -0.275 [95% CI -1.691, +1.141] · B higher 6, equal 3, lower 7 · sign-flip p = 0.695 · n = 16
+  wall    falls: A 0.013 · B 0.138 · B-A +0.125 [95% CI +0.048, +0.202] · B higher 8, equal 8, lower 0 · sign-flip p = 0.008 · n = 16
+  wall    failed picks: A 1.738 · B 1.963 · B-A +0.225 [95% CI -0.424, +0.874] · B higher 8, equal 3, lower 5 · sign-flip p = 0.495 · n = 16
+  wall    lost by pick: A 1.262 · B 1.850 · B-A +0.588 [95% CI -0.130, +1.305] · B higher 10, equal 2, lower 4 · sign-flip p = 0.111 · n = 16
+  leave   own: A 5.225 · B 4.950 · B-A -0.275 [95% CI -0.666, +0.116] · B higher 3, equal 2, lower 11 · sign-flip p = 0.174 · n = 16
+  leave   falls: A 0.113 · B 0.188 · B-A +0.075 [95% CI -0.075, +0.225] · B higher 7, equal 6, lower 3 · sign-flip p = 0.395 · n = 16
+  leave   failed picks: A 0.475 · B 0.775 · B-A +0.300 [95% CI -0.194, +0.794] · B higher 9, equal 5, lower 2 · sign-flip p = 0.252 · n = 16
+  leave   lost by pick: A 1.338 · B 1.875 · B-A +0.537 [95% CI -0.065, +1.140] · B higher 12, equal 1, lower 3 · sign-flip p = 0.083 · n = 16

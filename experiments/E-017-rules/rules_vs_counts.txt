@@ -1,0 +1,16 @@
+none own: A 0.425 · B 0.487 · B-A +0.062 [95% CI -0.228, +0.353] · B higher 6, equal 6, lower 4 · sign-flip p = 0.750 · n = 16
+none falls: A 0.038 · B 0.150 · B-A +0.113 [95% CI +0.017, +0.208] · B higher 7, equal 8, lower 1 · sign-flip p = 0.047 · n = 16
+none failed: A 0.625 · B 0.950 · B-A +0.325 [95% CI +0.112, +0.538] · B higher 12, equal 0, lower 4 · sign-flip p = 0.010 · n = 16
+none lostByPick: A 0.000 · B 0.000 · B-A +0.000 [95% CI +0.000, +0.000] · B higher 0, equal 16, lower 0 · sign-flip p = 1.000 · n = 16
+basket own: A 2.038 · B 1.925 · B-A -0.113 [95% CI -1.574, +1.349] · B higher 7, equal 0, lower 9 · sign-flip p = 0.884 · n = 16
+basket falls: A 0.200 · B 0.338 · B-A +0.138 [95% CI -0.017, +0.292] · B higher 9, equal 4, lower 3 · sign-flip p = 0.108 · n = 16
+basket failed: A 0.975 · B 1.438 · B-A +0.463 [95% CI -0.171, +1.096] · B higher 11, equal 0, lower 5 · sign-flip p = 0.154 · n = 16
+basket lostByPick: A 0.000 · B 0.038 · B-A +0.038 [95% CI -0.005, +0.080] · B higher 3, equal 13, lower 0 · sign-flip p = 0.250 · n = 16
+wall own: A 3.087 · B 2.888 · B-A -0.200 [95% CI -1.145, +0.745] · B higher 7, equal 2, lower 7 · sign-flip p = 0.680 · n = 16
+wall falls: A 0.038 · B 0.163 · B-A +0.125 [95% CI -0.015, +0.265] · B higher 7, equal 6, lower 3 · sign-flip p = 0.113 · n = 16
+wall failed: A 1.950 · B 2.050 · B-A +0.100 [95% CI -0.574, +0.774] · B higher 7, equal 0, lower 9 · sign-flip p = 0.786 · n = 16
+wall lostByPick: A 1.288 · B 1.688 · B-A +0.400 [95% CI -0.481, +1.281] · B higher 10, equal 1, lower 5 · sign-flip p = 0.361 · n = 16
+leave own: A 5.075 · B 5.088 · B-A +0.013 [95% CI -0.347, +0.372] · B higher 7, equal 2, lower 7 · sign-flip p = 1.000 · n = 16
+leave falls: A 0.100 · B 0.163 · B-A +0.062 [95% CI -0.052, +0.177] · B higher 5, equal 8, lower 3 · sign-flip p = 0.391 · n = 16
+leave failed: A 0.613 · B 0.787 · B-A +0.175 [95% CI -0.220, +0.570] · B higher 9, equal 2, lower 5 · sign-flip p = 0.398 · n = 16
+leave lostByPick: A 2.050 · B 1.600 · B-A -0.450 [95% CI -1.424, +0.524] · B higher 9, equal 1, lower 6 · sign-flip p = 0.423 · n = 16
