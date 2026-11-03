@@ -1,415 +1,338 @@
-let totalFrames = 120;
-const timeline = document.querySelector("#timeline");
-const duck = document.querySelector("#duck");
-const trail = document.querySelector("#trail");
-const blueBlock = document.querySelector("#blue-block");
-const redBall = document.querySelector("#red-ball");
-const attentionCone = document.querySelector("#attention-cone");
-const pauseButton = document.querySelector("#pause-button");
-const playButton = document.querySelector("#play-button");
-const playbackRate = document.querySelector("#playback-rate");
-const runSelect = document.querySelector("#run-select");
-const compareSelect = document.querySelector("#compare-select");
-const eventList = document.querySelector("#event-list");
-const inspector = document.querySelector("#json-inspector");
+// BirdBrain mind observatory: a read-only view over one run's event log.
+// Everything shown is derived from events; snapshots (STATE_SNAPSHOT, 2 Hz)
+// drive the timeline, and other events are shown up to the snapshot's time.
 
-let frameIndex = totalFrames - 1;
-let playing = true;
-let selectedFilter = "all";
-let selectedEvent = "action-7";
-let timer;
-let liveMode = false;
-let runId = "SIM-0042";
-let liveActionCount = 0;
-let eventSource;
-let cloudCalls = 0;
-let memoryEpisodes = 0;
-let memoryConflicts = 0;
+const $ = (sel) => document.querySelector(sel);
+const svg = $("#world-map");
+const state = {
+  runId: null, live: false, liveRunId: null, events: [], snapshots: [], truths: [], frames: [], generation: 0,
+  index: 0, playing: false, follow: true, filter: "mind", selected: null,
+  room: [3.0, 2.5], source: null, timer: null,
+};
 
-let events = [
-  { id:"boot", frame:2, kind:"body", icon:"↯", type:"RUN_STARTED", text:"MuJoCo adapter ready · seed 42", duration:"12ms", payload:{seed:42, model:"birdbrain_microduck_arena", mujoco:"3.17.0"} },
-  { id:"observe-1", frame:14, kind:"body", icon:"◉", type:"OBSERVATION", text:"3 objects visible · pose confidence 0.96", duration:"3.7ms", payload:{visible:["blue_block","red_ball","charging_zone"], confidence:.96} },
-  { id:"memory-2", frame:27, kind:"mind", icon:"◇", type:"MEMORY_RETRIEVED", text:"Blue block previously observed at (0.78, 0.51)", duration:"18ms", payload:{memory_id:"epi_0018", similarity:.91, age_seconds:84.2} },
-  { id:"goal-3", frame:38, kind:"mind", icon:"◎", type:"GOAL_PROPOSED", text:"Inspect the unfamiliar blue block", duration:"26ms", payload:{goal:"inspect_blue_block", source:"novelty", utility:.86, constraints:["energy > .35","collision_risk < .2"]} },
-  { id:"conflict-4", frame:51, kind:"mind", icon:"?", type:"BELIEF_CONFLICT", text:"Object moved 0.06 m from remembered pose", duration:"—", payload:{entity:"blue_block", observed:[.85,.55,.07], remembered:[.79,.52,.07], delta_m:.067} },
-  { id:"plan-5", frame:61, kind:"mind", icon:"⌁", type:"PLAN_CREATED", text:"approach → inspect → push-test", duration:"41ms", payload:{steps:["approach_object","center_gaze","push_test"], predicted_success:.78} },
-  { id:"slip-6", frame:73, kind:"body", icon:"!", type:"ANOMALY", text:"Unexpected foot slip · lateral drift 0.18 m/s", duration:"—", payload:{code:"foot_slip", severity:"warning", lateral_velocity:.18, contact:"left_foot_geom"} },
-  { id:"action-7", frame:82, kind:"body", icon:"▶", type:"ACTION_SELECTED", text:"Set walking joint targets", duration:"0.4ms", payload:{action:"set_joint_targets", targets:{left_hip_motor:.10,right_hip_motor:-.08,left_ankle_motor:-.04,right_ankle_motor:.06,neck_motor:.25}, frame_skip:5} },
-  { id:"reflect-8", frame:96, kind:"mind", icon:"✦", type:"REFLECTION", text:"Reduce stride amplitude after slip", duration:"52ms", payload:{lesson:"lower stride amplitude on low-confidence contact", confidence:.72, applies_to:"walk_forward"} },
-  { id:"observe-9", frame:111, kind:"body", icon:"◉", type:"OBSERVATION", text:"Blue block now 0.42 m ahead", duration:"3.5ms", payload:{target:"blue_block", distance_m:.42, bearing_deg:7.4, visible:true} }
-];
+const FILTERS = {
+  mind: new Set(["RUN_STARTED", "DECISION", "OUTCOME", "CHOICE_REJECTED", "FALL", "RUN_STOPPED", "RUN_FAILED"]),
+  skills: new Set(["SKILL_STEP_STARTED", "SKILL_STEP_ENDED", "SKILL_BIND", "EVENT_STARTED", "EVENT_ENDED", "GRASP_TRUTH"]),
+  beliefs: new Set(["ENTITY_CREATED", "ASSERTION_OPENED", "ASSERTION_CLOSED"]),
+};
 
-let frames = Array.from({length:totalFrames}, (_, i) => {
-  const t = i / 10;
-  const progress = i / (totalFrames - 1);
-  const x = 270 + progress * 115 + Math.sin(i / 12) * 7;
-  const y = 260 - progress * 100 + Math.cos(i / 17) * 5;
-  const heading = -28 + progress * 14 + Math.sin(i / 15) * 5;
-  return {
-    t, x, y, heading,
-    confidence: .69 + progress * .1 + Math.sin(i / 16) * .025,
-    energy: .91 - progress * .07,
-    speed: .12 + Math.abs(Math.sin(i / 10)) * .09,
-    pitch: -1.7 - Math.sin(i / 9) * 1.1,
-    joints:[.25 + Math.sin(i/18)*.05, .10 + Math.sin(i/9)*.1, -.04 + Math.sin(i/9+1)*.08, -.08 - Math.sin(i/9)*.1, .06 - Math.sin(i/9+1)*.08]
-  };
+const tc = (s) => {
+  const tenths = Math.round(s * 10);
+  return `${String(Math.floor(tenths / 600)).padStart(2, "0")}:${((tenths % 600) / 10).toFixed(1).padStart(4, "0")}`;
+};
+const text = (sel, value) => { $(sel).textContent = value; };
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+// Replace an element's contents only when they changed, keeping its scroll position.
+function setHTML(el, html) {
+  if (el._html === html) return;
+  const top = el.scrollTop;
+  el.innerHTML = html;
+  el._html = html;
+  el.scrollTop = top;
+}
+const fmtP = (p) => (p === null || p === undefined ? "—" : p.toFixed(2));
+
+// ---- loading ---------------------------------------------------------------
+async function loadRuns() {
+  const response = await fetch("/api/runs");
+  const { live_run_id, runs } = await response.json();
+  state.liveRunId = live_run_id;
+  const select = $("#run-select");
+  select.innerHTML = runs.map((r) => {
+    const res = r.result ? ` · ${r.result.inBasket}/${r.result.toys} toys` : r.status === "running" ? " · running" : "";
+    return `<option value="${esc(r.run_id)}">${esc(r.run_id)}${res}</option>`;
+  }).join("");
+  const params = new URLSearchParams(location.search);
+  const initial = params.get("run") || live_run_id || (runs[0] && runs[0].run_id);
+  const at = Number(params.get("t") || NaN);
+  if (params.get("truth")) $("#truth-toggle").checked = true;
+  if (initial) {
+    select.value = initial;
+    await open(initial, initial === live_run_id && !params.get("run"));
+    if (!Number.isNaN(at)) {
+      const i = state.snapshots.findIndex((s) => s.sim_time >= at);
+      render(i < 0 ? state.snapshots.length - 1 : i);
+    }
+  }
+}
+
+async function open(runId, live) {
+  if (state.source) state.source.close();
+  const generation = ++state.generation;      // a newer open() makes this one stop
+  Object.assign(state, { runId, live, events: [], snapshots: [], truths: [], frames: [], index: 0, follow: true, selected: null, lastYaw: undefined });
+  text("#run-id", runId);
+  text("#connection-label", live ? "Live" : "Replay");
+  let after = 0;
+  for (;;) {
+    const page = await (await fetch(`/api/runs/${encodeURIComponent(runId)}/events?after=${after}&limit=10000`)).json();
+    if (generation !== state.generation) return;
+    page.events.forEach(ingest);
+    if (page.events.length < 10000) break;
+    after = page.events.at(-1).sequence;
+  }
+  if (live) {
+    state.source = new EventSource("/api/events");
+    state.source.addEventListener("birdbrain", (msg) => {
+      const e = JSON.parse(msg.data);
+      if (e.run_id !== runId || (state.events.length && e.sequence <= state.events.at(-1).sequence)) return;
+      ingest(e);
+      if (state.follow) scheduleRender();
+    });
+  }
+  render(live ? state.snapshots.length - 1 : 0);
+}
+
+function ingest(e) {
+  state.events.push(e);
+  if (e.type === "STATE_SNAPSHOT") state.snapshots.push(e);
+  else if (e.type === "CAMERA_FRAME") state.frames.push(e);
+  else if (e.type === "TRUTH" || (e.type === "RUN_STOPPED" && e.payload.truth)) state.truths.push({ t: e.sim_time, ...(e.payload.truth || e.payload) });
+  else if (e.type === "RUN_STARTED") {
+    if (e.payload.room) state.room = e.payload.room;
+    text("#brain-name", e.payload.model || e.payload.provider || "—");
+  }
+}
+
+// ---- rendering -------------------------------------------------------------
+function render(i) {
+  if (!state.snapshots.length) return;
+  state.index = Math.max(0, Math.min(state.snapshots.length - 1, i));
+  state.follow = state.index === state.snapshots.length - 1;
+  const snap = state.snapshots[state.index];
+  const t = snap.sim_time;
+  const tl = $("#timeline");
+  tl.max = state.snapshots.length - 1;
+  tl.value = state.index;
+  text("#sim-time", tc(t));
+  text("#timeline-time", `${tc(t)} / ${tc(state.snapshots.at(-1).sim_time)}`);
+  text("#replay-state", state.live && state.follow ? "Live tail" : "Rewind the Quack");
+  const upTo = state.events.filter((e) => e.sim_time <= t + 1e-9);
+  renderWorld(snap, upTo);
+  renderCamera(snap);
+  renderMind(snap.payload, upTo);
+  renderDecisions(upTo);
+  renderTables(snap.payload);
+  renderTrace(upTo);
+}
+
+function toSvg([x, y]) {
+  const [w, h] = state.room;
+  const scale = Math.min(560 / w, 460 / h);
+  return [300 + x * scale, 250 - y * scale, scale];
+}
+
+function renderWorld(snap, upTo) {
+  const p = snap.payload;
+  const [w, h] = state.room;
+  const [x0, y0, s] = toSvg([-w / 2, h / 2]);
+  const parts = [`<clipPath id="room-clip"><rect x="${x0}" y="${y0}" width="${w * s}" height="${h * s}" rx="6" /></clipPath>`,
+    `<rect class="room" x="${x0}" y="${y0}" width="${w * s}" height="${h * s}" rx="6" />`];
+  const trail = state.snapshots.slice(0, state.index + 1).filter((_, k) => k % 2 === 0).map((sn) => toSvg(sn.payload.pose).slice(0, 2).join(","));
+  if (trail.length > 1) parts.push(`<polyline class="trail" points="${trail.join(" ")}" />`);
+  const target = p.action && Object.values(p.action.args || {})[0];
+  for (const e of p.entities) {
+    if (e.cls === "place") continue;
+    const [ex, ey] = toSvg([e.x, e.y]);
+    const r = Math.max(3, e.sigma * s);
+    const confident = e.conf >= 0.5;
+    if (e.cls === "basket") {
+      const half = 0.15 * s;
+      parts.push(`<rect class="basket ${confident ? "" : "doubt"}" x="${ex - half}" y="${ey - half}" width="${2 * half}" height="${2 * half}" rx="3"><title>${esc(e.id)}</title></rect>`);
+    } else {
+      parts.push(`<circle class="sigma" cx="${ex}" cy="${ey}" r="${r}" />`);
+      parts.push(`<circle class="entity ${esc(e.cls)} ${confident ? "" : "doubt"} ${e.id === target ? "target" : ""}" cx="${ex}" cy="${ey}" r="5"><title>${esc(e.id)} ±${e.sigma.toFixed(2)} m conf ${e.conf}</title></circle>`);
+    }
+  }
+  if ($("#truth-toggle").checked) {
+    const truth = [...state.truths].reverse().find((tr) => tr.t <= snap.sim_time + 1e-9);
+    if (truth) {
+      if (truth.basket) {
+        const [bx, by] = toSvg(truth.basket);
+        const half = 0.15 * s;
+        parts.push(`<rect class="truth" x="${bx - half}" y="${by - half}" width="${2 * half}" height="${2 * half}" rx="3"><title>basket (truth)</title></rect>`);
+      }
+      if (truth.duck) {
+        const [tx, ty] = toSvg(truth.duck);
+        parts.push(`<circle class="truth" cx="${tx}" cy="${ty}" r="10"><title>duck (truth)</title></circle>`);
+      }
+      for (const toy of truth.toys) {
+        const [tx, ty] = toSvg([toy.x, toy.y]);
+        parts.push(`<circle class="truth" cx="${tx}" cy="${ty}" r="7"><title>${esc(toy.id)} (truth)</title></circle>`);
+      }
+    }
+  }
+  const [dx, dy] = toSvg(p.pose);
+  if (p.view) {   // the camera's horizontal field of view, out to 1.5 m
+    const a = p.pose[2] + (p.view.cam_yaw || 0), half = (58 * Math.PI) / 180, reach = 1.5;
+    const corner = (b) => toSvg([p.pose[0] + reach * Math.cos(a + b), p.pose[1] + reach * Math.sin(a + b)]);
+    const [lx, ly] = corner(half), [rx, ry] = corner(-half), rr = reach * s;
+    parts.push(`<path class="fov" clip-path="url(#room-clip)" d="M${dx} ${dy} L${lx} ${ly} A${rr} ${rr} 0 0 1 ${rx} ${ry} Z" />`);
+  }
+  // Unwrap the heading so a turn through ±180° glides the short way round.
+  let yaw = (-p.pose[2] * 180) / Math.PI;
+  if (state.lastYaw !== undefined) yaw = state.lastYaw + ((((yaw - state.lastYaw) % 360) + 540) % 360) - 180;
+  state.lastYaw = yaw;
+  if (target) {
+    const t = p.entities.find((e) => e.id === target);
+    if (t) { const [tx, ty] = toSvg([t.x, t.y]); parts.push(`<line class="aim" x1="${dx}" y1="${dy}" x2="${tx}" y2="${ty}" />`); }
+  }
+  setHTML(svg.querySelector("#layer") || initMap(), parts.join(""));
+  const duck = svg.querySelector("#duck");
+  duck.style.setProperty("--step", `${state.playing ? 500 / Number($("#rate").value) : 0}ms`);
+  duck.setAttribute("transform", "");
+  duck.style.transform = `translate(${dx}px, ${dy}px) rotate(${yaw}deg)`;
+}
+
+let pending = false;
+function scheduleRender() {          // at most one render per animation frame while live
+  if (pending) return;
+  pending = true;
+  requestAnimationFrame(() => { pending = false; if (state.follow) render(state.snapshots.length - 1); });
+}
+
+function renderCamera(snap) {
+  const t = snap.sim_time;
+  let shot = null;
+  for (let k = state.frames.length - 1; k >= 0; k--) { if (state.frames[k].sim_time <= t + 1e-9) { shot = state.frames[k]; break; } }
+  const img = $("#camera-image");
+  $("#camera-empty").hidden = Boolean(shot);
+  img.hidden = !shot;
+  if (!shot) { setHTML($("#camera-boxes"), ""); text("#camera-time", "—"); return; }
+  const f = shot.payload;
+  const src = `/api/runs/${encodeURIComponent(state.runId)}/camera/${f.file}`;
+  if (img.getAttribute("src") !== src) img.setAttribute("src", src);
+  text("#camera-time", `frame ${tc(f.t)}`);
+  // Detections the mind received with the same frame, projected with a pinhole model.
+  const view = f.view;               // what the mind made of this very frame
+  const boxes = $("#camera-boxes");
+  boxes.setAttribute("viewBox", `0 0 ${f.width} ${f.height}`);
+  if (!view) { setHTML(boxes, ""); return; }
+  const th = Math.tan(f.hfov / 2), tv = Math.tan(f.vfov / 2);
+  setHTML(boxes, view.sightings.map((d) => {
+    const u = f.width / 2 - (f.width / 2) * Math.tan(d.bearing) / th;
+    const v = f.height / 2 - (f.height / 2) * (Math.tan(d.elevation) / Math.cos(d.bearing)) / tv;
+    const half = Math.max(5, (f.width / 2) * Math.tan(d.width / 2) / th);
+    const label = d.as && d.as !== "not placed" ? d.as : `${d.cls}?`;
+    return `<rect class="${d.as === "not placed" ? "unplaced" : ""}" x="${u - half}" y="${v - half}" width="${2 * half}" height="${2 * half}" />`
+      + `<text x="${u - half}" y="${Math.max(12, v - half - 4)}">${esc(label)}</text>`;
+  }).join(""));
+}
+
+function initMap() {
+  // The duck is a persistent element above a layer rebuilt each frame, so it can glide.
+  svg.innerHTML = `<g id="layer"></g><g class="duck" id="duck"><path d="M14 0 L-9 -8 L-5 0 L-9 8 Z" /></g>`;
+  return svg.querySelector("#layer");
+}
+
+function renderMind(p, upTo) {
+  const a = p.action;
+  text("#action", a ? `${a.skill}(${Object.values(a.args || {}).join(", ")})` : "Idle");
+  text("#reason", a ? a.reason : "No decision yet.");
+  text("#expect", a ? a.expect : "—");
+  text("#p-rule", fmtP(a && a.p_rule));
+  text("#p-model", fmtP(a && a.p_model));
+  $("#p-rule-meter").style.width = `${a && a.p_rule != null ? a.p_rule * 100 : 0}%`;
+  $("#p-model-meter").style.width = `${a && a.p_model != null ? a.p_model * 100 : 0}%`;
+  text("#note", p.note || "—");
+  text("#holding", p.holding || "nothing");
+  text("#provider-badge", a ? (a.provider === "local" ? "local policy" : a.provider) : "—");
+  const lat = upTo.filter((e) => e.type === "DECISION" && e.payload.provider !== "local").map((e) => e.payload.latency_s).sort((x, y) => x - y);
+  const median = lat.length ? lat[Math.floor(lat.length / 2)] : null;
+  const s = p.stats || {};
+  const chips = [
+    ["decisions", s.decisions], ["fallbacks", s.fallbacks], ["rejected", s.invalid], ["errors", s.provider_errors],
+    ["tokens", p.tokens], ["latency", median == null ? "—" : `${median.toFixed(2)} s`],
+  ];
+  setHTML($("#stats"), chips.map(([k, v]) => `<span><b>${esc(k)}</b>${esc(v ?? 0)}</span>`).join(""));
+}
+
+function renderDecisions(upTo) {
+  const rows = [];
+  let open = null;
+  for (const e of upTo) {
+    if (e.type === "DECISION") { open = { d: e, o: null }; rows.push(open); }
+    else if (e.type === "OUTCOME" && open) { open.o = e; open = null; }
+  }
+  setHTML($("#decision-list"), rows.slice(-14).reverse().map(({ d, o }) => {
+    const dp = d.payload;
+    const status = o ? o.payload.status : "running";
+    const held = o ? (o.payload.effect_held ? "held" : "did not hold") : "";
+    const surprise = o && o.payload.surprise_rule != null ? `surprise ${o.payload.surprise_rule.toFixed(2)}` : "";
+    return `<li class="${esc(status)} ${dp.fallback ? "fallback" : ""}">
+      <time>${tc(d.sim_time)}</time>
+      <strong>${esc(dp.skill)}(${esc(Object.values(dp.args || {}).join(", "))})</strong>
+      <span>${esc(dp.reason)}</span>
+      <em>${esc(dp.provider)}${dp.fallback ? ` · fallback: ${esc(dp.fallback)}` : ""} · p ${fmtP(dp.p_model ?? dp.p_rule)}</em>
+      <em class="outcome">${esc(status)}${o && o.payload.reason ? ` (${esc(o.payload.reason)})` : ""}${held ? ` · effect ${held}` : ""} ${surprise}</em>
+    </li>`;
+  }).join(""));
+}
+
+function renderTables(p) {
+  setHTML($("#skill-rows"), Object.entries(p.records || {}).map(([name, r]) =>
+    `<tr><td>${esc(name)}</td><td>${r.trials}</td><td>${r.effect_held}</td><td>${r.p.toFixed(2)}</td><td>${r.mean_s ?? "—"}</td></tr>`).join(""));
+  setHTML($("#belief-rows"), (p.entities || []).filter((e) => e.cls !== "place").map((e) =>
+    `<tr class="${e.conf >= 0.5 ? "" : "doubt"}"><td>${esc(e.id)}</td><td>${e.x.toFixed(2)}, ${e.y.toFixed(2)}</td><td>${e.sigma.toFixed(2)}</td><td>${e.conf.toFixed(2)}</td><td>${e.seen_ago.toFixed(0)} s</td></tr>`).join(""));
+}
+
+function summary(e) {
+  const p = e.payload;
+  if (p.summary) return p.summary;
+  switch (e.type) {
+    case "SKILL_STEP_STARTED": return `${p.path} → ${p.skill} ${JSON.stringify(p.args)}`;
+    case "SKILL_STEP_ENDED": return `${p.path} ${p.status}${p.reason ? ` (${p.reason})` : ""} after ${p.seconds} s`;
+    case "SKILL_BIND": return `${p.path}: ${p.name} := ${p.value}`;
+    case "ENTITY_CREATED": return `new ${p.cls} ${p.entity}`;
+    case "ASSERTION_OPENED": return `${p.rel}(${p.args.join(", ")}) = ${JSON.stringify(p.value).slice(0, 60)}`;
+    case "ASSERTION_CLOSED": return `${p.rel}(${p.args.join(", ")}) ended${p.reason ? `: ${p.reason}` : ""}`;
+    case "EVENT_STARTED": case "EVENT_ENDED": return `${p.kind} ${p.data.skill || ""} ${p.data.outcome || ""}`;
+    case "GRASP_TRUTH": return `grasp ${p.held ? "held" : "missed"} (true error ${p.error_m ?? "—"} m)`;
+    case "FALL": return `fell during ${p.skill}: ${p.note}`;
+    case "CHOICE_REJECTED": return `rejected ${p.skill}: ${p.problem}`;
+    case "RUN_STARTED": return `seed ${p.seed} · ${p.provider}${p.model ? ` (${p.model})` : ""}`;
+    default: return "";
+  }
+}
+
+function renderTrace(upTo) {
+  const allowed = FILTERS[state.filter];
+  const shown = upTo.filter((e) => e.type !== "STATE_SNAPSHOT" && e.type !== "TRUTH" && (!allowed || allowed.has(e.type))).slice(-120).reverse();
+  setHTML($("#event-list"), shown.map((e) =>
+    `<button class="event ${e.sequence === state.selected ? "selected" : ""} t-${esc(e.type)}" data-seq="${e.sequence}">
+      <time>${tc(e.sim_time)}</time><strong>${esc(e.type)}</strong><span>${esc(summary(e))}</span></button>`).join(""));
+}
+
+// ---- controls --------------------------------------------------------------
+$("#event-list").addEventListener("click", (ev) => {
+  const button = ev.target.closest(".event");
+  if (!button) return;
+  state.selected = Number(button.dataset.seq);
+  const e = state.events.find((x) => x.sequence === state.selected);
+  $("#json-inspector").textContent = JSON.stringify(e, null, 2);
+  render(state.index);
 });
+$("#filters").addEventListener("click", (ev) => {
+  const b = ev.target.closest("button");
+  if (!b) return;
+  document.querySelectorAll("#filters button").forEach((x) => x.classList.toggle("active", x === b));
+  state.filter = b.dataset.filter;
+  render(state.index);
+});
+$("#timeline").addEventListener("input", (ev) => { setPlaying(false); render(Number(ev.target.value)); });
+$("#truth-toggle").addEventListener("change", () => render(state.index));
+$("#run-select").addEventListener("change", (ev) => open(ev.target.value, ev.target.value === state.liveRunId));
+$("#play-button").addEventListener("click", () => setPlaying(!state.playing));
 
-function timecode(seconds) {
-  const minutes = Math.floor(seconds / 60).toString().padStart(2,"0");
-  return `${minutes}:${(seconds % 60).toFixed(2).padStart(5,"0")}`;
+function setPlaying(on) {
+  state.playing = on;
+  $("#play-button").textContent = on ? "Ⅱ" : "▶";
+  clearInterval(state.timer);
+  if (!on) return;
+  state.timer = setInterval(() => {
+    if (state.index >= state.snapshots.length - 1) { if (!state.live) setPlaying(false); return; }
+    render(state.index + 1);
+  }, 500 / Number($("#rate").value));
 }
+$("#rate").addEventListener("change", () => { if (state.playing) setPlaying(true); });
 
-function setText(selector, text) { document.querySelector(selector).textContent = text; }
-
-function jointBar(id, value) {
-  const bar = document.querySelector(`#${id}`);
-  const width = Math.min(49, Math.abs(value) / .7 * 50);
-  bar.style.width = `${width}%`;
-  bar.style.left = value < 0 ? `${50 - width}%` : "50%";
-  bar.style.background = value < 0 ? "#65a8ff" : "#f5c84c";
-}
-
-function renderFrame(index, fromUser = false) {
-  if (!frames.length) return;
-  frameIndex = Math.max(0, Math.min(frames.length - 1, index));
-  const f = frames[frameIndex];
-  timeline.max = frames.length - 1;
-  timeline.value = frameIndex;
-  duck.setAttribute("transform", `translate(${f.x} ${f.y}) rotate(${f.heading})`);
-  const points = frames.slice(0, frameIndex + 1).filter((_, i) => i % 4 === 0).map(p => `${p.x},${p.y}`).join(" ");
-  trail.setAttribute("d", points ? `M ${points.replaceAll(" ", " L ")}` : "");
-  const blockPosition = f.blueBlock || [430 + Math.sin(frameIndex/22)*3, 115 + Math.cos(frameIndex/22)*2];
-  const ballPosition = f.redBall || [455, 306];
-  blueBlock.setAttribute("transform", `translate(${blockPosition[0]} ${blockPosition[1]})`);
-  redBall.setAttribute("transform", `translate(${ballPosition[0]} ${ballPosition[1]})`);
-  attentionCone.setAttribute("cx", `${blockPosition[0]}`);
-  attentionCone.setAttribute("cy", `${blockPosition[1]}`);
-
-  setText("#sim-time", timecode(f.t));
-  setText("#timeline-time", `${timecode(f.t)} / ${timecode(frames.at(-1).t)}`);
-  setText("#pos-x", `${((f.x-310)/146).toFixed(2)}`);
-  setText("#pos-y", `${((215-f.y)/98).toFixed(2)}`);
-  setText("#heading", `${Math.round((f.heading+360)%360)}°`);
-  setText("#confidence", `${Math.round(f.confidence*100)}%`);
-  setText("#energy", `${Math.round(f.energy*100)}%`);
-  document.querySelector("#confidence-meter").style.width = `${f.confidence*100}%`;
-  document.querySelector("#energy-meter").style.width = `${f.energy*100}%`;
-  setText("#pitch", `${f.pitch.toFixed(1)}°`);
-  setText("#speed", f.speed.toFixed(2));
-  setText("#step-time", (f.stepMs ?? 3.4 + Math.abs(Math.sin(frameIndex/7))*.7).toFixed(1));
-  const jointIds = ["neck","lhip","lankle","rhip","rankle"];
-  f.joints.forEach((value, i) => { jointBar(`joint-${jointIds[i]}`, value); setText(`#joint-${jointIds[i]}-value`, `${value >= 0 ? "+" : ""}${value.toFixed(2)}`); });
-  renderEvents();
-  if (fromUser && frameIndex < totalFrames - 1) setPlaying(false);
-  setText("#replay-state", frameIndex === frames.length-1 && playing ? "Live tail" : `Reviewing frame ${frameIndex}`);
-}
-
-function renderEvents() {
-  const visible = events.filter(event => event.frame <= frameIndex && (selectedFilter === "all" || event.kind === selectedFilter));
-  eventList.innerHTML = visible.map(event => `
-    <button class="event ${event.id === selectedEvent ? "selected" : ""}" data-id="${event.id}">
-      <time>${timecode(frames[event.frame]?.t ?? event.envelope?.sim_time ?? 0)}</time><span class="event-icon">${event.icon}</span>
-      <strong>${event.type}</strong><span>${event.text}</span><em>${event.duration}</em>
-    </button>`).join("");
-  eventList.querySelectorAll(".event").forEach(button => button.addEventListener("click", () => selectEvent(button.dataset.id)));
-}
-
-function selectEvent(id) {
-  const event = events.find(item => item.id === id);
-  if (!event) return;
-  selectedEvent = id;
-  const eventTime = frames[event.frame]?.t ?? event.envelope?.sim_time ?? 0;
-  setText("#inspector-type", event.type);
-  setText("#inspector-time", timecode(eventTime));
-  inspector.textContent = JSON.stringify(event.envelope || {run_id:runId, sequence:event.frame, sim_time:eventTime, type:event.type, ...event.payload}, null, 2);
-  renderEvents();
-}
-
-function setPlaying(next) {
-  playing = next;
-  pauseButton.setAttribute("aria-pressed", String(!playing));
-  setText("#pause-label", playing ? "Pause" : "Resume");
-  pauseButton.querySelector(".pause-icon").textContent = playing ? "Ⅱ" : "▶";
-  playButton.textContent = playing ? "Ⅱ" : "▶";
-  playButton.setAttribute("aria-label", playing ? "Pause replay" : "Play replay");
-  clearInterval(timer);
-  if (liveMode) {
-    if (playing && frames.length) renderFrame(frames.length - 1);
-    return;
-  }
-  if (playing) timer = setInterval(() => {
-    const next = frameIndex >= frames.length - 1 ? 0 : frameIndex + 1;
-    renderFrame(next);
-  }, 100 / Number(playbackRate.value));
-}
-
-pauseButton.addEventListener("click", () => setPlaying(!playing));
-playButton.addEventListener("click", () => setPlaying(!playing));
-timeline.addEventListener("input", event => renderFrame(Number(event.target.value), true));
-document.querySelector("#step-back").addEventListener("click", () => { setPlaying(false); renderFrame(frameIndex - 1); });
-document.querySelector("#step-forward").addEventListener("click", () => { setPlaying(false); renderFrame(frameIndex + 1); });
-playbackRate.addEventListener("change", () => { setText("#rate", `${Number(playbackRate.value).toFixed(1)}×`); if (playing) setPlaying(true); });
-
-document.querySelectorAll("[data-filter]").forEach(button => button.addEventListener("click", () => {
-  document.querySelectorAll("[data-filter]").forEach(item => item.classList.remove("active"));
-  button.classList.add("active"); selectedFilter = button.dataset.filter; renderEvents();
-}));
-document.querySelectorAll("[data-overlay]").forEach(button => button.addEventListener("click", () => {
-  document.querySelectorAll("[data-overlay]").forEach(item => item.classList.remove("active")); button.classList.add("active");
-  document.querySelectorAll(".remembered, #attention-cone").forEach(item => item.style.display = button.dataset.overlay === "belief" ? "" : "none");
-}));
-document.querySelector("#focus-alerts").addEventListener("click", () => document.querySelector("#anomalies").scrollIntoView({behavior:"smooth", block:"center"}));
-document.querySelector("#copy-json").addEventListener("click", async event => { await navigator.clipboard.writeText(inspector.textContent); event.currentTarget.textContent = "Copied"; setTimeout(() => event.currentTarget.textContent = "Copy JSON", 1000); });
-document.querySelectorAll(".anomaly").forEach(button => button.addEventListener("click", () => { document.querySelectorAll(".anomaly").forEach(item => item.classList.remove("active")); button.classList.add("active"); selectEvent(button.dataset.event); }));
-document.addEventListener("keydown", event => { if (event.target.matches("input,select,button")) return; if (event.code === "Space") { event.preventDefault(); setPlaying(!playing); } if (event.code === "ArrowLeft") { setPlaying(false); renderFrame(frameIndex-1); } if (event.code === "ArrowRight") { setPlaying(false); renderFrame(frameIndex+1); } });
-
-function worldPoint(position) {
-  return [310 + position[0] * 146, 215 - position[1] * 98];
-}
-
-function liveFrame(snapshot, simTime) {
-  const targets = snapshot.actuator_targets;
-  const duckPosition = worldPoint(snapshot.duck.position);
-  return {
-    t: simTime,
-    x: duckPosition[0],
-    y: duckPosition[1],
-    heading: snapshot.heading_deg,
-    confidence: snapshot.confidence,
-    energy: snapshot.energy,
-    speed: snapshot.speed_mps,
-    pitch: snapshot.pitch_deg,
-    stepMs: snapshot.step_ms,
-    blueBlock: worldPoint(snapshot.blue_block.position),
-    redBall: worldPoint(snapshot.red_ball.position),
-    joints: [targets.neck_motor, targets.left_hip_motor, targets.left_ankle_motor, targets.right_hip_motor, targets.right_ankle_motor]
-  };
-}
-
-function liveEventView(envelope) {
-  const icons = {RUN_STARTED:"↯", RUN_STOPPED:"■", ACTION_SELECTED:"▶", ANOMALY:"!", RUN_FAILED:"×", MEMORY_RETRIEVED:"◇", MEMORY_CONSOLIDATED:"◆", BELIEF_CONFLICT:"?", WIKI_UPDATED:"✎", GOAL_PROPOSED:"◎", PLAN_CREATED:"⌁", SKILL_INVOKED:"✦", SKILL_UPDATED:"↗", MODEL_REQUESTED:"☁", MODEL_RESPONDED:"✓", MODEL_FALLBACK:"↘"};
-  const kind = ["ACTION_SELECTED", "ANOMALY", "RUN_FAILED"].includes(envelope.type) ? "body" : "mind";
-  return {
-    id: `live-${envelope.sequence}`,
-    frame: Math.max(0, frames.length - 1),
-    kind,
-    icon: icons[envelope.type] || "◉",
-    type: envelope.type,
-    text: envelope.payload.summary || envelope.payload.message || envelope.type.replaceAll("_", " ").toLowerCase(),
-    duration: "live",
-    payload: envelope.payload,
-    envelope
-  };
-}
-
-function renderLiveMind(snapshot) {
-  setText("#mode-badge", snapshot.mode);
-  setText("#intention", snapshot.intention);
-  setText("#rationale", snapshot.rationale);
-  setText("#skill", snapshot.skill);
-  setText("#attention-label", snapshot.attention);
-  if (snapshot.cognition) {
-    setText("#provider-name", snapshot.cognition.provider === "openai_responses" ? "OpenAI Responses" : "Local baseline");
-    setText("#learning-health", snapshot.cognition.provider === "openai_responses" ? "Cloud active" : "Local safe mode");
-  }
-  const list = document.querySelector("#goal-list");
-  list.innerHTML = snapshot.goals.map((goal, index) => `<li class="${index === 0 ? "active" : ""}"><b>${index + 1}</b><div><strong>${goal.name}</strong><span>${index === 0 ? "active objective" : "queued"}</span></div><code>${goal.utility.toFixed(2)}</code></li>`).join("");
-}
-
-function ingestLiveEvent(envelope) {
-  if (envelope.type === "STATE_SNAPSHOT") {
-    frames.push(liveFrame(envelope.payload, envelope.sim_time));
-    totalFrames = frames.length;
-    timeline.max = Math.max(0, frames.length - 1);
-    renderLiveMind(envelope.payload);
-    if (playing) renderFrame(frames.length - 1);
-    return;
-  }
-  if (envelope.type === "ACTION_SELECTED") {
-    liveActionCount += 1;
-    if (liveActionCount % 10 !== 0) return;
-  }
-  updateLearningSystems(envelope);
-  events.push(liveEventView(envelope));
-  if (events.length > 120) events = events.slice(-120);
-  if (!selectedEvent) {
-    selectedEvent = events.at(-1)?.id;
-    selectEvent(selectedEvent);
-  }
-  if (envelope.type === "ANOMALY") renderLiveAnomaly(envelope);
-  renderEvents();
-}
-
-function updateLearningSystems(envelope) {
-  const payload = envelope.payload;
-  if (envelope.type === "MODEL_RESPONDED") {
-    cloudCalls += 1;
-    setText("#provider-name", "OpenAI Responses");
-    setText("#learning-health", "Cloud active");
-    setText("#model-stats", `${cloudCalls} calls · ${payload.latency_ms.toFixed(0)}ms last`);
-  } else if (envelope.type === "MODEL_FALLBACK") {
-    setText("#provider-name", "Local fallback");
-    setText("#learning-health", "Degraded safely");
-    setText("#model-stats", `${payload.error} · no unsafe action`);
-  } else if (envelope.type === "MEMORY_CONSOLIDATED") {
-    memoryEpisodes = payload.episodes;
-    setText("#memory-status", payload.status === "conflicted" ? "Conflict tracked" : "Consolidated");
-    setText("#memory-stats", `${memoryEpisodes} episodes · ${memoryConflicts} conflicts`);
-  } else if (envelope.type === "BELIEF_CONFLICT") {
-    memoryConflicts += 1;
-    setText("#memory-stats", `${memoryEpisodes} episodes · ${memoryConflicts} conflicts`);
-  } else if (envelope.type === "SKILL_UPDATED") {
-    setText("#skill-learning-name", payload.skill);
-    setText("#skill-stats", `amp ${payload.amplitude_after.toFixed(3)} · ${payload.attempts} attempts · ${Math.round(payload.success_rate * 100)}% success`);
-  }
-}
-
-function renderLiveAnomaly(envelope) {
-  const button = document.querySelector(".anomaly");
-  button.style.display = "grid";
-  button.dataset.event = `live-${envelope.sequence}`;
-  button.querySelector("strong").textContent = envelope.payload.summary || envelope.payload.code;
-  button.querySelector("small").textContent = `${envelope.payload.severity || "warning"} · ${timecode(envelope.sim_time)}`;
-  button.dataset.live = "true";
-  const count = document.querySelectorAll(".anomaly[data-live='true']").length;
-  setText(".count-badge", `${count} open`);
-  setText("#alert-count", String(count));
-}
-
-async function connectLiveBridge() {
-  try {
-    const response = await fetch("/api/status", {cache:"no-store"});
-    if (!response.ok) return;
-    const status = await response.json();
-    if (status.schema_version !== "birdbrain.event.v1") return;
-    liveMode = true;
-    runId = status.run_id;
-    frames = [];
-    events = [];
-    totalFrames = 0;
-    frameIndex = 0;
-    selectedEvent = "";
-    liveActionCount = 0;
-    cloudCalls = 0;
-    memoryEpisodes = 0;
-    memoryConflicts = 0;
-    clearInterval(timer);
-    playing = true;
-    document.querySelectorAll(".anomaly").forEach(item => item.style.display = "none");
-    setText(".count-badge", "0 open");
-    setText("#alert-count", "0");
-    setText("#connection-label", "Live simulator");
-    setText("#run-id", runId.toUpperCase());
-    setText("#inspector-type", "AWAITING_EVENT");
-    setText("#inspector-time", "00:00.00");
-    inspector.textContent = JSON.stringify({run_id:runId, status:"connected", schema_version:status.schema_version}, null, 2);
-    document.querySelector(".status-pill").title = `Connected to ${runId}`;
-    await populateRuns();
-    eventSource = new EventSource(status.stream);
-    eventSource.addEventListener("birdbrain", event => ingestLiveEvent(JSON.parse(event.data)));
-    eventSource.onopen = () => setText("#connection-label", "Live simulator");
-    eventSource.onerror = () => setText("#connection-label", "Reconnecting");
-  } catch (_error) {
-    // The private hosted dashboard intentionally remains in demo mode when
-    // there is no same-origin local simulator bridge.
-  }
-}
-
-async function populateRuns() {
-  const response = await fetch("/api/runs", {cache:"no-store"});
-  if (!response.ok) return;
-  const catalog = await response.json();
-  runSelect.innerHTML = "";
-  compareSelect.innerHTML = '<option value="">Compare run…</option>';
-  const liveOption = new Option(`Live · ${catalog.current_run_id}`, "live", true, true);
-  runSelect.add(liveOption);
-  catalog.runs.filter(run => run.run_id !== catalog.current_run_id).forEach(run => {
-    const date = new Date(run.started_at).toLocaleString([], {month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"});
-    const score = run.score == null ? "—" : run.score.toFixed(1);
-    const label = `${date} · score ${score} · ${run.status}`;
-    runSelect.add(new Option(label, run.run_id));
-    compareSelect.add(new Option(label, run.run_id));
-  });
-  if (compareSelect.options.length > 1) {
-    compareSelect.selectedIndex = 1;
-    await compareWith(compareSelect.value);
-  }
-}
-
-async function loadRecordedRun(selectedRunId) {
-  if (selectedRunId === "live") {
-    window.location.reload();
-    return;
-  }
-  if (eventSource) eventSource.close();
-  setText("#connection-label", "Loading recording");
-  const response = await fetch(`/api/runs/${encodeURIComponent(selectedRunId)}/events?limit=10000`, {cache:"no-store"});
-  if (!response.ok) {
-    setText("#connection-label", "Recording unavailable");
-    return;
-  }
-  const recording = await response.json();
-  clearInterval(timer);
-  liveMode = false;
-  playing = false;
-  runId = selectedRunId;
-  frames = [];
-  events = [];
-  totalFrames = 0;
-  frameIndex = 0;
-  selectedEvent = "";
-  liveActionCount = 0;
-  cloudCalls = 0;
-  memoryEpisodes = 0;
-  memoryConflicts = 0;
-  document.querySelectorAll(".anomaly").forEach(item => item.style.display = "none");
-  setText(".count-badge", "0 open");
-  setText("#alert-count", "0");
-  recording.events.forEach(ingestLiveEvent);
-  totalFrames = frames.length;
-  setText("#connection-label", "Recorded run");
-  setText("#run-id", runId.toUpperCase());
-  document.querySelector(".status-pill").title = `${recording.run.status} recording`;
-  if (frames.length) renderFrame(frames.length - 1);
-  if (events.length) selectEvent(events.at(-1).id);
-  setPlaying(false);
-  setText("#replay-state", `${recording.run.status} · ${recording.run.event_count} events`);
-}
-
-runSelect.addEventListener("change", event => loadRecordedRun(event.target.value));
-compareSelect.addEventListener("change", event => compareWith(event.target.value));
-
-async function compareWith(otherRunId) {
-  if (!otherRunId) return;
-  const response = await fetch(`/api/compare?left=${encodeURIComponent(otherRunId)}&right=${encodeURIComponent(runId)}`, {cache:"no-store"});
-  if (!response.ok) {
-    setText("#comparison-verdict", "Comparison unavailable");
-    return;
-  }
-  renderComparison(await response.json());
-}
-
-function signed(value, suffix = "") {
-  return `${value > 0 ? "+" : ""}${value}${suffix}`;
-}
-
-function renderComparison(comparison) {
-  setText("#left-run-label", comparison.left_run_id.toUpperCase());
-  setText("#right-run-label", comparison.right_run_id.toUpperCase());
-  setText("#left-score", comparison.left.score.toFixed(1));
-  setText("#right-score", comparison.right.score.toFixed(1));
-  setText("#score-delta", signed(comparison.score_delta));
-  setText("#comparison-verdict", comparison.winner === "tie" ? "Tie" : `${comparison.winner} run leads`);
-  const deltas = comparison.metric_deltas;
-  document.querySelector("#metric-deltas").innerHTML = `
-    <span>Anomalies <b>${signed(deltas.anomalies)}</b></span>
-    <span>Confidence <b>${signed(Math.round(deltas.mean_confidence * 100), "%")}</b></span>
-    <span>Min height <b>${signed(deltas.min_body_height_m, "m")}</b></span>
-    <span>Cognitive cycles <b>${signed(deltas.cognitive_cycles)}</b></span>`;
-}
-
-selectEvent(selectedEvent);
-renderFrame(frameIndex);
-setPlaying(true);
-connectLiveBridge();
+loadRuns().catch((err) => { text("#connection-label", "Offline"); console.error(err); });

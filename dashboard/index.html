@@ -3,240 +3,116 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#101513" />
+    <meta name="theme-color" content="#f4f2ec" />
     <title>BirdBrain — Mind Observatory</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <a class="brand" href="#" aria-label="BirdBrain home">
+        <a class="brand" href="#" aria-label="BirdBrain">
           <span class="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 48 48" role="img">
-              <path d="M9 29c0-8 6-14 14-14 5 0 8 2 11 5l8 2-7 6c-2 7-8 11-15 11-6 0-11-4-11-10Z" />
-              <circle cx="29" cy="20" r="2.2" />
-              <path class="wing" d="M13 27c5-5 11-4 15 1-5 5-11 7-15-1Z" />
-            </svg>
+            <svg viewBox="0 0 48 48"><path d="M9 29c0-8 6-14 14-14 5 0 8 2 11 5l8 2-7 6c-2 7-8 11-15 11-6 0-11-4-11-10Z" /><circle cx="29" cy="20" r="2.2" /><path class="wing" d="M13 27c5-5 11-4 15 1-5 5-11 7-15-1Z" /></svg>
           </span>
-          <span><strong>BirdBrain</strong><small>Mind observatory</small></span>
+          <span><strong>BirdBrain</strong><small>Small duck. Big thoughts.</small></span>
         </a>
-
         <div class="run-strip" aria-label="Run status">
-          <span class="status-pill"><i></i><span id="connection-label">Demo run</span></span>
-          <span><b>RUN</b> <code id="run-id">SIM-0042</code></span>
-          <span><b>SIM</b> <code id="sim-time">00:00.00</code></span>
-          <span><b>RATE</b> <code id="rate">1.0×</code></span>
+          <span class="status-pill"><i></i><span id="connection-label">No run</span></span>
+          <span><b>RUN</b> <code id="run-id">—</code></span>
+          <span><b>SIM</b> <code id="sim-time">00:00.0</code></span>
+          <span><b>BRAIN</b> <code id="brain-name">—</code></span>
         </div>
-
         <div class="top-actions">
-          <button class="icon-button" id="focus-alerts" title="Jump to anomalies" aria-label="Jump to anomalies">
-            <span aria-hidden="true">!</span><em id="alert-count">2</em>
-          </button>
-          <button class="pause-button" id="pause-button" aria-pressed="false">
-            <span class="pause-icon" aria-hidden="true">Ⅱ</span>
-            <span id="pause-label">Pause</span>
-          </button>
+          <select id="run-select" aria-label="Choose a run"></select>
         </div>
       </header>
 
       <main class="dashboard">
         <section class="panel world-panel" aria-labelledby="world-title">
           <div class="panel-heading">
-            <div>
-              <p class="eyebrow">Perception + belief</p>
-              <h1 id="world-title">Bird’s-eye view</h1>
-            </div>
-            <div class="segmented" role="group" aria-label="World overlay">
-              <button class="active" data-overlay="belief">Belief</button>
-              <button data-overlay="physics">Physics</button>
-            </div>
+            <div><p class="eyebrow">Bird’s-eye view</p><h1 id="world-title">What I believe is where</h1></div>
+            <label class="toggle"><input type="checkbox" id="truth-toggle" /> Show simulator truth</label>
           </div>
-
-          <div class="world-stage">
-            <svg id="world-map" viewBox="0 0 620 430" role="img" aria-label="Top-down view of the Microduck arena">
-              <defs>
-                <pattern id="grid" width="31" height="31" patternUnits="userSpaceOnUse">
-                  <path d="M31 0H0V31" fill="none" stroke="rgba(255,255,255,.055)" stroke-width="1" />
-                </pattern>
-                <radialGradient id="attention" cx="50%" cy="50%" r="50%">
-                  <stop offset="0" stop-color="#f5c84c" stop-opacity=".3" />
-                  <stop offset="1" stop-color="#f5c84c" stop-opacity="0" />
-                </radialGradient>
-                <filter id="glow"><feGaussianBlur stdDeviation="5" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge></filter>
-              </defs>
-              <rect x="18" y="18" width="584" height="394" rx="20" class="arena" />
-              <rect x="18" y="18" width="584" height="394" rx="20" fill="url(#grid)" />
-              <path id="trail" class="trail" d="" />
-              <circle id="attention-cone" cx="430" cy="115" r="70" fill="url(#attention)" />
-
-              <g class="charge" transform="translate(84 338)">
-                <circle r="35" /><path d="m-4-16 16 0-10 14h12l-22 22 6-17h-12Z" />
-                <text x="0" y="52">CHARGE</text>
-              </g>
-
-              <g id="blue-block" class="object observed" transform="translate(430 115)">
-                <rect x="-16" y="-16" width="32" height="32" rx="5" />
-                <text x="0" y="34">BLUE BLOCK</text>
-              </g>
-              <g id="red-ball" class="object observed ball" transform="translate(455 306)">
-                <circle r="16" />
-                <text x="0" y="34">RED BALL</text>
-              </g>
-              <g class="object remembered" transform="translate(180 105)">
-                <rect x="-14" y="-14" width="28" height="28" rx="4" />
-                <text x="0" y="32">LAST SEEN</text>
-              </g>
-
-              <g id="duck" transform="translate(300 238) rotate(-18)">
-                <circle class="duck-range" r="36" />
-                <path class="duck-body" d="M-18 4c0-15 12-26 27-22 8 2 13 8 15 15l17 5-16 8c-4 10-14 17-27 15-10-2-16-10-16-21Z" />
-                <circle class="duck-eye" cx="14" cy="-8" r="3" />
-                <path class="duck-wing" d="M-13 2c8-8 18-5 24 3-8 8-19 11-24-3Z" />
-                <path class="heading-line" d="M28 3h45" />
-              </g>
-
-              <g class="legend" transform="translate(38 390)">
-                <circle cx="0" cy="0" r="4" class="solid-dot" /><text x="11" y="4">Observed now</text>
-                <circle cx="111" cy="0" r="4" class="ghost-dot" /><text x="122" y="4">Remembered</text>
-                <path d="M231 0h20" class="legend-trail" /><text x="260" y="4">Path</text>
-              </g>
-            </svg>
-
-            <div class="world-readout">
-              <span><b>X</b><code id="pos-x">+0.00</code></span>
-              <span><b>Y</b><code id="pos-y">+0.00</code></span>
-              <span><b>HEAD</b><code id="heading">342°</code></span>
-            </div>
+          <div class="world-stage"><svg id="world-map" viewBox="0 0 600 500" role="img" aria-label="Top-down map of beliefs"></svg></div>
+          <div class="legend">
+            <span><i class="dot toy"></i>toy I believe in (shaded ring = uncertainty, hollow = doubted)</span>
+            <span><i class="dot basket"></i>basket I believe in</span>
+            <span><i class="dot truth"></i>simulator truth, dashed (viewer only)</span>
           </div>
+        </section>
+
+        <section class="panel camera-panel" aria-labelledby="camera-title">
+          <div class="panel-heading">
+            <div><p class="eyebrow">Through the duck's eyes</p><h2 id="camera-title">What I see</h2></div>
+            <code id="camera-time">—</code>
+          </div>
+          <div class="camera-stage">
+            <img id="camera-image" alt="The duck's head-camera image" hidden />
+            <svg id="camera-boxes" viewBox="0 0 640 231" preserveAspectRatio="none" aria-label="Detections"></svg>
+            <p id="camera-empty">No camera images in this run. Live runs record them; add <code>--camera</code> to <code>birdbrain-run</code>.</p>
+          </div>
+          <p class="camera-legend"><span class="box-key"></span>each detection, labelled with the object I took it to be (dashed = could not place it) · field of view 116° × 60°, also shaded on the map</p>
         </section>
 
         <section class="panel mind-panel" aria-labelledby="mind-title">
-          <div class="panel-heading compact">
-            <div><p class="eyebrow">Cognition</p><h2 id="mind-title">What’s on my mind?</h2></div>
-            <span class="mode-badge" id="mode-badge">EXPLORING</span>
+          <div class="panel-heading">
+            <div><p class="eyebrow">What’s on my mind?</p><h2 id="mind-title">Current action</h2></div>
+            <span class="mode-badge" id="provider-badge">—</span>
           </div>
-
-          <div class="thought-card">
-            <div class="thought-symbol" aria-hidden="true">◎</div>
-            <div>
-              <span>Current intention</span>
-              <strong id="intention">Inspect the unfamiliar blue block</strong>
-              <p id="rationale">It moved 6 cm since my last observation. I want to test whether it is pushable.</p>
-            </div>
+          <div class="thought">
+            <strong id="action">Idle</strong>
+            <p id="reason">No decision yet.</p>
+            <dl class="facts">
+              <div><dt>Expected effect</dt><dd><code id="expect">—</code></dd></div>
+              <div><dt>Rule estimate</dt><dd><span class="meter"><i id="p-rule-meter"></i></span><code id="p-rule">—</code></dd></div>
+              <div><dt>Model estimate</dt><dd><span class="meter blue"><i id="p-model-meter"></i></span><code id="p-model">—</code></dd></div>
+              <div><dt>Doing now</dt><dd id="note">—</dd></div>
+              <div><dt>Holding</dt><dd id="holding">nothing</dd></div>
+            </dl>
           </div>
-
-          <dl class="mind-grid">
-            <div><dt>Active skill</dt><dd id="skill">approach_object</dd></div>
-            <div><dt>Attention</dt><dd id="attention-label">blue_block</dd></div>
-            <div><dt>Confidence</dt><dd><span class="meter"><i id="confidence-meter"></i></span><code id="confidence">78%</code></dd></div>
-            <div><dt>Energy</dt><dd><span class="meter green"><i id="energy-meter"></i></span><code id="energy">84%</code></dd></div>
-          </dl>
-
-          <div class="section-rule"><span>Pecking order</span><small>utility</small></div>
-          <ol class="goal-list" id="goal-list">
-            <li class="active"><b>1</b><div><strong>Inspect blue block</strong><span>novelty · reachable</span></div><code>0.86</code></li>
-            <li><b>2</b><div><strong>Map east wall</strong><span>coverage gap</span></div><code>0.61</code></li>
-            <li><b>3</b><div><strong>Recharge</strong><span>energy threshold 35%</span></div><code>0.22</code></li>
-          </ol>
+          <div class="chips" id="stats"></div>
         </section>
 
-        <section class="panel telemetry-panel" aria-labelledby="telemetry-title">
-          <div class="panel-heading compact">
-            <div><p class="eyebrow">Body</p><h2 id="telemetry-title">Vitals + actuators</h2></div>
-            <span class="health"><i></i> Nominal</span>
-          </div>
+        <section class="panel decisions-panel" aria-labelledby="decisions-title">
+          <div class="panel-heading"><div><p class="eyebrow">Pecking order of choices</p><h2 id="decisions-title">Decisions and outcomes</h2></div></div>
+          <ol class="decision-list" id="decision-list"></ol>
+        </section>
 
-          <div class="metric-row">
-            <div><span>Pitch</span><strong id="pitch">−2.4°</strong><small>stable</small></div>
-            <div><span>Speed</span><strong id="speed">0.18</strong><small>m/s</small></div>
-            <div><span>Step time</span><strong id="step-time">3.7</strong><small>ms</small></div>
-          </div>
+        <section class="panel skills-panel" aria-labelledby="skills-title">
+          <div class="panel-heading"><div><p class="eyebrow">Things I’ve quacked up</p><h2 id="skills-title">Skill record</h2></div></div>
+          <div class="table-wrap"><table class="skill-table"><colgroup><col style="width:34%"><col><col style="width:22%"><col><col></colgroup><thead><tr><th>Skill</th><th>Tries</th><th>Effect held</th><th>p</th><th>Mean s</th></tr></thead><tbody id="skill-rows"></tbody></table></div>
+        </section>
 
-          <div class="section-rule"><span>Joint targets</span><small>radians</small></div>
-          <div class="joint-chart" id="joint-chart">
-            <div><span>Neck</span><i><b id="joint-neck"></b></i><code id="joint-neck-value">+.25</code></div>
-            <div><span>L hip</span><i><b id="joint-lhip"></b></i><code id="joint-lhip-value">+.10</code></div>
-            <div><span>L ankle</span><i><b id="joint-lankle"></b></i><code id="joint-lankle-value">−.04</code></div>
-            <div><span>R hip</span><i><b id="joint-rhip"></b></i><code id="joint-rhip-value">−.08</code></div>
-            <div><span>R ankle</span><i><b id="joint-rankle"></b></i><code id="joint-rankle-value">+.06</code></div>
-          </div>
+        <section class="panel beliefs-panel" aria-labelledby="beliefs-title">
+          <div class="panel-heading"><div><p class="eyebrow">Beliefs</p><h2 id="beliefs-title">Objects I know about</h2></div></div>
+          <div class="table-wrap"><table class="skill-table"><colgroup><col style="width:24%"><col style="width:30%"><col><col><col></colgroup><thead><tr><th>Entity</th><th>x, y (m)</th><th>±</th><th>Conf</th><th>Seen</th></tr></thead><tbody id="belief-rows"></tbody></table></div>
         </section>
 
         <section class="panel events-panel" aria-labelledby="events-title">
-          <div class="panel-heading compact">
+          <div class="panel-heading">
             <div><p class="eyebrow">Trace</p><h2 id="events-title">Thought stream</h2></div>
-            <div class="filter-group" role="group" aria-label="Event filters">
-              <button class="active" data-filter="all">All</button>
-              <button data-filter="mind">Mind</button>
-              <button data-filter="body">Body</button>
+            <div class="segmented" role="group" aria-label="Filter events" id="filters">
+              <button class="active" data-filter="mind">Mind</button>
+              <button data-filter="skills">Skills</button>
+              <button data-filter="beliefs">Beliefs</button>
+              <button data-filter="all">All</button>
             </div>
           </div>
           <div class="event-list" id="event-list" aria-live="polite"></div>
         </section>
 
-        <section class="panel anomalies-panel" id="anomalies" aria-labelledby="anomaly-title">
-          <div class="panel-heading compact">
-            <div><p class="eyebrow">Feathered fails</p><h2 id="anomaly-title">Anomalies</h2></div>
-            <span class="count-badge">2 open</span>
-          </div>
-          <button class="anomaly active" data-event="slip-6">
-            <span class="severity warn">!</span><div><strong>Unexpected foot slip</strong><small>0.18 m/s lateral drift · 2.4s ago</small></div><span>›</span>
-          </button>
-          <button class="anomaly" data-event="conflict-4">
-            <span class="severity info">?</span><div><strong>Object position conflict</strong><small>visual observation ≠ semantic memory</small></div><span>›</span>
-          </button>
-        </section>
-
         <section class="panel inspector-panel" aria-labelledby="inspector-title">
-          <div class="panel-heading compact">
-            <div><p class="eyebrow">Selected event</p><h2 id="inspector-title">Raw inspector</h2></div>
-            <button class="copy-button" id="copy-json">Copy JSON</button>
-          </div>
-          <div class="inspector-meta"><span id="inspector-type">ACTION_SELECTED</span><code id="inspector-time">00:07.35</code></div>
-          <pre id="json-inspector" tabindex="0"></pre>
-        </section>
-
-        <section class="panel learning-panel" aria-labelledby="learning-title">
-          <div class="panel-heading compact">
-            <div><p class="eyebrow">Continuous learning</p><h2 id="learning-title">Cognition systems</h2></div>
-            <span class="health"><i></i><span id="learning-health">Ready</span></span>
-          </div>
-          <div class="learning-grid">
-            <div><span>Deliberation</span><strong id="provider-name">Local baseline</strong><small id="model-stats">0 cloud calls</small></div>
-            <div><span>Memory</span><strong id="memory-status">Consolidated</strong><small id="memory-stats">10 episodes · 1 conflict</small></div>
-            <div><span>Skill learning</span><strong id="skill-learning-name">orient_to_object</strong><small id="skill-stats">amp 0.120 · 0 attempts</small></div>
-          </div>
-        </section>
-
-        <section class="panel comparison-panel" id="comparison" aria-labelledby="comparison-title">
-          <div class="panel-heading compact">
-            <div><p class="eyebrow">Regression lab</p><h2 id="comparison-title">Run comparison</h2></div>
-            <span class="comparison-verdict" id="comparison-verdict">Demo baseline</span>
-          </div>
-          <div class="score-cards">
-            <div><span id="left-run-label">SIM-0041</span><strong id="left-score">82.0</strong><small>baseline score</small></div>
-            <b id="score-delta">+4.0</b>
-            <div><span id="right-run-label">SIM-0042</span><strong id="right-score">86.0</strong><small>candidate score</small></div>
-          </div>
-          <div class="metric-deltas" id="metric-deltas">
-            <span>Anomalies <b>−1</b></span><span>Confidence <b>+3%</b></span><span>Min height <b>+0.02m</b></span><span>Cognitive cycles <b>+2</b></span>
-          </div>
+          <div class="panel-heading"><div><p class="eyebrow">Selected event</p><h2 id="inspector-title">Raw inspector</h2></div></div>
+          <pre id="json-inspector" tabindex="0">Select an event.</pre>
         </section>
       </main>
 
-      <footer class="rewind-bar">
-        <div class="rewind-title"><span aria-hidden="true">↶</span><div><strong>Rewind the Quack</strong><small id="replay-state">Live tail</small></div></div>
-        <button class="transport" id="step-back" aria-label="Previous frame">‹</button>
-        <button class="transport primary" id="play-button" aria-label="Pause replay">Ⅱ</button>
-        <button class="transport" id="step-forward" aria-label="Next frame">›</button>
-        <div class="timeline-wrap">
-          <input id="timeline" type="range" min="0" max="119" value="119" aria-label="Run timeline" />
-          <div class="timeline-events" aria-hidden="true"><i style="left:15%"></i><i style="left:38%"></i><i class="warning" style="left:61%"></i><i style="left:78%"></i></div>
-        </div>
-        <code id="timeline-time">00:11.90 / 00:11.90</code>
-        <select id="run-select" aria-label="Recorded run"><option value="demo">Demo run</option></select>
-        <select id="compare-select" aria-label="Compare against"><option value="">Compare run…</option></select>
-        <select id="playback-rate" aria-label="Playback rate"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+      <footer class="timeline-bar">
+        <button class="transport" id="play-button" aria-label="Play">▶</button>
+        <input id="timeline" type="range" min="0" max="0" value="0" aria-label="Rewind the quack" />
+        <code id="timeline-time">00:00.0 / 00:00.0</code>
+        <select id="rate" aria-label="Replay speed"><option value="1">1×</option><option value="4" selected>4×</option><option value="16">16×</option></select>
+        <span id="replay-state">Rewind the Quack</span>
       </footer>
     </div>
     <script src="app.js"></script>

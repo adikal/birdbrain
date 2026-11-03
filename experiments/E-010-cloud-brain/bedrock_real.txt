@@ -1,0 +1,4 @@
+seed 16: 4/6 in basket · grasps 6/6 · falls 0 · decisions 20 · fallbacks 0 · 50.3 s wall
+seed 17: 4/6 in basket · grasps 5/5 · falls 0 · decisions 23 · fallbacks 0 · 58.6 s wall
+seeds 2 · in basket 4.00 of 6 (sd 0.00, min 4, max 4) · falls 0.00/run
+grasps 11/11 · decisions 43 · fallbacks 0 · invalid 0 · provider errors 0

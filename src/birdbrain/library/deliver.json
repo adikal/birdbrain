@@ -1,0 +1,75 @@
+{
+  "doc": "Carry the held toy to the basket and drop it in.",
+  "params": {},
+  "budget": 75,
+  "expect": "inside(held, basket)",
+  "body": [
+    {
+      "call": "require",
+      "args": {
+        "condition": "holding(self)"
+      }
+    },
+    {
+      "if": "not known(basket)",
+      "then": [
+        {
+          "call": "look_around",
+          "until": "known(basket)"
+        }
+      ]
+    },
+    {
+      "bind": "b",
+      "to": "basket"
+    },
+    {
+      "call": "require",
+      "args": {
+        "condition": "b is not none"
+      }
+    },
+    {
+      "call": "walk_toward",
+      "args": {
+        "x": "b",
+        "stop_at": 0.42,
+        "look": "'level'"
+      },
+      "timeout": 40
+    },
+    {
+      "call": "turn_toward",
+      "args": {
+        "x": "b",
+        "tolerance": 0.08
+      }
+    },
+    {
+      "call": "stand",
+      "args": {
+        "seconds": 1.4
+      }
+    },
+    {
+      "call": "walk_toward",
+      "args": {
+        "x": "b",
+        "stop_at": 0.22,
+        "speed": 0.25,
+        "look": "'level'",
+        "steady_last": 0.06
+      },
+      "timeout": 15
+    },
+    {
+      "call": "beak",
+      "args": {
+        "state": "open"
+      }
+    },
+    {
+      "call": "back_off"
+    }
+  ]
+}

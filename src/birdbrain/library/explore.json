@@ -1,0 +1,17 @@
+{
+  "doc": "Wander for a while, then look around.",
+  "params": {},
+  "budget": 30,
+  "expect": "true",
+  "body": [
+    {
+      "call": "wander",
+      "args": {
+        "seconds": 6
+      }
+    },
+    {
+      "call": "look_around"
+    }
+  ]
+}

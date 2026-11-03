@@ -1,0 +1,14 @@
+{
+  "doc": "Stand still for ten seconds.",
+  "params": {},
+  "budget": 15,
+  "expect": "true",
+  "body": [
+    {
+      "call": "stand",
+      "args": {
+        "seconds": 10
+      }
+    }
+  ]
+}

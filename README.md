@@ -2,107 +2,147 @@
 
 **Small duck. Big thoughts.**
 
-BirdBrain is a research platform for a persistent autonomous embodied agent. It
-combines cloud-LLM cognition, durable semantic and episodic memory,
-self-generated goals, learned skills, and an inspectable dashboard. Development
-starts in a MuJoCo-based Microduck simulator and is designed to transfer to
-physical hardware later.
+BirdBrain is a research project to build a persistent, autonomous, creative
+artificial creature: a small duck robot that lives in a room, decides for
+itself what is worth doing, runs its own experiments, and becomes more capable
+over time. A frozen foundation model in the cloud does the thinking. Local
+code grounds it in what the duck senses and measures, keeps a durable memory,
+and runs the body.
 
-## Principles
+Two books shaped the idea. Steve Grand's *Creatures* supplied the spirit: a
+small creature with its own needs, living one continuous life and learning
+from what its actions cause. Max Bennett's *A Brief History of Intelligence*
+supplied a checklist for a grounded mind: basic needs and reflexes, learning
+from prediction errors, imagination, a model of itself and others, and
+knowledge carried in language. Language models start with the last of these;
+BirdBrain supplies the others.
 
-- **Persistent:** identity, memory, goals, and learning survive process restarts.
-- **Embodied:** cognition is grounded in observations and actions through a
-  simulator-or-hardware adapter.
-- **Inspectable:** every decision can be traced in the BirdBrain dashboard.
-- **Safe by construction:** actions are bounded, interruptible, and auditable.
-- **Adapter-first:** cognition does not depend on a specific simulator or robot.
+The body is Pollen Robotics'
+[Microduck](https://github.com/pollen-robotics/microduck), a 25 cm biped.
+Until the physical robot arrives, the duck lives in
+[Microduck Lab](https://github.com/jonathanhawkins/microduck-lab), a MuJoCo
+world with Pollen's real robot model, its shipped walking and grasping
+policies, and simulated versions of the robot's own senses.
 
-## Repository layout
+## Central hypothesis
+
+An embodied agent with persistent causal memory, self-generated goals, and a
+learning-progress-driven choice of experiments can develop increasingly useful
+capabilities over time without updating its foundation model's weights.
+
+## Architecture
+
+BirdBrain is the mind. Microduck Lab and Pollen's software are the body.
 
 ```text
-src/birdbrain/       Core Python package
-src/birdbrain/assets First Microduck MJCF arena
-dashboard/            BirdBrain debugging dashboard
-tests/               Minimal unit tests
-docs/architecture.md System boundaries and data flow
-docs/roadmap.md      Staged development plan
+┌──────────────────────────────────────────────────────────────┐
+│ Cloud brain  (AWS Bedrock, Claude Sonnet 5.5)                │
+│   proposes goals · chooses the next action · predicts ·      │
+│   reflects after surprises                                   │
+├──────────────────────────────────────────────────────────────┤
+│ Local mind  (this repo)                                      │
+│   beliefs from senses · needs · measured scorecard ·         │
+│   validates every action · measures outcomes · fallback      │
+│   memory: events · assertions · causal rules · skills        │
+├──────────────────────────────────────────────────────────────┤
+│ Skills  (50 Hz)                                              │
+│   control primitives · compound skills as bounded programs   │
+│   senses in, intents out (twist, head, beak, reflex skill)   │
+├──────────────────────────────────────────────────────────────┤
+│ Body                                                         │
+│   simulation: Microduck Lab World, Pollen policies, MuJoCo   │
+│   hardware:   Pollen robotd (robot.move / head / do)         │
+└──────────────────────────────────────────────────────────────┘
+        events ──▶ BirdBrain dashboard (the mind)
+        frames ──▶ Microduck Lab /sim viewer (the body)
+        true simulator state ──▶ evaluator only
 ```
+
+The mind sees only what the real robot can sense: the head's 8×8 depth
+sensor, the camera's object detections, odometry, and its own telemetry. The
+simulator's true state is used to score runs and never reaches the agent.
+Because Microduck Lab brains emit the same intents as Pollen's robot daemon,
+moving to hardware replaces only the bottom layer.
+
+[`docs/design.md`](docs/design.md) is the full design.
+[`docs/ledger.md`](docs/ledger.md) is the research ledger, where hypotheses,
+experiments, results, and lessons are recorded as the design evolves.
+
+## Workspace
+
+BirdBrain expects to sit beside Microduck Lab, which in turn holds pinned
+checkouts of Pollen's two repositories:
+
+```text
+<workspace>/
+  birdbrain/                 this repo: the mind, memory, dashboard, experiments
+  microduck-lab/             the simulated body and world (pinned commit)
+    microduck/               Pollen robot software and shipped policies
+    microduck_rl/            Pollen MJCF models and training stack
+```
+
+BirdBrain imports Microduck Lab as a library and registers its brain at
+runtime. It never edits the upstream repositories.
 
 ## Quick start
 
-Requires Python 3.11 or newer.
+Requirements: macOS on Apple Silicon or Linux, Python 3.12,
+[uv](https://docs.astral.sh/uv/), Node 20+, and git.
+
+[`AGENTS.md`](AGENTS.md) has the exact setup, including the pinned upstream
+commits. In short:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e '.[dev,sim]'
-pytest
+mkdir birdbrain-workspace && cd birdbrain-workspace
+git clone git@github.com:adikal/birdbrain.git
+git clone https://github.com/jonathanhawkins/microduck-lab
+git -C microduck-lab checkout 8dad9218062f7b0ad29ae6d564305411f5a117c2
+(cd microduck-lab && ./scripts/setup.sh)
+cd birdbrain && uv venv -p 3.12 .venv
+uv pip install --python .venv/bin/python -e ../microduck-lab/microduck_local -e '.[dev,cloud]'
+.venv/bin/pytest
 ```
 
-The `sim` extra installs the pinned MuJoCo engine and its canonical Python
-bindings. MuJoCo's native library is bundled in that package; no separate
-system-wide simulator installation is required.
-
-The initial MuJoCo environment includes an articulated Microduck with five
-position-controlled joints, proprioceptive sensors, movable toys, a charging
-zone, and a bounded test arena. It runs without a display through the
-`MujocoMicroduckAdapter`.
-
-Run the live debugging dashboard and simulator bridge with:
+## Running it
 
 ```bash
-source .venv/bin/activate
-birdbrain-dashboard
+.venv/bin/birdbrain-run --seeds 16 --seconds 300 --jobs 8 --out experiments/mine/rows.jsonl
+.venv/bin/birdbrain-run --provider bedrock --seeds 5 --out experiments/mine/cloud.jsonl
+.venv/bin/birdbrain-compare A.jsonl B.jsonl          # paired, seed-matched comparison
+.venv/bin/birdbrain-dashboard --live --seed 3        # the mind, live, at http://127.0.0.1:8790
+.venv/bin/birdbrain-record playroom --brain d0=birdbrain --seconds 120 --out /tmp/rec   # video
 ```
 
-Open `http://127.0.0.1:8787` to inspect versioned live events. Runs are durably
-recorded as JSONL under `data/runs`; the run selector can reopen and replay a
-completed session after a restart. The private hosted dashboard uses the same
-interface in sample-data mode.
+Runs are scored from simulator truth (toys in the basket, falls, grasps) and
+every event the mind produces is recorded under `data/runs/`.
 
-The baseline cognition loop records observations and episodes, updates a
-provenance-aware semantic wiki, ranks self-generated goals, creates plans, and
-invokes simulator skills. Completed runs receive a deterministic regression
-score, and the dashboard can compare two traces metric by metric. Durable memory
-is stored under `data/memory`.
+## Cloud brain
 
-Cloud deliberation is optional. The currently implemented cloud adapter uses
-the OpenAI Responses API when `OPENAI_API_KEY` is set. AWS Bedrock is the next
-provider target, allowing BirdBrain to use an existing AWS account and a
-Bedrock model through the provider-neutral cognition boundary instead of
-requiring an OpenAI Platform key. Until that adapter lands, BirdBrain remains
-fully functional on the deterministic local baseline.
+The cloud brain is Claude Sonnet 5.5 (`us.anthropic.claude-sonnet-5-5`) on
+AWS Bedrock, called through the Converse API with the standard AWS
+credential chain (profiles, SSO sessions, temporary credentials, or IAM
+roles). The identity needs `bedrock:InvokeModel` on that model in the
+configured region. Skills are offered as tools whose arguments are the
+entities the duck believes in, so the model acts only through calls local
+code can check; it never sends motor values. Any invalid, missing, or
+failed answer falls back to the local policy and is recorded. Never commit
+credentials; model usage is billed to the AWS account.
 
-The planned Bedrock adapter will use the Bedrock Runtime Converse API and the
-standard AWS credential chain (including AWS profiles, SSO sessions, temporary
-credentials, IAM roles, or `AWS_BEARER_TOKEN_BEDROCK`). Its AWS identity will
-need `bedrock:InvokeModel`, access to the selected model, and a configured AWS
-region. Never commit AWS credentials or Bedrock API keys to this repository;
-AWS usage is billed separately through the AWS account. See
-[the architecture](docs/architecture.md#aws-bedrock-provider) for the intended
-configuration and safety boundary.
+## Principles
 
-For every cloud provider, the model may select only registered goals and
-skills—local code retains actuator control and falls back safely on any refusal,
-timeout, unavailable credential, or invalid response.
-
-Install the cloud extra once with `pip install -e '.[cloud]'` before enabling
-the adapter.
-
-```bash
-export OPENAI_API_KEY="..."
-export BIRDBRAIN_OPENAI_MODEL="gpt-6-astra"  # optional override
-birdbrain-dashboard --cognition auto
-```
-
-Skill parameters and outcome statistics persist under `data/skills`. Memory
-consolidation stores sourced observation profiles and flags incompatible object
-positions instead of silently overwriting them.
-
-See [the architecture](docs/architecture.md) and [roadmap](docs/roadmap.md) for
-the planned system and Bedrock integration milestone.
+- **Persistent:** identity, memory, goals, and learning survive restarts.
+- **Embodied:** cognition is grounded in what the robot can actually sense and do.
+- **Honest evaluation:** privileged simulator state scores the agent and is never an input.
+- **Inspectable:** every decision can be traced from perception to outcome.
+- **Safe by construction:** actions are bounded, interruptible, and auditable.
+- **Simple first:** add a mechanism only when an experiment in the ledger shows it is needed.
 
 ## Status
 
-Phase 0: foundations. Interfaces are intentionally small while the research
-questions and simulator integration are validated.
+Milestones 0 to 2 are complete. The mind runs on Microduck Lab's body from
+the robot's own senses, with a general knowledge representation, a bounded
+skill language, and the Bedrock cloud brain. On held-out seeds it tidies as
+well as the lab's hand-tuned brain (ledger E-008), and the cloud brain
+matches the local policy with no invalid action in 370 decisions (E-010).
+Next is Milestone 3: needs and self-generated goals. The milestones are
+listed in [`docs/design.md`](docs/design.md#15-milestones).

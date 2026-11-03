@@ -1,0 +1,19 @@
+seed 0: 6/6 in the basket · picked 6 · delivered 6 · grasps 6/6 · falls 0 · walked 16 m laden / 26 m unladen · scenery contacts 25 · 300.0 s sim
+seed 1: 5/6 in the basket · picked 5 · delivered 5 · grasps 5/6 · falls 3 (approach 3 · 0 laden) · walked 10 m laden / 31 m unladen · scenery contacts 31 · 300.0 s sim
+seed 2: 5/6 in the basket · picked 6 · delivered 6 · grasps 6/7 · falls 0 · walked 15 m laden / 26 m unladen · scenery contacts 14 · 300.0 s sim
+seed 3: 4/6 in the basket · picked 5 · delivered 5 · grasps 5/5 · falls 0 · walked 8 m laden / 32 m unladen · scenery contacts 53 · 300.0 s sim
+seed 4: 6/6 in the basket · picked 6 · delivered 6 · grasps 6/7 · falls 0 · walked 13 m laden / 27 m unladen · scenery contacts 7 · 300.0 s sim
+seed 5: 5/6 in the basket · picked 5 · delivered 5 · grasps 5/6 · falls 1 (approach 1 · 0 laden) · walked 9 m laden / 31 m unladen · scenery contacts 48 · 300.0 s sim
+seed 6: 6/6 in the basket · picked 6 · delivered 6 · grasps 6/7 · falls 0 · walked 13 m laden / 27 m unladen · scenery contacts 23 · 300.0 s sim
+seed 7: 6/6 in the basket · picked 6 · delivered 6 · grasps 6/6 · falls 1 (backoff 1 · 0 laden) · walked 15 m laden / 27 m unladen · scenery contacts 17 · 300.0 s sim
+seed 8: 5/6 in the basket · picked 6 · delivered 6 · grasps 6/8 · falls 0 · walked 12 m laden / 27 m unladen · scenery contacts 14 · 300.0 s sim
+seed 9: 5/6 in the basket · picked 5 · delivered 5 · grasps 5/6 · falls 1 (approach 1 · 0 laden) · walked 11 m laden / 30 m unladen · scenery contacts 29 · 300.0 s sim
+seed 10: 5/6 in the basket · picked 6 · delivered 6 · grasps 6/7 · falls 0 · walked 14 m laden / 27 m unladen · scenery contacts 13 · 300.0 s sim
+seed 11: 3/6 in the basket · picked 3 · delivered 3 · grasps 3/3 · falls 1 (approach 1 · 0 laden) · walked 4 m laden / 35 m unladen · scenery contacts 20 · 300.0 s sim
+seed 12: 5/6 in the basket · picked 5 · delivered 5 · grasps 5/5 · falls 1 (backoff 1 · 0 laden) · walked 14 m laden / 29 m unladen · scenery contacts 23 · 300.0 s sim
+seed 13: 5/6 in the basket · picked 6 · delivered 6 · grasps 6/6 · falls 1 (drop 1 · 0 laden) · walked 13 m laden / 27 m unladen · scenery contacts 14 · 300.0 s sim
+seed 14: 5/6 in the basket · picked 6 · delivered 6 · grasps 6/7 · falls 1 (approach 1 · 0 laden) · walked 11 m laden / 29 m unladen · scenery contacts 28 · 300.0 s sim
+seed 15: 5/6 in the basket · picked 6 · delivered 6 · grasps 6/7 · falls 0 · walked 14 m laden / 27 m unladen · scenery contacts 13 · 300.0 s sim
+mean tidied 0.84 · falls 0.62/run
+falls by state: approach 7 · backoff 2 · drop 1
+laden 0 falls / 191 m = 0.00 per 100 m · unladen 10 falls / 458 m = 2.18 per 100 m

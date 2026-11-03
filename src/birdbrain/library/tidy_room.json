@@ -1,0 +1,46 @@
+{
+  "doc": "Put every known toy in the basket, exploring when none is known.",
+  "params": {},
+  "budget": 300,
+  "expect": "not exists(toy, not inside(it, basket))",
+  "body": [
+    {
+      "repeat": [
+        {
+          "if": "holding(self)",
+          "then": [
+            {
+              "call": "deliver",
+              "on_fail": []
+            }
+          ],
+          "else": [
+            {
+              "bind": "x",
+              "to": "nearest(toy, not inside(it, basket) and failures('pick', it) < 3)"
+            },
+            {
+              "if": "x is none",
+              "then": [
+                {
+                  "call": "explore"
+                }
+              ],
+              "else": [
+                {
+                  "call": "pick",
+                  "args": {
+                    "x": "x"
+                  },
+                  "on_fail": []
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "until": "not holding(self) and not exists(toy, not inside(it, basket))",
+      "max": 30
+    }
+  ]
+}

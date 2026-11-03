@@ -20,3 +20,4 @@ data/
 artifacts/
 checkpoints/
 work/
+MUJOCO_LOG.TXT

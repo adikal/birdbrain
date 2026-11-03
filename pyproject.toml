@@ -4,10 +4,10 @@ build-backend = "hatchling.build"
 
 [project]
 name = "birdbrain-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "Persistent autonomous embodied-agent research platform"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 dependencies = []
 
 [project.optional-dependencies]
@@ -15,14 +15,15 @@ dev = [
   "pytest>=8.0",
   "ruff>=0.6",
 ]
-sim = [
-  "mujoco==3.17.0",
-]
 cloud = [
+  "boto3>=1.35",
   "certifi>=2024.0",
 ]
 
 [project.scripts]
+birdbrain-run = "birdbrain.run:main"
+birdbrain-compare = "birdbrain.evaluation:main"
+birdbrain-record = "birdbrain.record:main"
 birdbrain-dashboard = "birdbrain.observability.server:main"
 
 [tool.hatch.build.targets.wheel]
@@ -34,4 +35,4 @@ testpaths = ["tests"]
 
 [tool.ruff]
 line-length = 88
-target-version = "py311"
+target-version = "py312"

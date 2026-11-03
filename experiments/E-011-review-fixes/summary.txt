@@ -1,0 +1,9 @@
+before_87101d0:
+  seeds 16 · in basket 5.31 of 6 (sd 0.60, min 4, max 6) · falls 0.81/run
+  grasps 86/94 · decisions 375 · fallbacks 0 · invalid 0 · provider errors 0
+after_965ce8c:
+  seeds 16 · in basket 5.31 of 6 (sd 0.79, min 4, max 6) · falls 0.44/run
+  grasps 91/94 · decisions 535 · fallbacks 0 · invalid 0 · provider errors 0
+after_2303c9b:
+  seeds 16 · in basket 5.00 of 6 (sd 0.52, min 4, max 6) · falls 0.62/run
+  grasps 85/93 · decisions 478 · fallbacks 0 · invalid 0 · provider errors 0

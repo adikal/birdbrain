@@ -1,32 +1,30 @@
 # BirdBrain dashboard
 
-The dashboard is a buildless, responsive debugging surface for the agent. It
-automatically connects to the local read-only observability bridge when served
-by BirdBrain, and falls back to a deterministic sample run when hosted alone.
+A buildless, read-only view of one run's event log, served by
+`birdbrain-dashboard` at `http://127.0.0.1:8790` (loopback only).
 
-It includes:
+- **What I see:** the duck's head-camera image (rendered from the camera
+  pose the detector recorded, with its 116° × 60° field of view) and every
+  detection the mind received in that frame, labelled with the object it
+  was taken to be. A dashed box is a detection the mind could not place.
+  The same field of view is shaded on the map.
+- **Bird's-eye view:** what the duck believes is where, each object with its
+  uncertainty, the current target, and the duck's trail. "Show simulator
+  truth" overlays the true toy positions; they come from viewer-only `TRUTH`
+  events and never reach the mind.
+- **What's on my mind:** the current action as a tool call, its reason, the
+  expected effect, the counted-outcome and model probabilities, and what the
+  skill is doing this tick. Chips show decisions, fallbacks, rejected
+  choices, tokens, and median cloud latency.
+- **Decisions and outcomes:** each choice with its provider, probability,
+  outcome, and surprise.
+- **Skill record** and **objects I know about:** the mind's statistics and
+  beliefs at the selected time.
+- **Thought stream** and **raw inspector:** every event, filterable.
+- **Rewind the Quack:** the timeline scrubs through 2 Hz snapshots;
+  `?run=<id>&t=<seconds>` opens a recorded run at a time.
 
-- top-down observed and remembered world state;
-- goals, rationale, attention, confidence, energy, and active skill;
-- body telemetry and actuator targets;
-- filterable event trace and raw JSON inspection;
-- anomalies and belief conflicts;
-- timeline scrubbing and replay ("Rewind the Quack");
-- scored run selection and side-by-side metric comparison.
-
-The continuous-learning panel reports whether deliberation is local or cloud
-backed, model latency and fallback state, memory consolidation/conflicts, and
-the latest learned skill amplitude and success rate.
-
-To run it against the real MuJoCo simulator:
-
-```bash
-source .venv/bin/activate
-birdbrain-dashboard
-```
-
-Then open `http://127.0.0.1:8787`. The bridge binds only to localhost by
-default and exposes read-only status, snapshot, and Server-Sent Events routes.
-
-The privately hosted Site cannot directly control the simulator. It remains a
-safe interactive demo unless a future authenticated relay is introduced.
+Start it with `birdbrain-dashboard` to replay recorded runs, or
+`birdbrain-dashboard --live --seed 3 [--provider bedrock] [--speed 4]` to
+watch a live playroom. Camera images are recorded in live runs (turn off
+with `--no-camera`) and in `birdbrain-run --camera` runs.

@@ -1,0 +1,93 @@
+{
+  "doc": "Walk to toy x and pick it up in the beak. A toy near the basket is approached from the far side.",
+  "params": {
+    "x": "toy"
+  },
+  "budget": 45,
+  "expect": "holding(self, x)",
+  "body": [
+    {
+      "call": "require",
+      "args": {
+        "condition": "not holding(self)"
+      }
+    },
+    {
+      "if": "known(basket) and near(x, basket, 0.33)",
+      "then": [
+        {
+          "bind": "s",
+          "to": "beyond(x, basket, 0.45)"
+        },
+        {
+          "call": "walk_toward",
+          "args": {
+            "x": "s",
+            "stop_at": 0.06,
+            "avoid": "basket",
+            "look": "level"
+          },
+          "timeout": 25
+        }
+      ]
+    },
+    {
+      "call": "walk_toward",
+      "args": {
+        "x": "x",
+        "stop_at": 0.07,
+        "aim_left": 0.014,
+        "avoid": "basket",
+        "avoid_r": 0.3
+      },
+      "timeout": 35
+    },
+    {
+      "call": "stand",
+      "args": {
+        "seconds": 0.6
+      }
+    },
+    {
+      "call": "reflex",
+      "args": {
+        "name": "ground_pick"
+      }
+    },
+    {
+      "call": "stand",
+      "args": {
+        "seconds": 0.3
+      }
+    },
+    {
+      "call": "require",
+      "args": {
+        "condition": "holding(self)"
+      },
+      "on_fail": [
+        {
+          "call": "doubt",
+          "args": {
+            "x": "x"
+          }
+        },
+        {
+          "call": "move",
+          "args": {
+            "vx": -0.4,
+            "vy": 0.0,
+            "wz": 0.0,
+            "seconds": 1.0
+          }
+        },
+        {
+          "call": "require",
+          "args": {
+            "condition": "false"
+          }
+        }
+      ]
+    }
+  ]
+}

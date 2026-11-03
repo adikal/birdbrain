@@ -1,0 +1,32 @@
+{
+  "doc": "Leave the basket rim: sidestep left, turn around, walk away.",
+  "params": {},
+  "budget": 20,
+  "expect": "not near(self, basket, 0.4)",
+  "body": [
+    {
+      "call": "move",
+      "args": {
+        "vx": 0.0,
+        "vy": 0.3,
+        "wz": 0.0,
+        "seconds": 1.5
+      }
+    },
+    {
+      "call": "turn",
+      "args": {
+        "angle": 2.6
+      }
+    },
+    {
+      "call": "move",
+      "args": {
+        "vx": 0.3,
+        "vy": 0.0,
+        "wz": 0.0,
+        "seconds": 1.5
+      }
+    }
+  ]
+}

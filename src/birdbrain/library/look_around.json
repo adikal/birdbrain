@@ -1,0 +1,14 @@
+{
+  "doc": "Turn a full circle in place, looking.",
+  "params": {},
+  "budget": 20,
+  "expect": "true",
+  "body": [
+    {
+      "call": "turn",
+      "args": {
+        "angle": 6.283
+      }
+    }
+  ]
+}
