@@ -1,0 +1,25 @@
+== B minus A, rooms 6 on, paired by life
+  none    own: A 0.800 · B 0.500 · B-A -0.300 [95% CI -0.963, +0.363] · B higher 2, equal 2, lower 4 · sign-flip p = 0.375 · n = 8
+  none    falls: A 0.075 · B 0.150 · B-A +0.075 [95% CI -0.124, +0.274] · B higher 3, equal 3, lower 2 · sign-flip p = 0.562 · n = 8
+  none    failed picks: A 1.175 · B 1.350 · B-A +0.175 [95% CI -0.407, +0.757] · B higher 4, equal 1, lower 3 · sign-flip p = 0.547 · n = 8
+  none    lost by pick: A 0.000 · B 0.000 · B-A +0.000 [95% CI +0.000, +0.000] · B higher 0, equal 8, lower 0 · sign-flip p = 1.000 · n = 8
+  none    approvals: A 0.000 · B 0.000 · B-A +0.000 [95% CI +0.000, +0.000] · B higher 0, equal 8, lower 0 · sign-flip p = 1.000 · n = 8
+  none    disapprovals: A 0.000 · B 0.000 · B-A +0.000 [95% CI +0.000, +0.000] · B higher 0, equal 8, lower 0 · sign-flip p = 1.000 · n = 8
+  basket  own: A 3.150 · B 2.800 · B-A -0.350 [95% CI -2.137, +1.437] · B higher 3, equal 0, lower 5 · sign-flip p = 0.703 · n = 8
+  basket  falls: A 0.200 · B 0.575 · B-A +0.375 [95% CI +0.100, +0.650] · B higher 6, equal 1, lower 1 · sign-flip p = 0.031 · n = 8
+  basket  failed picks: A 1.375 · B 1.800 · B-A +0.425 [95% CI -0.320, +1.170] · B higher 6, equal 0, lower 2 · sign-flip p = 0.219 · n = 8
+  basket  lost by pick: A 0.000 · B 0.000 · B-A +0.000 [95% CI +0.000, +0.000] · B higher 0, equal 8, lower 0 · sign-flip p = 1.000 · n = 8
+  basket  approvals: A 1.950 · B 1.725 · B-A -0.225 [95% CI -1.269, +0.819] · B higher 3, equal 0, lower 5 · sign-flip p = 0.633 · n = 8
+  basket  disapprovals: A 0.000 · B 0.000 · B-A +0.000 [95% CI +0.000, +0.000] · B higher 0, equal 8, lower 0 · sign-flip p = 1.000 · n = 8
+  wall    own: A 4.650 · B 3.225 · B-A -1.425 [95% CI -3.013, +0.163] · B higher 1, equal 1, lower 6 · sign-flip p = 0.047 · n = 8
+  wall    falls: A 0.000 · B 0.125 · B-A +0.125 [95% CI -0.028, +0.278] · B higher 3, equal 5, lower 0 · sign-flip p = 0.250 · n = 8
+  wall    failed picks: A 2.050 · B 2.425 · B-A +0.375 [95% CI -0.855, +1.605] · B higher 5, equal 0, lower 3 · sign-flip p = 0.516 · n = 8
+  wall    lost by pick: A 1.525 · B 1.000 · B-A -0.525 [95% CI -1.334, +0.284] · B higher 2, equal 0, lower 6 · sign-flip p = 0.195 · n = 8
+  wall    approvals: A 3.925 · B 2.725 · B-A -1.200 [95% CI -2.701, +0.301] · B higher 2, equal 0, lower 6 · sign-flip p = 0.094 · n = 8
+  wall    disapprovals: A 1.075 · B 0.900 · B-A -0.175 [95% CI -0.684, +0.334] · B higher 2, equal 2, lower 4 · sign-flip p = 0.500 · n = 8
+  leave   own: A 5.125 · B 5.000 · B-A -0.125 [95% CI -0.929, +0.679] · B higher 3, equal 1, lower 4 · sign-flip p = 0.703 · n = 8
+  leave   falls: A 0.125 · B 0.175 · B-A +0.050 [95% CI -0.145, +0.245] · B higher 3, equal 4, lower 1 · sign-flip p = 0.750 · n = 8
+  leave   failed picks: A 0.425 · B 0.800 · B-A +0.375 [95% CI -0.118, +0.868] · B higher 6, equal 0, lower 2 · sign-flip p = 0.156 · n = 8
+  leave   lost by pick: A 1.500 · B 1.925 · B-A +0.425 [95% CI -0.923, +1.773] · B higher 4, equal 1, lower 3 · sign-flip p = 0.516 · n = 8
+  leave   approvals: A 0.450 · B 0.650 · B-A +0.200 [95% CI -0.469, +0.869] · B higher 4, equal 2, lower 2 · sign-flip p = 0.500 · n = 8
+  leave   disapprovals: A 1.125 · B 1.400 · B-A +0.275 [95% CI -0.700, +1.250] · B higher 4, equal 0, lower 4 · sign-flip p = 0.555 · n = 8

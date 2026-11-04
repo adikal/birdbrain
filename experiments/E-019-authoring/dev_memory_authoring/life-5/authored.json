@@ -1,0 +1,286 @@
+{
+  "attempts": {
+    "pick|target tried before=yes": 1
+  },
+  "log": [
+    {
+      "answer_0": {
+        "body": [
+          {
+            "args": {
+              "condition": "not holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "if": "known(x)",
+            "then": [
+              {
+                "args": {
+                  "tolerance": 0.15,
+                  "x": "x"
+                },
+                "call": "turn_toward",
+                "timeout": 6
+              },
+              {
+                "args": {
+                  "seconds": 0.5
+                },
+                "call": "stand"
+              }
+            ]
+          },
+          {
+            "max": 2,
+            "repeat": [
+              {
+                "if": "not known(x) or not seen_since(x, 3)",
+                "then": [
+                  {
+                    "args": {},
+                    "call": "look_around",
+                    "timeout": 15
+                  }
+                ]
+              }
+            ],
+            "until": "known(x) and seen_since(x, 3)"
+          },
+          {
+            "args": {
+              "condition": "known(x)"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "x": "x"
+            },
+            "call": "pick",
+            "timeout": 60
+          }
+        ],
+        "doc": "Re-acquire a previously tried toy by looking at it (or looking around if it was doubted) before calling pick.",
+        "name": "pick_retry_reacquire",
+        "reason": "Most failures on retried targets were 'toy no longer where believed': the belief was stale. Re-observing the toy (turn toward it, look around if doubted or unseen recently) refreshes its position before the normal pick, and aborts early rather than walking to an empty spot."
+      },
+      "answer_1": {
+        "body": [
+          {
+            "args": {
+              "condition": "not holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "else": [
+              {
+                "args": {},
+                "call": "look_around"
+              }
+            ],
+            "if": "known(x)",
+            "then": [
+              {
+                "args": {
+                  "tolerance": 0.2,
+                  "x": "x"
+                },
+                "call": "turn_toward",
+                "timeout": 5
+              },
+              {
+                "args": {
+                  "seconds": 0.5
+                },
+                "call": "stand"
+              }
+            ]
+          },
+          {
+            "if": "known(x)",
+            "then": [
+              {
+                "args": {
+                  "x": "x"
+                },
+                "call": "pick",
+                "on_fail": [
+                  {
+                    "args": {
+                      "seconds": 0.8,
+                      "vx": -0.2,
+                      "vy": 0.0,
+                      "wz": 0.0
+                    },
+                    "call": "move"
+                  },
+                  {
+                    "args": {},
+                    "call": "look_around"
+                  },
+                  {
+                    "if": "known(x) and not holding(self)",
+                    "then": [
+                      {
+                        "args": {
+                          "x": "x"
+                        },
+                        "call": "pick"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "args": {
+              "condition": "holding(self)"
+            },
+            "call": "require"
+          }
+        ],
+        "doc": "Re-pick a toy that was tried before: face it and look to refresh its position, then pick, and if that fails look around once and retry if it is found again.",
+        "name": "pick_retry_fresh",
+        "reason": "Failures on re-tried toys come mostly from stale beliefs about where the toy is. Facing the toy and pausing refreshes the belief before approach. On failure the skill looks around and retries once if the toy is seen again. The program does not use seen_since, so the earlier refusal no longer applies."
+      },
+      "child": "w_pick_retry_fresh",
+      "condition": "target tried before yes",
+      "episode": 7,
+      "evidence": {
+        "n": 11,
+        "n_otherwise": 42,
+        "rate": 0.36363636363636365,
+        "rate_otherwise": 0.8333333333333334,
+        "z": -2.1629935362701462
+      },
+      "skill": "pick",
+      "status": "trial"
+    }
+  ],
+  "skills": {
+    "w_pick_retry_fresh": {
+      "body": [
+        {
+          "args": {
+            "condition": "not holding(self)"
+          },
+          "call": "require"
+        },
+        {
+          "else": [
+            {
+              "args": {},
+              "call": "look_around"
+            }
+          ],
+          "if": "known(x)",
+          "then": [
+            {
+              "args": {
+                "tolerance": 0.2,
+                "x": "x"
+              },
+              "call": "turn_toward",
+              "timeout": 5
+            },
+            {
+              "args": {
+                "seconds": 0.5
+              },
+              "call": "stand"
+            }
+          ]
+        },
+        {
+          "if": "known(x)",
+          "then": [
+            {
+              "args": {
+                "x": "x"
+              },
+              "call": "pick",
+              "on_fail": [
+                {
+                  "args": {
+                    "seconds": 0.8,
+                    "vx": -0.2,
+                    "vy": 0.0,
+                    "wz": 0.0
+                  },
+                  "call": "move"
+                },
+                {
+                  "args": {},
+                  "call": "look_around"
+                },
+                {
+                  "if": "known(x) and not holding(self)",
+                  "then": [
+                    {
+                      "args": {
+                        "x": "x"
+                      },
+                      "call": "pick"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "args": {
+            "condition": "holding(self)"
+          },
+          "call": "require"
+        }
+      ],
+      "budget": 75.0,
+      "defaults": {},
+      "doc": "Re-pick a toy that was tried before: face it and look to refresh its position, then pick, and if that fails look around once and retry if it is found again.",
+      "expect": "holding(self, x)",
+      "params": {
+        "x": "toy"
+      }
+    }
+  },
+  "tokens": 6908,
+  "trials": [
+    {
+      "child": "w_pick_retry_fresh",
+      "counts": {
+        "pick": [
+          7.636363636363637,
+          16.0,
+          0.0
+        ],
+        "w_pick_retry_fresh": [
+          9.0,
+          14.0,
+          0.0
+        ]
+      },
+      "feature": "target tried before",
+      "live": {
+        "pick": [
+          4.0,
+          6.0,
+          0.0
+        ],
+        "w_pick_retry_fresh": [
+          9.0,
+          14.0,
+          0.0
+        ]
+      },
+      "opened": 7,
+      "parent": "pick",
+      "reason": "Failures on re-tried toys come mostly from stale beliefs about where the toy is. Facing the toy and pausing refreshes the belief before approach. On failure the skill looks around and retries once if the toy is seen again. The program does not use seen_since, so the earlier refusal no longer applies.",
+      "status": "trial",
+      "value": "yes"
+    }
+  ]
+}

@@ -104,6 +104,25 @@ Entry ids: `E-###` experiments, `H-###` hypotheses, `L-###` lessons.
 - **L-020. Better predictions are not better choices.** Rules that
   predicted better made worse choices when the duck chose by their means.
   The optimizer's curse is the likely reason (H-018). (E-017)
+- **L-021. Exploration has a price, and the body pays it.** Thompson
+  sampling over a wide posterior sent the duck to the riskiest picks. Where
+  failure is costly, explore the outcome you want and be pessimistic about
+  the one you fear. (E-018)
+- **L-022. Ask the author about a measured failure.** Shown the program, the
+  condition, the rates, and how the tries ended, the cloud brain wrote
+  targeted fixes. The rules of Milestone 4 earned their keep here, by
+  pointing at what to fix. (E-019)
+- **L-023. A choice made because something looked bad is biased.** The
+  situations chosen for authoring were the parent's worst, so the parent's
+  own counts there understate it. Compare against fresh outcomes. (E-019)
+- **L-024. A measure keyed by a name must follow what runs in its place.**
+  Written variants of `pick` ran under their own names, so the failed-pick
+  measure, the give-up rule and a rule feature all missed them, and an
+  artifact read as a third of a pick saved per room. (E-019 review)
+- **L-025. Judge a skill by what the room rewards.** A written delivery
+  succeeded more often and took longer, won its trials, and cost the
+  room a tenth of a toy where time was short. A trial's score should be
+  the same currency as the goal. (E-020)
 
 ## Open hypotheses
 
@@ -115,10 +134,18 @@ Ordered by what to test next. Resolved ones keep their verdict.
 - **H-002 Supported for the lab brain.** Delivery misses limit its rate: 15
   of its 179 deliveries over 32 seeds left the toy outside the basket
   (E-007, E-008). BirdBrain's deliveries landed in nearly every case.
-- **H-006** (Milestone 5) **Partly supported.** Every compound skill the
-  playroom has needed so far fits the bounded language (sequence, if,
-  repeat until, bind, call). The test that matters is skills written by the
-  cloud brain.
+- **H-006** (Milestone 5) **Supported.** The cloud brain wrote 27 skills
+  in the bounded language for situations the duck had measured as failing.
+  All of them checked. In those situations they raised success by 8 to 10
+  points against the same rooms with the original skills, with no more
+  falls. The duck kept 15 and retired 1 on its own evidence (E-019).
+  With fair trials and on fresh lives, success there rose 7.5 points per
+  life with a task and 10 with the basket owner, with no more falls; the
+  duck kept 6 of 44 and retired 3 (E-020).
+- **H-021** (authoring). Scoring a written skill's trial by successes per
+  second, where the room is short of time, removes E-020's whole-room cost
+  without losing the gain in its situation. *Test:* the task setting of
+  E-020, toys in the basket, rooms 11 to 20, paired by life.
 - **H-007** (Milestone 4) **Early data.** The language model's stated
   probabilities beat counted outcomes for actions with little history
   (Brier 0.167 against 0.206 with fewer than 3 prior trials) and the two
@@ -159,11 +186,13 @@ Ordered by what to test next. Resolved ones keep their verdict.
   conditions predict whether a skill's expected effect holds better than
   counts per skill or per kind, on outcomes they had not seen. For falls
   they are worse than counts per kind (E-017).
-- **H-018** (new). Choosing by a posterior draw from the rules, in place
-  of their mean, removes the optimizer's curse and turns better
-  predictions into fewer failed picks and falls. *Test:* `--rules` with
-  draws against counts, paired by life.
-- **H-017** (new). Learning the conditions of the owner's reactions with
+- **H-018 Refuted in development.** Posterior draws from the rules made
+  the duck explore rim picks, which fall; falls rose in every arm (E-018).
+- **H-020 Refuted in development.** Judging falls by an upper credible
+  bound paralysed the duck early in life (E-018).
+- **H-017 Refuted in development** (E-018): over conditions, the owner
+  model learned the leave-it owner's dislike of picks more slowly.
+- **H-017, as first stated.** Learning the conditions of the owner's reactions with
   the rules of E-017, in place of hand-chosen kinds of action, reduces toys
   lost to picks. *Test:* lost-by-pick and own measure, paired by life.
 - **H-004** (Milestone 4). Beliefs with evidence predict the outcome of actions
@@ -177,6 +206,331 @@ Ordered by what to test next. Resolved ones keep their verdict.
   gains more competence per episode than choosing by novelty.
 
 ## Experiments
+
+### E-020 · 2026-11-04 · Milestone 5a: fair trials for written skills (pre-registered)
+
+**Question.** E-019 kept written skills against a parent prior biased low
+(L-023), and two kept skills did no better than the control. With fair
+trials, are the skills the duck keeps really better, and does authoring
+still help in the situations it targets? Does it help with an owner, where
+behaviour comes from the approval scorecard?
+
+**Changes** (`authoring.py`).
+- *No prior.* Both skills start from zero in a trial.
+- *Turns.* Parent and written skill take turns until each has 8 outcomes
+  in the situation; then Thompson sampling decides.
+- *Re-review.* Kept skills stay under review and can be retired.
+- *Building on.* A kept written skill can be the parent of a newer one.
+- Every action of a written skill counts as a try of its parent (E-019
+  review).
+
+**Development** (lives 0 to 7, task arm, against E-019's control lives;
+`dev_authoring.jsonl`). 17 skills written, 5 retired, 2 kept, 10 still on
+trial at the end of life (E-019's rule: 12 written, 8 kept). In the
+written skills' situations after they were written, success against the
+control life was +0.03 per life [−0.03, +0.09], 3 of 8 lives higher, with
+falls −0.01. Part of E-019's apparent gain came from generous keeping, and
+part of this one is spent on the parent's turns.
+
+**Predictions, written before the held-out runs** (lives 160 to 175,
+rooms 16001 to 17520, 20 rooms; two settings, task and the basket owner,
+each with a control and an authoring arm on the same rooms; per life,
+paired):
+1. Honest judging: across both settings, at least 3 written skills are
+   retired.
+2. In the written skills' situations after they were written, success in
+   the authoring life is not lower than in the control life: per-life CI
+   lower bound above −0.05, in each setting.
+3. Falls there are not higher: per-life CI upper bound below +0.03.
+4. With the basket owner, her own measure (toys gained in the basket,
+   rooms 11 to 20) is not lower: CI lower bound above −0.5.
+5. Reported, with no prediction: skills kept, and kept skills' success in
+   their situations after they were kept, against the control life.
+
+**Method.** Commit `0be3b0a` (later commits change only the dashboard).
+Each setting and arm:
+`birdbrain-run --seeds 16 --seed0 160 --episodes 20 --seconds 300 --jobs 3 [--owner basket] [--author] --tag e020-<setting>-<arm> --memory data/lifetimes/e020-<setting>-<arm>`.
+1,280 rooms. Report, per setting:
+`scripts/skills_report.py <setting>_ctl.jsonl <setting>_auth.jsonl --lives data/lifetimes/e020-<setting>-auth --control-lives data/lifetimes/e020-<setting>-ctl --late 11`
+(`task_report.txt`, `basket_report.txt`).
+
+**Result.**
+
+| Prediction | Measure | Task | Basket owner | Verdict |
+|---|---|---|---|---|
+| 1 | written skills retired | 3 of 28 | 0 of 16 | met, at the threshold (3) |
+| 2 | success in the written skills' situations, per life, authoring minus control | +0.075 [+0.038, +0.112], 13 of 14 lives higher | +0.104 [−0.018, +0.225], 8 of 11 higher | met |
+| 3 | fall rate there, per life | +0.002 [−0.009, +0.013] | −0.029 [−0.084, +0.025] | met |
+| 4 | the owner's measure (toys gained in the basket), rooms 11 to 20 | | +0.09 [−0.16, +0.34], 6 higher, 5 lower | met |
+| 5 | kept; kept skills after they were kept, per life | 5 kept in 4 lives; +0.12 [−0.06, +0.31], 3 of 4 higher | 1 kept, no outcomes after | reported |
+
+- *Most trials did not finish.* Of 44 written skills, 6 were kept, 3
+  retired, and 35 were still on trial when their life ended (20 of 28 in
+  the task setting, 15 of 16 with the owner). Turns until each side has 8
+  outcomes take most of a life where the situation comes up a few times a
+  room, and with the owner it comes up less often.
+- *The retired skills were worse than their parents in their trials* (6 of
+  15 against 12 of 19, 7 of 10 against 13 of 14, 7 of 20 against 18 of
+  31). One kept skill did worse than the control life after it was kept
+  (life 174, picks of toys tried before: 45% of 11 against 75% of 12) and
+  was still under review at the end.
+- *No written skill was built on another.* The duck never asked again
+  about a situation where a skill was kept, so the mechanism was not
+  exercised (nor in development).
+- *Far deliveries* again gained the most: +0.11 [+0.02, +0.20] in the
+  task setting (11 of 13 lives), +0.15 [+0.04, +0.25] with the owner (8 of
+  10).
+- *Unexpected: in the task setting the whole room did slightly worse.*
+  Toys in the basket, rooms 11 to 20, were −0.11 [−0.22, −0.004] (7 lives
+  lower, 2 higher, sign-flip p = 0.06; E-019: −0.006). Falls were
+  unchanged (+0.00). The event logs point to time. A written far delivery
+  ends in `done` more often than the original there (69% of 247 against
+  55% of 709 in the control arm), but takes longer: 24.2 s against 17.4 s
+  a try, 35.0 s against 31.8 s per `done`. Rooms last 300 s and the task
+  policy nearly finishes (5.4 of 6), so seconds spent are toys lost. With
+  the owner, where the duck has time to spare, there was no such cost.
+
+**Analysis.** With fair trials the gain holds. In the situations the
+skills were written for, success rose by 7 to 10 points per life against
+the same rooms with the original skills, with no more falls, in both
+settings. Judging is now honest: the skills retired were worse in their
+trials, and E-019's generous keeping is gone (6 of 44 kept, against 15 of
+27). Judging is also slow: most trials were undecided at the end of a
+20-room life, so in practice the duck spent its life alternating between
+the two skills. That alternation costs little success here, because the written
+skills mostly do better.
+
+The trial scores a skill by success per try, and the room rewards success
+per second. A skill that succeeds more often but takes longer can win its
+trial and cost the room a toy. This showed in the task setting, where time
+is short; it is a small effect (a tenth of a toy a room, CI just below
+zero) and was not predicted.
+
+**Decision.** Milestone 5a is met: keep decisions are judged on fresh
+outcomes, and authoring helps in its situations with an owner as well as
+with a task. Keep the 5a trial rule. Two things are left for authoring:
+score trials by what the room rewards, success per unit of time where time
+is short (H-021); and shorten the turns phase, or let it end early when
+the difference is clear, so trials finish within a life.
+
+### E-019 · 2026-11-04 · Milestone 5: skills written by the cloud brain (pre-registered)
+
+**Question.** Can the cloud brain write skills, in the bounded skill
+language, that do better than the hand-written ones where those fail, and
+keep only those that do, on measured merit (H-006's real test)?
+
+**Design** (`authoring.py`). After each room the duck reflects.
+- *Finding a weakness.* It looks for the compound skill and condition with
+  the most negative effect on the expected effect (at least 2 posterior
+  sds, at least 8 outcomes, success at most 60% there), using the
+  Milestone 4 rules.
+- *Asking.* Claude Sonnet 5.5 (Bedrock) is shown the skill's program, the
+  condition, the success rate there and elsewhere, how those tries ended
+  (status and reason, counted), the language, and the primitives. It
+  answers with a tool call holding a program.
+- *Checking.* Local code checks it: constructs, known skills and
+  arguments, bound names, relation arities, no self-call. The written skill
+  takes its parent's parameters and expected effect. A refused program
+  gets one retry with the reason.
+- *Trial.* Whenever the parent is about to run in that situation, the duck
+  chooses between parent and written skill by Thompson sampling on success
+  (the effect held, no fall). The parent's past outcomes there count as a
+  prior worth at most 10 trials, since the situation was chosen for looking
+  bad. After 8 trials the written skill is kept when better with
+  probability 0.9 and retired when worse with probability 0.9.
+- Behaviour is otherwise the task-driven local policy (explicit tidy goal),
+  which gives the most skill runs per room. The cloud brain only writes
+  skills.
+
+**Development** (lives 0 to 7; rows, report and the written skills in
+`experiments/E-019-authoring/`).
+- *Ten rooms were too few.* Skills were written after rooms 6 to 10,
+  leaving most with no trials.
+- *The parent's prior was biased.* Its full past counts entered the trial,
+  biased low because the situation was picked for its failures. They now
+  count at most 10 trials.
+- *A written program called `seen_since` with the wrong arity* and
+  crashed the run. Arity is now checked at load, so the author is told,
+  and any run-time error inside a skill fails that skill.
+- *Lives of 20 rooms.* 12 skills were written in 8 lives, all accepted,
+  and 8 were kept. In each written skill's situation after it was
+  written, success in the authoring life against the control life (same
+  rooms, original skill) was +0.20 [+0.10, +0.31], higher in 9 of 12
+  situations, with falls unchanged (−0.008). In rooms 11 to 20, failed
+  picks fell by 0.56 a room [−1.01, −0.11] (first reported as −0.83; see
+  *Review* below), and toys in the basket were unchanged (−0.01 [−0.19,
+  +0.17]).
+- The skills written are sensible and specific. For far deliveries:
+  approach in stages and re-sight the basket mid-way ("the belief is fresh
+  before the final approach"). For picks of toys not seen recently: walk to
+  a middle distance, pause, re-observe, look around if lost, then pick.
+  Most targeted the two failures the rules found in E-017: far deliveries
+  and stale positions.
+
+**Predictions, written before the held-out runs** (lives 144 to 159,
+rooms 14401 to 15920, 20 rooms each, control and authoring arms on the same
+rooms, paired by life):
+1. At least one written skill is kept in at least 10 of 16 lives.
+2. In the situations skills were written for, after they were written,
+   success (the expected effect held and the duck did not fall) is higher
+   in the authoring life than in the control life: mean difference with CI
+   lower bound above 0.
+3. The fall rate in those situations is not higher: CI upper bound below
+   +0.03.
+4. Failed pick decisions per room, rooms 11 to 20, authoring minus
+   control: CI upper bound below 0.
+5. Toys in the basket, rooms 11 to 20: CI lower bound above −0.3.
+6. Reported, with no prediction: requests, refusals, retirements, tokens,
+   and the situations chosen.
+
+**Method.** Commit `d527b27`. Both arms:
+`birdbrain-run --seeds 16 --seed0 144 --episodes 20 --seconds 300 --jobs 5 --tag e019-<arm> --memory data/lifetimes/e019-<arm>`,
+with `--author` for the authoring arm. 640 rooms. Report:
+`scripts/skills_report.py ctl.jsonl auth.jsonl --lives data/lifetimes/e019-auth --control-lives data/lifetimes/e019-ctl --late 11`
+(`report.txt`).
+
+**Result.**
+
+| Prediction | Measure | Result | Verdict |
+|---|---|---|---|
+| 1 | lives with a kept written skill | 11 of 16 | met |
+| 2 | success in the written skills' situations, authoring minus control | +0.079 [+0.005, +0.152] over 26 situations, 15 higher; per life (outcomes pooled, each once) +0.104 [+0.024, +0.183], 10 of 14 higher | met |
+| 3 | fall rate in those situations | +0.002 [−0.010, +0.014] | met |
+| 4 | failed pick decisions per room, rooms 11 to 20 | −0.05 [−0.31, +0.21], 6 of 16 lower, p = 0.72 (first reported as −0.36; see *Review*) | missed |
+| 5 | toys in the basket, rooms 11 to 20 | −0.006 [−0.15, +0.14] | met |
+
+- *Requests.* 27, all accepted on the first or second try. 15 skills were
+  kept, 1 retired, and 11 were still on trial when their life ended. The
+  author used 107k tokens over 16 lives.
+- *Situations chosen.* Far deliveries (15 of 27 requests), picks of toys
+  tried before (4), picks of toys with vague or stale positions (6), and
+  picks of toys at mid or far distance (2). These are the failures the
+  E-017 rules found.
+- *Far deliveries.* Success rose +0.13 [+0.03, +0.23] against the control
+  life (first request per life; 8 of 14 lives higher). The gain is large in some lives (82%
+  against 49%; 86% against 59%; 87% against 58%) and absent in others.
+  The written programs differ from life to life; the best approach the
+  basket in stages, re-sighting it mid-way.
+
+**Analysis.** The cloud brain, shown a failure the duck had measured and
+nothing more, wrote programs in the bounded language that did better in
+that situation than the hand-written skill, in the same rooms. The duck
+kept the good ones on its own evidence and retired one bad one. H-006 is
+supported, and Milestone 5's exit test is met: a skill the cloud brain
+wrote was kept on measured merit and did its job better where the original
+failed.
+
+The effect on the whole task is small. Toys in the basket were unchanged,
+because the task policy already tidies 5.4 of 6 toys and a failed
+delivery is usually retried. Failed picks did not change (−0.05 a room).
+
+Two caveats:
+- *Keep decisions are generous.* They compare the written skill's trial
+  outcomes with a parent prior drawn from the outcomes that made the
+  situation look bad (shrunk to 10 trials). Two kept far-delivery skills
+  did no better than the control life (50% against 59%; 41% against 42%).
+  The unbiased measure is the comparison with the control life, which the
+  predictions used.
+- *The comparisons are within this task and room family.*
+
+**Decision.** Keep authoring as an option (`--author`). Next: judge keep
+decisions against outcomes after the request, not the biased prior; let a
+kept skill become the parent for its situation; and try authoring in the
+owner arms, where situations are rarer and a written skill matters more.
+
+**Review** (after the results; `semantic-review/2026-11-04-013551-pr-local.md`).
+The success and fall results reproduce from `data/lifetimes/e019-*`. No
+truth reaches the authoring prompt, and defaults reproduce the control
+arm's rows exactly (life 144, rooms 1 to 3, after the fixes). Findings
+and fixes:
+- *The failed-pick measure missed written variants.* `pickDecisionsFailed`
+  counted depth-0 actions named `pick`, so a pick run as `w_pick_*`
+  disappeared. Recounted from the event logs (`skills_report.py --runs`),
+  pick decisions are 8.08 and 8.06 a room in the two arms and failed picks
+  −0.05 [−0.31, +0.21], not −0.36. Development: −0.56, not −0.83. Fixed:
+  a written skill's action events carry `variant_of`, and the measure
+  counts them (`report_reviewed.txt`).
+- *Give-up and `target tried before` missed them too.* `failures(pick, x)`
+  did not count a `w_pick_*` that copies pick's body, so a toy could be
+  tried past three failures. Fixed in `relations.tries`: a variant's run
+  is a try of its parent, and a pick nested inside it is the same try.
+  This changes the authoring arm's behaviour; E-019's rows predate it.
+- *Overlapping trials.* The first matching trial took every run where two
+  conditions of one parent held, starving the second (life 150: 3 runs in
+  10 rooms). Now every matching trial draws, the highest written draw runs
+  if it beats the parent, and a parent run counts in all of them.
+- *Malformed programs crashed a run.* `"args": []` crashed the check at the
+  end of a room, before memory was saved; a non-string `if`, `until` or
+  `to` passed the check and crashed the next room. The check now refuses
+  them. All 27 held-out programs (and the development ones) still pass.
+- *A written skill calling another could fail to load.* Skills were loaded
+  in name order, so a caller sorting before its callee was retired on the
+  next room. They now load in dependency order.
+- The 26 situations overlap within a life (and life 157 asked about far
+  deliveries twice), so the per-life figure, with each outcome counted
+  once, is now computed by the script and is the one to quote. The
+  situation counts above were corrected (15/4/6/2).
+- Still open: a kept skill is never re-reviewed, so the two kept
+  far-delivery skills that did no better than control stay in use.
+
+### E-018 · 2026-11-03 · Milestone 4a: rules that steer (development, both refuted)
+
+**Question.** Does choosing by a posterior draw from the rules, in place of
+their mean, turn better predictions into better choices (H-018)? Does
+learning the owner's reactions over conditions, with a finer wall-distance
+condition (under 0.1, 0.1 to 0.2, 0.2 to 0.3, 0.3 to 0.5, over 0.5 m), in
+place of hand-chosen kinds, reduce toys lost to picks (H-017)?
+
+**Design.** `--rules draw` draws one model per skill and decision from the
+Laplace posterior and evaluates every candidate with it.
+`--owner-model conditions` logs every action with its features. EM
+alternates credit with a refit of two logistic models (approval,
+disapproval) on soft outcomes. The default configuration reproduces E-017
+round 2 decision for decision (checked on 6 episodes).
+
+**Development** (lives 0 to 7, four owner arms, ten rooms; each variant
+minus the baseline, rooms 6 to 10, paired by life, n = 8; rows and tables
+in `experiments/E-018-steer/`):
+
+| Owner | Draws: own measure | Draws: falls | Conditions: own measure | Conditions: toys lost to picks |
+|---|---|---|---|---|
+| None | −0.30 [−0.96, +0.36] | +0.08 | −0.15 | 0 |
+| Basket | −0.35 [−2.14, +1.44] | +0.38 [+0.10, +0.65] | −0.43 [−1.13, +0.28] | 0 |
+| Wall | −1.43 [−3.01, +0.16] | +0.13 | −1.53 [−3.34, +0.29] | −0.43 [−1.48, +0.63] |
+| Leave-it | −0.13 [−0.93, +0.68] | +0.05 | −0.93 [−1.45, −0.40] | +2.65 [+1.42, +3.88] |
+
+Both together were no better than either.
+
+**Analysis.**
+- *Draws explore where it is dangerous.* Toys inside the basket by the
+  rim are rarely tried, so their posterior is wide, and draws sometimes
+  make them look good. In the basket arm's late rooms the duck picked such
+  toys 19 times (against 2 under counts); one succeeded and 10 fell.
+  Thompson sampling did what it is built to do, but exploration here is
+  paid in falls, and a life of ten rooms is too short to recoup it. The
+  optimizer's curse (L-020) is real, but trading it for unbounded
+  exploration is worse.
+- *Conditions dilute a simple preference.* The leave-it owner dislikes
+  every pick. The kinds model learns that from three kinds and quickly. The
+  condition model spreads the same evidence over a dozen features, its
+  shrinkage holds the pick effect back, and the duck kept picking (1.9
+  failed picks a room against 0.4). The finer wall condition did not
+  measurably reduce lost toys in the wall arm.
+
+*Cautious* (H-020, tested afterwards on the same lives): draws for the
+expected effect, falls judged by mean + 2 sd on the log-odds. The duck
+nearly stopped picking (0.1 failed picks a room, from 1.2 to 2.1), so the
+basket and wall owners' measures fell to 0.0 and 0.35 (−3.15 and −4.30,
+8 of 8 lives lower) while the leave-it owner gained (+0.78). Early in a
+life every fall estimate is uncertain, so an upper bound makes every pick
+look dangerous. H-020 is refuted as specified (`caut_vs_base.txt`).
+
+**Decision.** None of the three changes goes to a held-out round; there is
+no supported prediction to pre-register. Both remain as options. Next:
+explore safely, by drawing for the expected effect while judging falls
+pessimistically (an upper credible bound), and give the condition model a
+skill-level prior learned across lives, so a simple preference is learned
+as fast as with kinds.
 
 ### E-017 · 2026-11-03 · Milestone 4: causal rules predict outcomes (pre-registered)
 

@@ -1,0 +1,489 @@
+{
+  "attempts": {
+    "deliver|basket distance=far": 1,
+    "pick|target tried before=yes": 1
+  },
+  "log": [
+    {
+      "answer_0": {
+        "body": [
+          {
+            "args": {
+              "condition": "holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "if": "not known(basket)",
+            "then": [
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ]
+          },
+          {
+            "args": {
+              "condition": "known(basket)"
+            },
+            "call": "require"
+          },
+          {
+            "max": 3,
+            "repeat": [
+              {
+                "if": "not known(basket)",
+                "then": [
+                  {
+                    "call": "look_around",
+                    "until": "known(basket)"
+                  }
+                ]
+              },
+              {
+                "bind": "b",
+                "to": "basket"
+              },
+              {
+                "args": {
+                  "condition": "b is not none"
+                },
+                "call": "require"
+              },
+              {
+                "args": {
+                  "tolerance": 0.1,
+                  "x": "b"
+                },
+                "call": "turn_toward"
+              },
+              {
+                "args": {
+                  "look": "'level'",
+                  "speed": 0.5,
+                  "stop_at": 0.9,
+                  "x": "b"
+                },
+                "call": "walk_toward",
+                "on_fail": [
+                  {
+                    "args": {
+                      "x": "basket"
+                    },
+                    "call": "doubt"
+                  },
+                  {
+                    "call": "look_around",
+                    "until": "known(basket)"
+                  }
+                ],
+                "timeout": 25
+              },
+              {
+                "args": {
+                  "seconds": 0.8
+                },
+                "call": "stand"
+              }
+            ],
+            "until": "known(basket) and distance(self, basket) < 1.1"
+          },
+          {
+            "if": "not known(basket)",
+            "then": [
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ]
+          },
+          {
+            "bind": "c",
+            "to": "basket"
+          },
+          {
+            "args": {
+              "condition": "c is not none"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "tolerance": 0.08,
+              "x": "c"
+            },
+            "call": "turn_toward"
+          },
+          {
+            "args": {
+              "seconds": 1.0
+            },
+            "call": "stand"
+          },
+          {
+            "call": "deliver"
+          }
+        ],
+        "doc": "Approach a far basket in stages, re-sighting it each time so its believed position is fresh, then run the normal deliver from close range.",
+        "name": "deliver_far",
+        "reason": "Most far-basket failures are 'basket no longer where it was believed', meaning the long approach used a stale position estimate. Walking in stages with a stop, a turn toward the basket and a fresh sighting refreshes the belief, so the final deliver starts from the near range where it already succeeds 86% of the time. Speeds are kept moderate and no new risky motion is added, so falls should not increase."
+      },
+      "child": "w_deliver_far",
+      "condition": "basket distance far",
+      "episode": 10,
+      "evidence": {
+        "n": 40,
+        "n_otherwise": 35,
+        "rate": 0.55,
+        "rate_otherwise": 0.8571428571428571,
+        "z": -2.1910207043762435
+      },
+      "skill": "deliver",
+      "status": "trial"
+    },
+    {
+      "answer_0": {
+        "body": [
+          {
+            "args": {
+              "condition": "not holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "args": {},
+            "call": "look_around"
+          },
+          {
+            "max": 2,
+            "repeat": [
+              {
+                "else": [
+                  {
+                    "args": {},
+                    "call": "look_around"
+                  }
+                ],
+                "if": "known(x)",
+                "then": [
+                  {
+                    "args": {
+                      "tolerance": 0.15,
+                      "x": "x"
+                    },
+                    "call": "turn_toward"
+                  },
+                  {
+                    "args": {
+                      "x": "x"
+                    },
+                    "call": "pick",
+                    "on_fail": [
+                      {
+                        "args": {
+                          "seconds": 0.3
+                        },
+                        "call": "stand"
+                      },
+                      {
+                        "args": {},
+                        "call": "look_around"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ],
+            "until": "holding(self)"
+          },
+          {
+            "args": {
+              "condition": "holding(self)"
+            },
+            "call": "require"
+          }
+        ],
+        "doc": "Re-sight a toy that was tried before by looking around, then face it and pick it, with one retry after another look.",
+        "name": "pick_retried_target",
+        "reason": "Most failures were \"toy no longer where it was believed\": the belief about a previously tried toy is stale. Looking around first refreshes the belief before walking, and a retry after re-sighting gives a second chance."
+      },
+      "child": "w_pick_retried_target",
+      "condition": "target tried before yes",
+      "episode": 11,
+      "evidence": {
+        "n": 30,
+        "n_otherwise": 69,
+        "rate": 0.36666666666666664,
+        "rate_otherwise": 0.6811594202898551,
+        "z": -2.3506751085179114
+      },
+      "skill": "pick",
+      "status": "trial"
+    }
+  ],
+  "skills": {
+    "w_deliver_far": {
+      "body": [
+        {
+          "args": {
+            "condition": "holding(self)"
+          },
+          "call": "require"
+        },
+        {
+          "if": "not known(basket)",
+          "then": [
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ]
+        },
+        {
+          "args": {
+            "condition": "known(basket)"
+          },
+          "call": "require"
+        },
+        {
+          "max": 3,
+          "repeat": [
+            {
+              "if": "not known(basket)",
+              "then": [
+                {
+                  "call": "look_around",
+                  "until": "known(basket)"
+                }
+              ]
+            },
+            {
+              "bind": "b",
+              "to": "basket"
+            },
+            {
+              "args": {
+                "condition": "b is not none"
+              },
+              "call": "require"
+            },
+            {
+              "args": {
+                "tolerance": 0.1,
+                "x": "b"
+              },
+              "call": "turn_toward"
+            },
+            {
+              "args": {
+                "look": "'level'",
+                "speed": 0.5,
+                "stop_at": 0.9,
+                "x": "b"
+              },
+              "call": "walk_toward",
+              "on_fail": [
+                {
+                  "args": {
+                    "x": "basket"
+                  },
+                  "call": "doubt"
+                },
+                {
+                  "call": "look_around",
+                  "until": "known(basket)"
+                }
+              ],
+              "timeout": 25
+            },
+            {
+              "args": {
+                "seconds": 0.8
+              },
+              "call": "stand"
+            }
+          ],
+          "until": "known(basket) and distance(self, basket) < 1.1"
+        },
+        {
+          "if": "not known(basket)",
+          "then": [
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ]
+        },
+        {
+          "bind": "c",
+          "to": "basket"
+        },
+        {
+          "args": {
+            "condition": "c is not none"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "tolerance": 0.08,
+            "x": "c"
+          },
+          "call": "turn_toward"
+        },
+        {
+          "args": {
+            "seconds": 1.0
+          },
+          "call": "stand"
+        },
+        {
+          "call": "deliver"
+        }
+      ],
+      "budget": 105.0,
+      "defaults": {},
+      "doc": "Approach a far basket in stages, re-sighting it each time so its believed position is fresh, then run the normal deliver from close range.",
+      "expect": "inside(held, basket, 0.03, 0)",
+      "params": {}
+    },
+    "w_pick_retried_target": {
+      "body": [
+        {
+          "args": {
+            "condition": "not holding(self)"
+          },
+          "call": "require"
+        },
+        {
+          "args": {},
+          "call": "look_around"
+        },
+        {
+          "max": 2,
+          "repeat": [
+            {
+              "else": [
+                {
+                  "args": {},
+                  "call": "look_around"
+                }
+              ],
+              "if": "known(x)",
+              "then": [
+                {
+                  "args": {
+                    "tolerance": 0.15,
+                    "x": "x"
+                  },
+                  "call": "turn_toward"
+                },
+                {
+                  "args": {
+                    "x": "x"
+                  },
+                  "call": "pick",
+                  "on_fail": [
+                    {
+                      "args": {
+                        "seconds": 0.3
+                      },
+                      "call": "stand"
+                    },
+                    {
+                      "args": {},
+                      "call": "look_around"
+                    }
+                  ]
+                }
+              ]
+            }
+          ],
+          "until": "holding(self)"
+        },
+        {
+          "args": {
+            "condition": "holding(self)"
+          },
+          "call": "require"
+        }
+      ],
+      "budget": 75.0,
+      "defaults": {},
+      "doc": "Re-sight a toy that was tried before by looking around, then face it and pick it, with one retry after another look.",
+      "expect": "holding(self, x)",
+      "params": {
+        "x": "toy"
+      }
+    }
+  },
+  "tokens": 7213,
+  "trials": [
+    {
+      "child": "w_deliver_far",
+      "counts": {
+        "deliver": [
+          5.25,
+          12.0,
+          0.25
+        ],
+        "w_deliver_far": [
+          22.0,
+          27.0,
+          1.0
+        ]
+      },
+      "feature": "basket distance",
+      "live": {
+        "deliver": [
+          0.0,
+          2.0,
+          0.0
+        ],
+        "w_deliver_far": [
+          22.0,
+          27.0,
+          1.0
+        ]
+      },
+      "opened": 10,
+      "parent": "deliver",
+      "reason": "Most far-basket failures are 'basket no longer where it was believed', meaning the long approach used a stale position estimate. Walking in stages with a stop, a turn toward the basket and a fresh sighting refreshes the belief, so the final deliver starts from the near range where it already succeeds 86% of the time. Speeds are kept moderate and no new risky motion is added, so falls should not in",
+      "status": "kept",
+      "value": "far"
+    },
+    {
+      "child": "w_pick_retried_target",
+      "counts": {
+        "pick": [
+          6.666666666666666,
+          14.0,
+          0.0
+        ],
+        "w_pick_retried_target": [
+          10.0,
+          13.0,
+          0.0
+        ]
+      },
+      "feature": "target tried before",
+      "live": {
+        "pick": [
+          3.0,
+          4.0,
+          0.0
+        ],
+        "w_pick_retried_target": [
+          10.0,
+          13.0,
+          0.0
+        ]
+      },
+      "opened": 11,
+      "parent": "pick",
+      "reason": "Most failures were \"toy no longer where it was believed\": the belief about a previously tried toy is stale. Looking around first refreshes the belief before walking, and a retry after re-sighting gives a second chance.",
+      "status": "kept",
+      "value": "yes"
+    }
+  ]
+}

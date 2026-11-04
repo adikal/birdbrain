@@ -143,18 +143,30 @@ def holding(kb: KnowledgeBase, t: float, who: str = SELF, x: str | None = None) 
     return held is not None and (x is None or held == x)
 
 
+def tries(kb: KnowledgeBase, skill: str, x: str | None = None) -> list[Any]:
+    """Action events that were tries of `skill` (on `x`): runs of the skill itself and of
+    skills written in its place (`variant_of`, Milestone 5). A run of the skill nested
+    inside a run of its variant is part of that one try, not another."""
+    events = kb.find_events("action", x)
+    variants = [e for e in events if e.data.get("variant_of") == skill]
+
+    def within(e: Any, v: Any) -> bool:
+        return (e.data.get("depth", 0) > v.data.get("depth", 0) and e.t0 >= v.t0
+                and (v.t1 is None or (e.t1 is not None and e.t1 <= v.t1)))
+
+    return [e for e in events if e.data.get("variant_of") == skill
+            or (e.data.get("skill") == skill and not any(within(e, v) for v in variants))]
+
+
 def attempts(kb: KnowledgeBase, t: float, skill: str, x: str, outcome: str | None = None) -> int:
     """How many times `skill` was tried on `x` (optionally: with this outcome)."""
-    return sum(1 for e in kb.find_events("action", x)
-               if e.data.get("skill") == skill
-               and (outcome is None or e.data.get("outcome") == outcome))
+    return sum(1 for e in tries(kb, skill, x) if outcome is None or e.data.get("outcome") == outcome)
 
 
 def failures(kb: KnowledgeBase, t: float, skill: str, x: str) -> int:
     """How many times `skill` on `x` ended without success (failed or timed out).
     Runs stopped by their caller are not failures of the skill."""
-    return sum(1 for e in kb.find_events("action", x)
-               if e.data.get("skill") == skill and e.data.get("outcome") in {"failed", "timeout"})
+    return sum(1 for e in tries(kb, skill, x) if e.data.get("outcome") in {"failed", "timeout"})
 
 
 def seen_since(kb: KnowledgeBase, t: float, x: str) -> float:

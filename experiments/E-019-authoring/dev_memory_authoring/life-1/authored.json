@@ -1,0 +1,251 @@
+{
+  "attempts": {
+    "pick|target last seen=a while ago": 1
+  },
+  "log": [
+    {
+      "answer_0": {
+        "body": [
+          {
+            "args": {
+              "condition": "not holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "if": "not seen_since(x, 2)",
+            "then": [
+              {
+                "args": {
+                  "avoid": "basket",
+                  "avoid_r": 0.3,
+                  "stop_at": 0.5,
+                  "x": "x"
+                },
+                "call": "walk_toward",
+                "timeout": 15
+              },
+              {
+                "args": {
+                  "seconds": 0.5
+                },
+                "call": "stand"
+              },
+              {
+                "if": "not seen_since(x, 2)",
+                "then": [
+                  {
+                    "args": {},
+                    "call": "look_around"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "else": [
+              {
+                "args": {
+                  "x": "x"
+                },
+                "call": "doubt"
+              },
+              {
+                "args": {
+                  "condition": "false"
+                },
+                "call": "require"
+              }
+            ],
+            "if": "seen_since(x, 3)",
+            "then": [
+              {
+                "args": {
+                  "x": "x"
+                },
+                "call": "pick"
+              }
+            ]
+          },
+          {
+            "args": {
+              "condition": "holding(self)"
+            },
+            "call": "require"
+          }
+        ],
+        "doc": "Re-sights a toy that was last seen long ago (approach, then look around if needed) and only then picks it up; otherwise doubts it and fails early.",
+        "name": "pick_after_reacquire",
+        "reason": "Most failures were \"toy is no longer where it was believed\": the stale belief was walked to blindly. Re-acquiring the toy with a closer approach and a look-around refreshes its position before the grasp, and if it is not found the belief is dropped instead of wasting a failed grasp attempt."
+      },
+      "answer_1": {
+        "body": [
+          {
+            "args": {
+              "condition": "not holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "avoid": "basket",
+              "avoid_r": 0.3,
+              "look": "'level'",
+              "stop_at": 0.45,
+              "x": "x"
+            },
+            "call": "walk_toward",
+            "on_fail": [
+              {
+                "args": {},
+                "call": "look_around"
+              }
+            ],
+            "timeout": 25
+          },
+          {
+            "args": {
+              "seconds": 0.6
+            },
+            "call": "stand"
+          },
+          {
+            "if": "not known(x)",
+            "then": [
+              {
+                "args": {},
+                "call": "look_around"
+              }
+            ]
+          },
+          {
+            "args": {
+              "condition": "known(x)"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "x": "x"
+            },
+            "call": "pick"
+          }
+        ],
+        "doc": "Approach a toy not seen recently to a middle distance, re-observe it (looking around if lost), then run the normal pick.",
+        "name": "pick_after_refresh",
+        "reason": "A stale belief about the toy's position causes most failures. Walking to a mid distance and pausing lets the camera re-sight the toy and correct the belief before the final approach. If the toy is not found, a full look-around runs first. The final grasp then uses a fresh position instead of an old one. The program no longer calls seen_since, which caused the refusal."
+      },
+      "child": "w_pick_after_refresh",
+      "condition": "target last seen a while ago",
+      "episode": 6,
+      "evidence": {
+        "n": 17,
+        "n_otherwise": 29,
+        "rate": 0.4117647058823529,
+        "rate_otherwise": 0.8620689655172413,
+        "z": -2.122888682266242
+      },
+      "skill": "pick",
+      "status": "trial"
+    }
+  ],
+  "skills": {
+    "w_pick_after_refresh": {
+      "body": [
+        {
+          "args": {
+            "condition": "not holding(self)"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "avoid": "basket",
+            "avoid_r": 0.3,
+            "look": "'level'",
+            "stop_at": 0.45,
+            "x": "x"
+          },
+          "call": "walk_toward",
+          "on_fail": [
+            {
+              "args": {},
+              "call": "look_around"
+            }
+          ],
+          "timeout": 25
+        },
+        {
+          "args": {
+            "seconds": 0.6
+          },
+          "call": "stand"
+        },
+        {
+          "if": "not known(x)",
+          "then": [
+            {
+              "args": {},
+              "call": "look_around"
+            }
+          ]
+        },
+        {
+          "args": {
+            "condition": "known(x)"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "x": "x"
+          },
+          "call": "pick"
+        }
+      ],
+      "budget": 75.0,
+      "defaults": {},
+      "doc": "Approach a toy not seen recently to a middle distance, re-observe it (looking around if lost), then run the normal pick.",
+      "expect": "holding(self, x)",
+      "params": {
+        "x": "toy"
+      }
+    }
+  },
+  "tokens": 7168,
+  "trials": [
+    {
+      "child": "w_pick_after_refresh",
+      "counts": {
+        "pick": [
+          6.11764705882353,
+          14.0,
+          0.0
+        ],
+        "w_pick_after_refresh": [
+          29.0,
+          37.0,
+          0.0
+        ]
+      },
+      "feature": "target last seen",
+      "live": {
+        "pick": [
+          2.0,
+          4.0,
+          0.0
+        ],
+        "w_pick_after_refresh": [
+          29.0,
+          37.0,
+          0.0
+        ]
+      },
+      "opened": 6,
+      "parent": "pick",
+      "reason": "A stale belief about the toy's position causes most failures. Walking to a mid distance and pausing lets the camera re-sight the toy and correct the belief before the final approach. If the toy is not found, a full look-around runs first. The final grasp then uses a fresh position instead of an old one. The program no longer calls seen_since, which caused the refusal.",
+      "status": "kept",
+      "value": "a while ago"
+    }
+  ]
+}

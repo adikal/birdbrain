@@ -11,7 +11,8 @@ const state = {
 };
 
 const FILTERS = {
-  mind: new Set(["RUN_STARTED", "DECISION", "OUTCOME", "CHOICE_REJECTED", "FALL", "HEARD", "RUN_STOPPED", "RUN_FAILED"]),
+  mind: new Set(["RUN_STARTED", "DECISION", "OUTCOME", "CHOICE_REJECTED", "FALL", "HEARD", "SKILL_WRITTEN",
+                 "SKILL_REVIEWED", "RUN_STOPPED", "RUN_FAILED"]),
   skills: new Set(["SKILL_STEP_STARTED", "SKILL_STEP_ENDED", "SKILL_BIND", "EVENT_STARTED", "EVENT_ENDED", "GRASP_TRUTH"]),
   beliefs: new Set(["ENTITY_CREATED", "ASSERTION_OPENED", "ASSERTION_CLOSED"]),
 };
@@ -34,13 +35,14 @@ const fmtP = (p) => (p === null || p === undefined ? "—" : p.toFixed(2));
 
 // ---- loading ---------------------------------------------------------------
 async function loadRuns() {
-  const response = await fetch("/api/runs");
+  const wanted = new URLSearchParams(location.search).get("run");
+  const response = await fetch(`/api/runs?limit=300${wanted ? `&include=${encodeURIComponent(wanted)}` : ""}`);
   const { live_run_id, runs } = await response.json();
   state.liveRunId = live_run_id;
   const select = $("#run-select");
   select.innerHTML = runs.map((r) => {
-    const res = r.result ? ` · ${r.result.inBasket}/${r.result.toys} toys` : r.status === "running" ? " · running" : "";
-    return `<option value="${esc(r.run_id)}">${esc(r.run_id)}${res}</option>`;
+    const res = r.result ? ` · ${r.result.inBasket}/${r.result.toys} in basket` : r.status === "running" ? " · running" : "";
+    return `<option value="${esc(r.run_id)}" title="${esc(r.run_id)}">${esc(r.title || r.run_id)}${res}</option>`;
   }).join("");
   const params = new URLSearchParams(location.search);
   const initial = params.get("run") || live_run_id || (runs[0] && runs[0].run_id);
@@ -261,7 +263,7 @@ function renderDecisions(upTo) {
     const surprise = o && o.payload.surprise_rule != null ? `surprise ${o.payload.surprise_rule.toFixed(2)}` : "";
     return `<li class="${esc(status)} ${dp.fallback ? "fallback" : ""}">
       <time>${tc(d.sim_time)}</time>
-      <strong>${esc(dp.skill)}(${esc(Object.values(dp.args || {}).join(", "))})</strong>
+      <strong>${esc(dp.skill)}(${esc(Object.values(dp.args || {}).join(", "))})${dp.variant_of ? ` <em>in place of ${esc(dp.variant_of)}</em>` : ""}</strong>
       <span>${esc(dp.reason)}</span>
       <em>${esc(dp.provider)}${dp.fallback ? ` · fallback: ${esc(dp.fallback)}` : ""} · p ${fmtP(dp.p_model ?? dp.p_rule)}</em>
       <em class="outcome">${esc(status)}${o && o.payload.reason ? ` (${esc(o.payload.reason)})` : ""}${held ? ` · effect ${held}` : ""} ${surprise}</em>
@@ -272,8 +274,14 @@ function renderDecisions(upTo) {
 function renderTables(p) {
   // Milestone 4: credible rules, as the cloud brain reads them.
   setHTML($("#rule-list"), (p.rules || []).map((r) => `<li>${esc(r)}</li>`).join(""));
+  // Milestone 5: skills the cloud brain wrote, the situation each is for, and how they are doing.
+  setHTML($("#written-list"), (p.written_skills || []).map((w) =>
+    `<li><b>${esc(w.skill)}</b> <span class="status-${esc(w.status)}">${esc(w.status)}</span> · for ${esc(w.for)}<br>`
+    + `written: ${esc(w.written)} · original: ${esc(w.parent)}<br><i>${esc(w.doc)}</i></li>`).join(""));
+  // Skills named w_… were written by the cloud brain (Milestone 5); their description is on hover.
+  const written = Object.fromEntries((p.written_skills || []).map((w) => [w.skill, w]));
   setHTML($("#skill-rows"), Object.entries(p.records || {}).map(([name, r]) =>
-    `<tr><td>${esc(name)}</td><td>${r.trials}</td><td>${r.effect_held}</td><td>${r.p.toFixed(2)}</td><td>${r.mean_s ?? "—"}</td></tr>`).join(""));
+    `<tr><td class="skill-name" title="${esc(written[name] ? `${written[name].doc} (for ${written[name].for}; ${written[name].status})` : name)}">${esc(name)}${written[name] ? '<span class="written-tag">WRITTEN</span>' : ""}</td><td>${r.trials}</td><td>${r.effect_held}</td><td>${r.p.toFixed(2)}</td><td>${r.mean_s ?? "—"}</td></tr>`).join(""));
   setHTML($("#belief-rows"), (p.entities || []).filter((e) => e.cls !== "place").map((e) =>
     `<tr class="${e.conf >= 0.5 ? "" : "doubt"}"><td>${esc(e.id)}</td><td>${e.x.toFixed(2)}, ${e.y.toFixed(2)}</td><td>${e.sigma.toFixed(2)}</td><td>${e.conf.toFixed(2)}</td><td>${e.seen_ago.toFixed(0)} s</td></tr>`).join(""));
 }
@@ -326,6 +334,7 @@ function summary(e) {
     case "GRASP_TRUTH": return `grasp ${p.held ? "held" : "missed"} (true error ${p.error_m ?? "—"} m)`;
     case "FALL": return `fell during ${p.skill}: ${p.note}`;
     case "CHOICE_REJECTED": return `rejected ${p.skill}: ${p.problem}`;
+    case "SKILL_REVIEWED": return `${p.child}: ${p.status} (p better ${p.p_better})`;
     case "RUN_STARTED": return `seed ${p.seed} · ${p.provider}${p.model ? ` (${p.model})` : ""}`;
     default: return "";
   }

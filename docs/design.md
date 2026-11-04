@@ -35,7 +35,13 @@ Bayesian logistic models of how the conditions it believes hold change the
 chance that a skill works or that it falls. Scored on outcomes they had not
 seen, the rules beat the counts the scorecard had used (Brier 0.128 against
 0.135 over 64 held-out lives), but choosing by their means made picks fail
-and the duck fall more often. All results come from simulation
+and the duck fall more often. Last, the cloud brain writes skills. After
+each room the duck names the situation where a skill most clearly fails,
+the cloud brain writes a program for it in the bounded skill language, and
+the duck tries it against the original and keeps it only on evidence. On
+16 held-out lives it kept a written skill in 11, and in the situations they
+were written for, success rose 8 to 10 points against the same rooms with
+the original skills, with no more falls. All results come from simulation
 with a scripted owner. The report states the limits of that setting and the
 plan for hardware.
 
@@ -83,7 +89,10 @@ This report makes the following contributions:
   action, with the finding that additive effects learn from a few dozen
   outcomes where rule trees cannot, and that better predictions do not by
   themselves make better choices (section 4.4).
-- **A pre-registered experimental record** of seventeen experiments,
+- **Skills written by the cloud brain and kept on evidence.** The duck asks
+  about a failure it measured, checks the program it gets, and keeps it only
+  if it does better there in Thompson-sampled trials (section 4.5).
+- **A pre-registered experimental record** of nineteen experiments,
   including failed predictions and rejected changes, with paired
   comparisons on held-out rooms (sections 5 and 6).
 
@@ -452,6 +461,39 @@ skill and per kind of action, and is scored by its Brier score when the
 action ends. The rules are learned and scored in every run; by default,
 decisions still use the counts (section 6.8).
 
+### 4.5 Skills written by the cloud brain
+
+After each room the duck reflects. Its causal rules name the compound skill
+and condition with the most negative effect on the skill's expected effect,
+if that effect is at least two posterior standard deviations from zero over
+at least eight outcomes and the skill succeeds there at most 60% of the
+time. The cloud brain is then shown the skill's program, the condition, the
+success rate there and elsewhere, how those tries ended (status and reason,
+counted), the skill language, every primitive, and the hand-written
+compound skills. It answers with one tool call holding a program. The
+prompt asks for a program that achieves the same expected effect in that
+situation and says it will be kept only if it succeeds more often there,
+a fall counting as a failure; it does not suggest a solution.
+
+Local code checks the program before it can run: known constructs and
+step shapes, known skills and arguments, bound names, relation arities,
+and no call to itself. The written skill takes its parent's parameters and expected
+effect, so the two are compared on the same outcome. A refused program gets
+one retry with the reason. A written skill does not replace its parent.
+Whenever the parent is about to run in that situation, the duck chooses
+between the two (or, where several written skills' situations overlap,
+among them) by Thompson sampling on success (the expected effect held
+and the duck did not fall), each a Beta(1, 1) posterior; the parent's past
+outcomes there enter as a prior worth at most ten trials, because the
+situation was chosen for looking bad. After eight trials the written skill
+is kept when it is better with probability 0.9 and retired when it is worse
+with probability 0.9. Written skills, their trials, and every request and
+answer are kept for life. A written skill reaches the body only through the
+primitives, so the body's safety does not depend on what the cloud brain
+writes, and any run-time error inside a skill fails that skill. A written
+skill's runs are tries of its parent for the duck's bookkeeping (giving up
+on a toy, "tried before") and for evaluation.
+
 ## 5. Evaluation methodology
 
 **Platform.** Microduck Lab at commit `8dad921`: Pollen's robot model and
@@ -645,6 +687,92 @@ optimizer's curse: choosing among up to six toys by predicted means picks
 the toy whose prediction is most optimistic, which is disproportionately
 one whose prediction is wrong. This is untested (H-018).
 
+### 6.9 Rules that steer (E-018)
+
+Three ways of letting the rules choose were tried on development lives,
+against deciding with counts, and all three were worse. Choosing by one
+posterior draw per decision sent the duck to toys inside the basket by the
+rim, whose wide posteriors sometimes draw high: in the basket arm's late
+rooms it tried 19 such picks (2 under counts), and 10 of them ended in
+falls. Judging falls by an upper credible bound while drawing for the
+expected effect made every pick look dangerous early in life, and the duck
+nearly stopped picking (the basket owner's measure fell from 3.15 to 0.0).
+Learning the owner's reactions over conditions, with a finer wall-distance
+condition, spread the leave-it owner's simple dislike of picks over a
+dozen features, and the duck kept picking (1.9 failed picks a room against
+0.4). Where failure costs a fall, exploration is paid for by the body,
+and a life of ten rooms is too short to recoup it (L-021). Decisions
+therefore keep the counts; the rules predict, explain, and, below, point
+the cloud brain at what to fix.
+
+### 6.10 Skills written by the cloud brain (E-019)
+
+Sixteen held-out lives of twenty rooms each ran twice on the same rooms:
+once as a control and once with authoring. Behaviour was the task-driven
+local policy, which runs the most skills per room. The cloud brain only
+wrote skills, once after each room at most.
+
+| Measure | Result |
+|---|---|
+| Requests; programs accepted | 27; 27 (some after one retry) |
+| Kept / retired / still on trial at end of life | 15 / 1 / 11 |
+| Lives with a kept skill | 11 of 16 |
+| Success in the written skills' situations, authoring minus control | +0.079 [+0.005, +0.152] over 26 situations; per life +0.104 [+0.024, +0.183], 10 of 14 lives higher |
+| Fall rate in those situations | +0.002 [−0.010, +0.014] |
+| Failed pick decisions per room, rooms 11 to 20 | −0.05 [−0.31, +0.21] (first reported as −0.36: written pick variants were not counted) |
+| Toys in the basket, rooms 11 to 20 | −0.006 [−0.15, +0.14] |
+| Author tokens, all 16 lives | 107k |
+
+The situations the duck asked about were the failures its rules had found:
+far deliveries (15 requests), picks of toys tried before (4), picks of toys
+whose position was vague or stale (6), and picks at mid or far distance
+(2). The programs it got back were specific to the failure. For far
+deliveries, the best of them approach the basket in stages and re-sight it
+mid-way, so the belief is fresh before the final approach. For stale
+positions, they walk to a middle distance, pause, re-observe, look around
+if the toy is lost, and then call the original pick. Far deliveries
+succeeded 13 points more often than in the control lives (+0.13 [+0.03,
++0.23], first request per life). The gain was large in some lives (82% against 49%, 87% against
+58%) and absent in others: the programs differ from life to life, and so
+does how well they work.
+
+Toys in the basket did not change, because the task policy already tidies
+5.4 of 6 toys and a failed delivery is usually retried. The keep decision
+is generous: it compares the written skill's trials with the parent's past
+outcomes in a situation chosen for looking bad, and two kept far-delivery
+skills did no better than the control life. The comparison with the
+control life, which the predictions used, carries no such bias.
+
+### 6.11 Fair trials, and authoring with an owner (E-020)
+
+Milestone 5a changed how a written skill is judged. Both skills start a
+trial with no prior; they take turns until each has 8 outcomes in the
+situation, and Thompson sampling decides after that. Kept skills stay
+under review. The same 16 held-out lives ran four times on the same rooms:
+with a task and with the basket owner, each with and without authoring.
+
+| Measure | Task | Basket owner |
+|---|---|---|
+| Written / kept / retired / still on trial | 28 / 5 / 3 / 20 | 16 / 1 / 0 / 15 |
+| Success in the written skills' situations, per life, authoring minus control | +0.075 [+0.038, +0.112] | +0.104 [−0.018, +0.225] |
+| Fall rate there | +0.002 [−0.009, +0.013] | −0.029 [−0.084, +0.025] |
+| Toys in the basket, rooms 11 to 20 | −0.11 [−0.22, −0.004] | +0.09 [−0.16, +0.34] (her own measure) |
+| Author tokens, 16 lives | 122k | 66k |
+
+The gain in the targeted situations holds with fair trials, and with the
+owner as well as with the task. The duck now keeps few skills (6 of 44,
+against 15 of 27 in E-019), and the three it retired had done worse than
+their parents in their trials. Most trials were still running at the end
+of a life: with turns of 8 outcomes each, a situation that comes up a few
+times a room takes most of 20 rooms to decide.
+
+With the task, the whole room did slightly worse, by a tenth of a toy. A
+written far delivery succeeds more often than the original but takes 24 s
+a try against 17 s, and in a 300 s room that the task policy nearly
+finishes, the extra seconds cost toys. The trial scored success per try;
+the room rewards success per second (L-025). With the owner, the duck had
+time to spare and showed no cost.
+
 ## 7. Discussion
 
 **Ground the beliefs before tuning the behavior.** The largest gains in
@@ -678,6 +806,11 @@ choosing the best of several candidates by their predicted means selects
 the overrated ones. The owner model already decides by posterior draws; the
 same treatment for the rules is the next experiment (H-018).
 
+**Point the author at a measured failure.** The cloud brain wrote good
+skills when shown a specific failure the duck had counted, with its
+reasons. The rules of Milestone 4 did not steer well, but they were the
+right instrument for asking (L-022).
+
 **The language model brings priors.** The cloud brain learns faster from
 the same evidence, and its prior helps when the owner's preference matches
 common human expectations and biases the duck when nobody is there. The
@@ -704,8 +837,13 @@ the architecture learns.
   over, and the features the rules use, are chosen by hand. The duck's
   "by a wall" is coarser than the wall owner's, which costs her toys
   (E-016).
-- **Rules do not yet steer.** The rules predict better but are not used
-  for decisions, which still rest on counts per skill (E-017).
+- **Rules do not steer.** The rules predict better, but every way of
+  choosing with them was worse (E-017, E-018); decisions rest on counts.
+- **Generous keep decisions.** A written skill is kept against a parent
+  prior from the outcomes that made the situation look bad (E-019).
+- **One task for authoring.** Written skills were tested with the
+  task-driven policy, which tidies 5.4 of 6 toys already, so they could not
+  raise toys in the basket.
 - **One room family and one model.** Every experiment uses the same
   playroom layout family and Claude Sonnet 5.5. The cloud owner arm has two
   lives per arm.
@@ -723,9 +861,10 @@ the architecture learns.
 | 3b | Learning what the owner wants | With approval as its only social need and phrases that carry only valence, it learns each of several hidden preferences within a life, and without an owner it does not tidy | met, basket effect below its predicted size (E-015) |
 | 3c | Credit timing and safe deliveries | Credit reactions to the changes they answer, and cut churn at walls by half (H-016); halve falls at the basket rim (H-011) | done: both hypotheses refuted, causes found (E-016) |
 | 4 | Predictions, surprise, causal rules | Rules over conditions, predicted before and scored after every action, beat counted priors on outcomes they had not seen | met (E-017) |
-| 4a | Rules that steer | Decide with posterior draws from the rules (H-018), and learn the owner's reactions over the same conditions in place of hand-chosen kinds (H-017); fewer failed picks and fewer toys lost to picks, paired by life | next |
+| 4a | Rules that steer | Decide with posterior draws from the rules (H-018), and learn the owner's reactions over the same conditions in place of hand-chosen kinds (H-017); fewer failed picks and fewer toys lost to picks, paired by life | tried: draws, an upper bound on falls, and conditions for the owner were all worse in development (E-018) |
 | 4b | One valence | Falls, an empty battery, new objects found, and the owner's reactions become valence events learned by one mechanism, replacing hand-set scorecard terms without losing the results of E-014 and E-015 | planned |
-| 5 | Skills composed by the cloud brain | A compound skill the cloud brain wrote is kept on measured merit and does something no hand-written skill does, or does it better | planned |
+| 5 | Skills composed by the cloud brain | A compound skill the cloud brain wrote is kept on measured merit and does something no hand-written skill does, or does it better | met (E-019) |
+| 5a | Authoring, sharpened | Keep decisions judged on fresh outcomes (L-023); kept skills become parents; authoring in the owner arms | met: gains hold with fair trials and with the owner; no skill was built on another; a small whole-room cost with the task (E-020) |
 | 6 | Lifetimes, agents A to D, changing owners | The developmental agent beats the proactive one on competence gained per room; after the owner's preference changes mid-life the duck recovers within a stated number of rooms | planned |
 | 7 | Hardware | On-device keyword spotting for the phrase lists, toy and basket detection, a wall map from the range sensor; the same mind drives the physical Microduck under supervision | planned |
 
@@ -750,10 +889,11 @@ A frozen language model becomes a usable mind for a small robot when local
 code gives it measured beliefs, bounded skills, needs, and a memory of
 outcomes. The same structure lets the creature learn something nobody told
 it: what its owner likes, from her approval and disapproval alone. It also
-learns, from its own outcomes, which conditions make its skills work. The
-next steps are to let those rules steer its choices without being misled by
-their own optimism, to learn the owner's reactions over the same
-conditions, and to carry the mind onto the physical duck.
+learns, from its own outcomes, which conditions make its skills work, and
+uses them to ask the cloud brain for new skills where its own fail, keeping
+only those that do better. The next steps are to judge those skills on fresh
+evidence, to let written skills build on each other, and to carry the mind
+onto the physical duck.
 
 ## Appendix A. Parameters
 
@@ -803,6 +943,7 @@ are under `experiments/`.
 | `needs.py`, `goals.py` | Needs, candidate goals, and the scorecard |
 | `reactions.py` | Beliefs about the owner: credit by EM, choice by Thompson sampling |
 | `rules.py` | Causal rules: features of the situation, Bayesian logistic models per skill and outcome |
+| `authoring.py` | Reflection: finding a weakness, asking the cloud brain for a skill, checking it, trials |
 | `phrases.py`, `phrases.toml` | The owner's phrase lists (editable) and their valence |
 | `owner.py` | The scripted owner (simulator side, reads truth) |
 | `records.py` | Counted outcomes per skill and per kind of action |

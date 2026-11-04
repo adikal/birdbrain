@@ -86,9 +86,17 @@ uv run record-world playroom --brain d0=tidy --seconds 120 --seed 1 --stride 10 
   `scripts/lifetimes.py` summarizes the rows. `--credit moments|underway`
   chooses how reactions are credited (E-016). Causal rules are learned and
   scored in every run (`scripts/predictions.py`); `--rules` also decides with
-  them (E-017). The owner's phrases are in
+  them (E-017), as a draw (`--rules draw`) or with a bound on falls
+  (`--rules cautious`, E-018). `--owner-model conditions` learns the owner's
+  reactions over conditions. `--author` (Bedrock) lets the cloud brain write
+  skills between rooms, tried and kept on evidence (E-019, E-020);
+  `scripts/skills_report.py` summarizes them. The owner's phrases are in
   `src/birdbrain/phrases.toml` (or `BIRDBRAIN_PHRASES`). Compare arms with `.venv/bin/birdbrain-compare A.jsonl B.jsonl`.
-  Event logs go to `data/runs/` (set `BIRDBRAIN_RUNS_DIR` to change it).
+  Event logs go to `data/runs/` (set `BIRDBRAIN_RUNS_DIR` to change it); each run is about
+  2 MB, so delete an experiment's logs once its rows and summaries are committed. The
+  dashboard keeps its replays in `data/replays/`, the newest 50 (`--keep`). `--title` on
+  `birdbrain-run` or the dashboard names a run in the run list (live runs get one
+  automatically), and `scripts/showcase.py` records one titled replay per milestone.
 - **The mind:** `.venv/bin/birdbrain-dashboard --live --seed 3 [--needs] [--room tidy] [--owner basket]`, then open
   `http://127.0.0.1:8790`. Without `--live` it replays recorded runs;
   `?run=<id>&t=<seconds>&truth=1` opens a run at a time with the truth

@@ -1,0 +1,40 @@
+life-0: w_deliver_far for deliver when basket distance far (after room 10) -> kept; during the trial: written [27.0, 29.0, 0.0], parent [1.0, 3.0, 0.0] [successes, trials, falls]
+life-0: w_pick_refresh_first for pick when target position vague (after room 12) -> kept; during the trial: written [19.0, 24.0, 0.0], parent [0.0, 1.0, 0.0] [successes, trials, falls]
+life-1: w_pick_after_refresh for pick when target last seen a while ago (after room 6) -> kept; during the trial: written [29.0, 37.0, 0.0], parent [2.0, 4.0, 0.0] [successes, trials, falls]
+life-2: w_deliver_far for deliver when basket distance far (after room 9) -> kept; during the trial: written [20.0, 23.0, 1.0], parent [3.0, 3.0, 0.0] [successes, trials, falls]
+life-2: w_pick_refresh for pick when target tried before yes (after room 18) -> trial; during the trial: written [0, 0, 0], parent [4.0, 5.0, 0.0] [successes, trials, falls]
+life-3: w_deliver_far for deliver when basket distance far (after room 9) -> kept; during the trial: written [20.0, 28.0, 0.0], parent [1.0, 3.0, 0.0] [successes, trials, falls]
+life-4: w_deliver_far for deliver when basket distance far (after room 10) -> kept; during the trial: written [22.0, 27.0, 1.0], parent [0.0, 2.0, 0.0] [successes, trials, falls]
+life-4: w_pick_retried_target for pick when target tried before yes (after room 11) -> kept; during the trial: written [10.0, 13.0, 0.0], parent [3.0, 4.0, 0.0] [successes, trials, falls]
+life-5: w_pick_retry_fresh for pick when target tried before yes (after room 7) -> trial; during the trial: written [9.0, 14.0, 0.0], parent [4.0, 6.0, 0.0] [successes, trials, falls]
+life-6: w_deliver_far for deliver when basket distance far (after room 6) -> trial; during the trial: written [17.0, 31.0, 2.0], parent [16.0, 30.0, 4.0] [successes, trials, falls]
+life-7: w_deliver_far for deliver when basket distance far (after room 6) -> kept; during the trial: written [31.0, 34.0, 1.0], parent [2.0, 2.0, 0.0] [successes, trials, falls]
+life-7: w_pick_restep for pick when target distance mid (after room 7) -> trial; during the trial: written [0.0, 2.0, 0.0], parent [36.0, 48.0, 0.0] [successes, trials, falls]
+
+requests 12, skills written 12, trials by status {'kept': 8, 'trial': 4}, lives with a kept skill 6 of 8, authoring tokens 50340
+  all trials, written: 204 of 262 succeeded (78%), 5 falls (1.9%)
+  all trials, parent : 72 of 111 succeeded (65%), 4 falls (3.6%)
+  kept skills, written: 178 of 215 succeeded (83%), 3 falls (1.4%)
+  kept skills, parent : 12 of 22 succeeded (55%), 0 falls (0.0%)
+  success, written minus parent during trials, per life: +0.209 [95% CI +0.019, +0.398], n = 8 lives, higher in 6
+
+in each written skill's situation, after it was written, authoring life against control life:
+  life-0 deliver when basket distance far: authoring 88% of 32, control 48% of 52
+  life-0 pick when target position vague: authoring 76% of 25, control 57% of 30
+  life-1 pick when target last seen a while ago: authoring 76% of 41, control 49% of 51
+  life-2 deliver when basket distance far: authoring 88% of 26, control 46% of 46
+  life-2 pick when target tried before yes: authoring 80% of 5, control 50% of 6
+  life-3 deliver when basket distance far: authoring 68% of 31, control 70% of 27
+  life-4 deliver when basket distance far: authoring 76% of 29, control 48% of 46
+  life-4 pick when target tried before yes: authoring 76% of 17, control 64% of 25
+  life-5 pick when target tried before yes: authoring 65% of 20, control 54% of 24
+  life-6 deliver when basket distance far: authoring 54% of 61, control 57% of 60
+  life-7 deliver when basket distance far: authoring 92% of 36, control 54% of 56
+  life-7 pick when target distance mid: authoring 72% of 50, control 73% of 48
+  success, authoring minus control: +0.201 [95% CI +0.096, +0.307], 9 of 12 situations higher, sign-flip p = 0.004
+  fall rate, authoring minus control: -0.008 [95% CI -0.031, +0.015], 3 of 12 situations higher, sign-flip p = 0.500
+
+rooms 11 on, authoring minus control, paired by life:
+  inBasket: A 5.287 · B 5.275 · B-A -0.012 [95% CI -0.194, +0.169] · B higher 5, equal 1, lower 2 · sign-flip p = 1.000 · n = 8
+  falls: A 0.412 · B 0.362 · B-A -0.050 [95% CI -0.211, +0.111] · B higher 3, equal 1, lower 4 · sign-flip p = 0.625 · n = 8
+  pickDecisionsFailed: A 3.025 · B 2.200 · B-A -0.825 [95% CI -1.466, -0.184] · B higher 0, equal 1, lower 7 · sign-flip p = 0.016 · n = 8

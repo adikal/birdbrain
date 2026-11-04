@@ -68,8 +68,16 @@ class Handler(BaseHTTPRequestHandler):
                         "live_run_id": journal.run_id if journal else None,
                         "latest_sequence": journal.latest_sequence if journal else 0})
         elif route == "/api/runs":
-            self._json({"live_run_id": self.server.journal.run_id if self.server.journal else None,
-                        "runs": self.server.store.list_runs()})
+            # The run picker needs names and scores, not whole result rows, and a store can hold
+            # thousands of runs: the newest 300, plus the one asked for.
+            query = parse_qs(parsed.query)
+            runs = self.server.store.list_runs(limit=int(query.get("limit", ["300"])[0]),
+                                               include=query.get("include", [None])[0])
+            light = [{"run_id": r.get("run_id"), "title": (r.get("config") or {}).get("title"),
+                      "status": r.get("status"), "updated_at": r.get("updated_at"),
+                      "result": None if not r.get("result") else
+                      {k: r["result"].get(k) for k in ("inBasket", "toys", "owner", "episode")}} for r in runs]
+            self._json({"live_run_id": self.server.journal.run_id if self.server.journal else None, "runs": light})
         elif route == "/api/events":
             self._stream()
         elif route.startswith("/api/runs/") and "/camera/" in route:
@@ -208,11 +216,34 @@ def live_loop(session: Any, seconds: float, speed: float, stop: threading.Event,
                             payload={"result": session.result(time.monotonic() - t_wall), "truth": session.truth()})
 
 
+def _live_title(args: Any) -> str:
+    """A plain description of what a live run shows."""
+    brain = "cloud brain (Bedrock)" if args.provider == "bedrock" else "local policy"
+    if args.owner:
+        what = "no owner (control)" if args.owner == "none" else f"owner who likes toys {OWNER_TEXT[args.owner]}"
+        what = f"Milestone 3b · {what}"
+    elif args.needs:
+        what = f"Milestone 3 · no task, needs only, {args.room} room"
+    else:
+        what = "Milestone 1 · task: tidy the room"
+    if args.memory:
+        what += f" · memory {args.memory.name}"
+    if args.author:
+        what += " · writes skills (Milestone 5)"
+    return f"Live · {what} · {brain} · room {args.seed}"
+
+
+OWNER_TEXT = {"basket": "in the basket", "wall": "by the walls", "leave": "left where they are"}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--host", default="127.0.0.1", help="a loopback address")
     ap.add_argument("--port", type=int, default=8790)
-    ap.add_argument("--runs-dir", type=Path, default=Path("data/runs"))
+    ap.add_argument("--runs-dir", type=Path, default=Path("data/replays"),
+                    help="replays shown in the dashboard (experiment logs are in data/runs)")
+    ap.add_argument("--keep", type=int, default=50, help="replays kept in --runs-dir; older ones are deleted")
+    ap.add_argument("--title", default=None, help="what a --live run shows, for the run list")
     ap.add_argument("--dashboard-dir", type=Path, default=_default_dashboard_dir())
     ap.add_argument("--live", action="store_true", help="run a live playroom")
     ap.add_argument("--seed", type=int, default=0)
@@ -223,23 +254,42 @@ def main() -> None:
     ap.add_argument("--room", choices=["messy", "tidy"], default="messy")
     ap.add_argument("--owner", choices=["none", "basket", "wall", "leave"], default=None,
                     help="Milestone 3b: a scripted owner with this hidden preference")
+    ap.add_argument("--author", action="store_true",
+                    help="Milestone 5: when the run ends, the cloud brain may write a skill (needs --memory)")
+    ap.add_argument("--rules", choices=["mean", "draw", "cautious"], default=None)
+    ap.add_argument("--memory", type=Path, default=None,
+                    help="lifetime memory directory to start from (it is updated when the run ends)")
     ap.add_argument("--no-camera", action="store_true", help="do not render head-camera images")
     args = ap.parse_args()
     if not _is_loopback(args.host):
         ap.error("--host must be a loopback address (127.0.0.1 or ::1); use an SSH tunnel for remote viewing")
+    args.runs_dir.mkdir(parents=True, exist_ok=True)
     store = JsonlRunStore(args.runs_dir)
     journal, stop = None, threading.Event()
     if args.live:
         from birdbrain.run import PlayroomSession
         journal = EventJournal(run_id=f"live-s{args.seed}-{args.provider}-{int(time.time()) % 10**6}", store=store)
-        session = PlayroomSession(args.seed, provider=args.provider, journal=journal, needs=args.needs, room=args.room, owner=args.owner)
+        title = args.title or _live_title(args)
+        session = PlayroomSession(args.seed, provider=args.provider, journal=journal, needs=args.needs, room=args.room, owner=args.owner,
+                                  memory_dir=args.memory, author=args.author, rules=args.rules,
+                                  title=title)
         camera = None
         if not args.no_camera:
             from birdbrain.observability.camera import HeadCamera
             camera = HeadCamera(session.world, session.duck, store.run_dir(journal.run_id) / "camera")
         threading.Thread(target=live_loop, args=(session, args.seconds, args.speed, stop, camera),
                          daemon=True).start()
-    server = DashboardServer((args.host, args.port), args.dashboard_dir, store, journal)
+    pruned = store.prune(args.keep, protect={journal.run_id} if journal else set())
+    if pruned:
+        print(f"deleted {len(pruned)} replays beyond the newest {args.keep} in {args.runs_dir}", flush=True)
+    try:
+        server = DashboardServer((args.host, args.port), args.dashboard_dir, store, journal)
+    except OSError as error:
+        if error.errno in {48, 98}:            # address in use (macOS, Linux)
+            stop.set()
+            ap.exit(1, f"Port {args.port} is already in use, probably by another dashboard. Stop it "
+                       f"(lsof -nP -iTCP:{args.port} -sTCP:LISTEN) or pass --port.\n")
+        raise
     print(f"BirdBrain dashboard: http://{args.host}:{server.server_port}", flush=True)
     try:
         server.serve_forever()

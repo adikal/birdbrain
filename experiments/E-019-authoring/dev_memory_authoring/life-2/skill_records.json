@@ -1,0 +1,116 @@
+{
+  "deliver": {
+    "done": 82,
+    "effect_held": 87,
+    "falls": 7,
+    "recent": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true
+    ],
+    "seconds": 1967.940000000294,
+    "trials": 110
+  },
+  "explore": {
+    "done": 42,
+    "effect_held": 51,
+    "falls": 0,
+    "recent": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "seconds": 755.6799999998248,
+    "trials": 51
+  },
+  "look_around": {
+    "done": 77,
+    "effect_held": 81,
+    "falls": 0,
+    "recent": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "seconds": 816.7799999999603,
+    "trials": 81
+  },
+  "pick": {
+    "done": 110,
+    "effect_held": 110,
+    "falls": 0,
+    "recent": [
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true
+    ],
+    "seconds": 1617.1000000002596,
+    "trials": 146
+  },
+  "rest": {
+    "done": 15,
+    "effect_held": 22,
+    "falls": 0,
+    "recent": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "seconds": 180.6799999998644,
+    "trials": 22
+  },
+  "w_deliver_far": {
+    "done": 20,
+    "effect_held": 20,
+    "falls": 1,
+    "recent": [
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "seconds": 661.4200000001396,
+    "trials": 23
+  }
+}

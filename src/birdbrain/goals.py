@@ -149,10 +149,26 @@ def candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
 PUTS = ("deliver", "put_by_wall", "drop")
 
 
+#: owner(skill, args) -> (p approval, p disapproval, uncertainty): one posterior draw of the
+#: owner's reaction to this action (Thompson sampling), from `reactions.py`.
+Owner = Callable[[str, dict[str, Any]], tuple[float, float, float]]
+
+
+def kinds_owner(reactions: Any, rng: Any, draws: dict[str, Any], kind_of: Callable[[str, dict[str, Any]], str]) -> Owner:
+    """The owner's reactions by kind of action (E-015): one Beta draw per kind, kept in
+    `draws` so a pick and the put that follows it use the same beliefs."""
+    def owner(skill: str, args: dict[str, Any]) -> tuple[float, float, float]:
+        kind = kind_of(skill, args)
+        b = reactions.belief(kind)
+        if kind not in draws:
+            draws[kind] = b.sample(rng)
+        return (*draws[kind], b.uncertainty)
+    return owner
+
+
 def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
-                        reactions: Any, tools: set[str], rng: Any, kind_records: dict[str, Any] | None = None,
-                        draws: dict[str, float] | None = None, give_up_after: int = 3,
-                        predict: Predict | None = None) -> list[Goal]:
+                        tools: set[str], owner_p: Owner, kind_records: dict[str, Any] | None = None,
+                        give_up_after: int = 3, predict: Predict | None = None) -> list[Goal]:
     """Goals when the social need is approval (Milestone 3b, design section 4.3).
 
     No goal names a state of the room. Each goal is a way of acting, valued by what the
@@ -161,13 +177,11 @@ def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[s
     afterwards, since a pick is always followed by one. The owner's reaction to each kind
     of action is valued by one draw from its posterior (Thompson sampling, `reactions.py`):
     that is how the duck tries what it knows little about, and stops trying what never
-    pleases her. `draws` holds the draws already made, so a pick and the put that follows
-    it are chosen with the same beliefs (the caller clears it when the duck holds nothing).
-    Risk and success are counted per kind of action where it matters: a pick by a wall is
+    pleases her. The draws last a pick and the put that follows it, so both are chosen
+    with the same beliefs (`owner_p` keeps them). Risk and success are counted per kind of action where it matters: a pick by a wall is
     not a pick in the open.
     """
     kind_records = kind_records or {}
-    draws = {} if draws is None else draws          # kind -> (p approval, p disapproval)
     pressure = needs.pressure
     held = kb.value("holding", SELF)
     here = kb.position(SELF)
@@ -183,12 +197,10 @@ def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[s
         return (r.p, r.progress, (r.seconds / r.trials if r.trials else 30.0) / HORIZON_S,
                 r.fall_rate * needs.p.safety_per_fall * (1.0 + pressure["safety"]))
 
-    def owner(kind: str) -> tuple[float, float]:
+    def owner(skill: str, args: dict[str, Any] | None = None) -> tuple[float, float]:
         """(value of the owner's reaction, one posterior draw; uncertainty, reported)."""
-        b = reactions.belief(kind)
-        if kind not in draws:
-            draws[kind] = b.sample(rng)
-        return needs.approval_value(*draws[kind]), b.uncertainty
+        up, down, unsure = owner_p(skill, args or {})
+        return needs.approval_value(up, down), unsure
 
     def kind_stats(kind: str, skill: str, args: dict[str, Any]) -> tuple[float, float, float, float]:
         if predict is not None:
@@ -209,7 +221,7 @@ def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[s
             if a is None or not known(kb, t, e) or failures(kb, t, "pick", e) >= give_up_after:
                 continue
             kind = f"pick from {where(kb, t, e)}"
-            value, unsure = owner(kind)
+            value, unsure = owner("pick", {"x": e})
             p_pick, lp_pick, c_pick, r_pick = kind_stats(kind, "pick", {"x": e})
             travel = 0.0 if here is None else here.distance(a.value) / MICRODUCK.walk_speed / HORIZON_S
             out.append(Goal(f"approval:pick:{e}", "pick", "approval", "true", (("pick", (("x", e),)),),

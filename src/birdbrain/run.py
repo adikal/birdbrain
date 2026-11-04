@@ -37,7 +37,8 @@ class PlayroomSession:
                  model: str | None = None, speculate: bool = False,
                  memory_dir: Path | None = None, needs: bool | str = False, room: str = "messy",
                  owner: str | None = None, episode: int | None = None, lifetime: int | None = None,
-                 credit: str = "moments", rules: bool = False) -> None:
+                 credit: str = "moments", rules: str | None = None, owner_model: str = "kinds",
+                 author: bool = False, title: str | None = None) -> None:
         from microduck_local.brain.brain_env import POLICIES_DIR, onnx_infer
         from microduck_local.world import World, make_playroom
 
@@ -87,8 +88,10 @@ class PlayroomSession:
         self.brain = BirdBrainBrain(provider=chooser, log=self._log, latency=latency, token_budget=token_budget,
                                     speculate=speculate, memory_dir=memory_dir, needs=needs,
                                     room=self.bounds if needs == "approval" else None, seed=seed,
-                                    credit=credit, rules=rules)
+                                    credit=credit, rules=rules, owner_model=owner_model,
+                                    author=self._author(model) if author else None)
         self.mind = self.brain.mind
+        self.mind.episode = episode
         self._falls = self._attempts = 0
         self.grasp_errors: list[float | None] = []
         self.basket_errors: list[tuple[float, float]] = []      # (distance to basket, belief error)
@@ -99,7 +102,7 @@ class PlayroomSession:
         self._sat_start: dict[str, int] = {}
         self.time_in: dict[str, float] = {}                 # seconds per skill
         self.journal.publish("RUN_STARTED", sim_time=0.0, payload={
-            "seed": seed, "toys": toys, "provider": self.mind.provider.name,
+            "title": title, "seed": seed, "toys": toys, "provider": self.mind.provider.name,
             "model": getattr(self.mind.provider, "model", None), "latency": latency,
             "scenario": self.scenario.name, "room": list(self.scenario.floor),
             "basket_size": list(self.scenario.basket.size) if self.scenario.basket else None})
@@ -209,7 +212,9 @@ class PlayroomSession:
         far = sorted(err for dist, err in self.basket_errors if dist > 1.0)
         near = sorted(err for dist, err in self.basket_errors if dist <= 1.0)
         confident = [e for e in kb.of_class("basket") if kb.get("at", e) is not None and kb.get("at", e).conf >= 0.5]
-        picks = [e for e in kb.find_events("action") if e.data.get("skill") == "pick" and e.data.get("depth") == 0]
+        # Pick decisions, including those run as a skill written in place of pick (E-019 review).
+        picks = [e for e in kb.find_events("action") if e.data.get("depth") == 0
+                 and "pick" in {e.data.get("skill"), e.data.get("variant_of")}]
         return {
             "basketErrFarMedian": round(_quantile(far, 0.5), 3), "basketErrFarP90": round(_quantile(far, 0.9), 3),
             "basketErrNearMedian": round(_quantile(near, 0.5), 3),
@@ -219,6 +224,11 @@ class PlayroomSession:
             "pickDecisions": len(picks),
             "pickDecisionsFailed": sum(1 for e in picks if e.data.get("outcome") != "done"),
         }
+
+    @staticmethod
+    def _author(model: str | None) -> Any:
+        from birdbrain.providers.bedrock import BedrockAuthor, BedrockProvider
+        return BedrockAuthor(BedrockProvider.from_env(model=model))
 
     def owner_room(self) -> Any:
         """Truth for the owner (and for evaluation): never passed to the mind."""
@@ -272,7 +282,9 @@ class PlayroomSession:
             "records": {name: r.to_dict() for name, r in mind.records.items()},
             **mind.stats, "tokens": mind.tokens_used, **self.perception_metrics(),
             "simSeconds": round(self.world.t, 1), "wallSeconds": round(wall_seconds, 1),
-            "rules": mind.use_rules, **self.owner_metrics(),
+            "writtenSkills": mind.authoring.summary(), "authoringTokens": mind.authoring.tokens,
+            "rules": mind.use_rules, "ownerModelKind": mind.owner_model if mind.reactions is not None else None,
+            **self.owner_metrics(),
         }
 
 
@@ -282,7 +294,8 @@ def run_one(seed: int, *, toys: int = 6, seconds: float = 300.0, provider: str =
             camera: bool = False, speculate: bool = False,
             memory_dir: Path | None = None, needs: bool = False, room: str = "messy",
             owner: str | None = None, episode: int | None = None, lifetime: int | None = None,
-            credit: str = "moments", rules: bool = False) -> dict[str, Any]:
+            credit: str = "moments", rules: str | None = None, owner_model: str = "kinds",
+            author: bool = False, title: str | None = None) -> dict[str, Any]:
     life = "" if episode is None else f"-L{lifetime}e{episode}"
     run_id = f"{tag or 'run'}{life}-s{seed}-{provider}-{int(time.time() * 1000) % 10**9}"
     store = JsonlRunStore(runs_dir) if runs_dir else None
@@ -291,7 +304,7 @@ def run_one(seed: int, *, toys: int = 6, seconds: float = 300.0, provider: str =
                               token_budget=token_budget, model=model, speculate=speculate,
                               memory_dir=memory_dir, needs=needs, room=room,
                               owner=owner, episode=episode, lifetime=lifetime, credit=credit,
-                              rules=rules)
+                              rules=rules, owner_model=owner_model, author=author, title=title)
     head = None
     if camera and store is not None:
         from birdbrain.observability.camera import HeadCamera
@@ -336,7 +349,7 @@ def run_lifetime(lifetime: int, episodes: int, memory_root: Path, **kwargs: Any)
     for e in range(1, episodes + 1):
         row = run_one(room_seed(lifetime, e), **{**kwargs, "memory_dir": memory, "episode": e,
                                                 "lifetime": lifetime})
-        rows.append({**row, "room_seed": row["seed"], "seed": lifetime})
+        rows.append({**row, "room_seed": row["seed"], "seed": lifetime, "episode": e})
     return rows
 
 
@@ -386,9 +399,17 @@ def main() -> None:
     ap.add_argument("--credit", choices=["moments", "underway"], default="moments",
                     help="Milestone 3b: credit the owner's reactions to the duck's own changes to the room "
                          "(grasp, release, bump; E-016) or to any action under way (E-015)")
-    ap.add_argument("--rules", action="store_true",
-                    help="decide with causal rules (Milestone 4) instead of counts per skill; the rules are "
-                         "learned and scored either way")
+    ap.add_argument("--rules", choices=["mean", "draw", "cautious"], default=None,
+                    help="decide with causal rules (Milestone 4) instead of counts per skill: their posterior "
+                         "mean, one posterior draw per decision (E-018), or a draw for the expected effect with an upper "
+                         "bound on falls (H-020); the rules are learned and scored "
+                         "either way")
+    ap.add_argument("--owner-model", choices=["kinds", "conditions"], default="kinds",
+                    help="Milestone 3b: learn the owner's reactions per hand-chosen kind of action, or over the "
+                         "conditions of each action (E-018)")
+    ap.add_argument("--author", action="store_true",
+                    help="Milestone 5: between episodes, the cloud brain (Bedrock) writes skills for situations "
+                         "where a skill clearly fails; written skills are tried and kept or retired on merit")
     ap.add_argument("--episodes", type=int, default=None,
                     help="each seed is a lifetime of this many episodes (rooms), memory kept between them; "
                          "memory goes under --memory (default data/lifetimes/<tag>)")
@@ -396,6 +417,7 @@ def main() -> None:
                     help="think while acting: ask for the next decision when each skill starts")
     ap.add_argument("--camera", action="store_true",
                     help="record viewer data for the dashboard at 2 Hz: head-camera images and the truth overlay")
+    ap.add_argument("--title", default=None, help="what the run shows, for the dashboard's run list")
     ap.add_argument("--jobs", type=int, default=1)
     ap.add_argument("--out", required=True, help="rows are appended here as JSON lines")
     ap.add_argument("--tag", default="")
@@ -407,7 +429,8 @@ def main() -> None:
               "latency": args.latency, "runs_dir": runs_dir, "tag": args.tag,
               "token_budget": args.token_budget, "model": args.model, "camera": args.camera,
               "speculate": args.speculate, "memory_dir": args.memory, "needs": args.needs, "room": args.room,
-              "owner": args.owner, "credit": args.credit, "rules": args.rules}
+              "owner": args.owner, "credit": args.credit, "rules": args.rules, "owner_model": args.owner_model,
+              "author": args.author, "title": args.title}
     memory_root = None
     if args.episodes is not None:
         memory_root = args.memory or Path("data/lifetimes") / (args.tag or "untagged")

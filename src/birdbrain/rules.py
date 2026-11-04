@@ -59,6 +59,9 @@ def features(kb: KnowledgeBase, t: float, args: dict[str, Any]) -> Features:
         out["target tried before"] = "yes" if failures(kb, t, "pick", target) else "no"
         out["target by the rim"] = _bin(None if pb is None else p.distance(pb), (0.35,), ("yes", "no"))
         out["target by a wall"] = _bin(wall_distance(kb, t, target), (0.3,), ("yes", "no"))
+        out["target from the wall"] = _bin(wall_distance(kb, t, target), (0.1, 0.2, 0.3, 0.5),
+                                           ("under 0.1 m", "0.1 to 0.2 m", "0.2 to 0.3 m", "0.3 to 0.5 m",
+                                            "over 0.5 m"))
     out["holding"] = "yes" if kb.value("holding", SELF) is not None else "no"
     out["basket"] = "unknown" if pb is None else ("precise" if pb.sigma < 0.05 else "vague")
     out["basket distance"] = _bin(None if pb is None or here is None else here.distance(pb),
@@ -81,14 +84,28 @@ def _sigmoid(z: float) -> float:
 class Model:
     """One skill's fitted model. Conditions are centred indicators: each weight is a
     deviation from the average situation the duck has met, and a feature not described
-    counts as average. `cov` is the Laplace posterior covariance of the weights."""
+    counts as average. `full_cov` is the Laplace posterior covariance of (base, weights)."""
 
     base: float
     keys: list[str]                                # "feature=value", in weight order
     w: np.ndarray
-    cov: np.ndarray
+    full_cov: np.ndarray
     means: np.ndarray                              # how often each value held, among rows with the feature
     n: float
+
+    @property
+    def cov(self) -> np.ndarray:
+        return self.full_cov[1:, 1:]
+
+    def logit_sd(self, f: Features) -> float:
+        """Posterior sd of the log-odds in situation `f`."""
+        a = np.concatenate(([1.0], self.row(f)))
+        return float(np.sqrt(max(a @ self.full_cov @ a, 0.0)))
+
+    def draw(self, rng: np.random.Generator) -> Model:
+        """One model drawn from the Laplace posterior (Thompson sampling, ledger E-018)."""
+        theta = rng.multivariate_normal(np.concatenate(([self.base], self.w)), self.full_cov, method="cholesky")
+        return Model(float(theta[0]), self.keys, theta[1:], self.full_cov, self.means, self.n)
 
     def logit(self, f: Features) -> float:
         return self.base + float(self.w @ self.row(f))
@@ -152,7 +169,7 @@ class RuleLearner:
 
     def _fit(self, ex: list) -> Model:
         if not ex:
-            return Model(self.prior_logit, [], np.zeros(0), np.zeros((0, 0)), np.zeros(0), 0.0)
+            return Model(self.prior_logit, [], np.zeros(0), np.array([[self.sd_base ** 2]]), np.zeros(0), 0.0)
         keys = sorted({f"{k}={v}" for f, _, _ in ex for k, v in f.items()})
         feats = [k.split("=", 1) for k in keys]
         weight = np.array([e[2] for e in ex])
@@ -188,7 +205,8 @@ class RuleLearner:
         p = 1.0 / (1.0 + np.exp(-np.clip(x @ w, -30.0, 30.0)))
         hess = (x * (weight * p * (1.0 - p))[:, None]).T @ x + np.diag(precision)
         cov = np.linalg.inv(hess)
-        return Model(float(w[0]), keys, w[1:], cov[1:, 1:], means, float(weight.sum()))
+        cov = (cov + cov.T) / 2.0
+        return Model(float(w[0]), keys, w[1:], cov, means, float(weight.sum()))
 
     def rules(self) -> list[dict[str, Any]]:
         """Every credible condition of every skill, with its effect on the odds against

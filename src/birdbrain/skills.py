@@ -22,7 +22,7 @@ from importlib.resources import files
 from typing import Any
 
 from birdbrain.body import CLASSES, MICRODUCK, BodyProfile, Command, Observation
-from birdbrain.expr import ClassRef, Evaluator, ExprError, names
+from birdbrain.expr import ClassRef, Evaluator, ExprError, check_calls, names
 from birdbrain.kr import SELF, KnowledgeBase
 from birdbrain.relations import bearing, distance, known
 
@@ -107,6 +107,7 @@ class Skill:
     body: list[Any] = field(default_factory=list)
     defaults: dict[str, Any] = field(default_factory=dict)
     expect: str = "true"                   # default prediction, an expression over args and `held`
+    variant_of: str | None = None          # a skill written in place of this one (Milestone 5)
 
 
 PRIMITIVES: dict[str, Skill] = {}
@@ -291,7 +292,7 @@ class Library:
         skill = self._register(name, spec)
         try:
             self._check(skill)
-        except ValueError:
+        except Exception:                    # any failed check leaves the library as it was
             if previous is None:
                 del self.skills[name]
             else:
@@ -305,7 +306,7 @@ class Library:
         skill = Skill(name=name, params=dict(spec.get("params", {})), doc=spec.get("doc", ""),
                       budget=float(spec.get("budget", 60.0)), level="compound",
                       body=list(spec["body"]), defaults=dict(spec.get("defaults", {})),
-                      expect=spec.get("expect", "true"))
+                      expect=spec.get("expect", "true"), variant_of=spec.get("variant_of"))
         self.skills[name] = skill
         return skill
 
@@ -338,6 +339,19 @@ def check_program(body: list[Any], bound: set[str], library: Library | None = No
     for step in body:
         if not isinstance(step, dict) or len({"call", "if", "repeat", "bind"} & step.keys()) != 1:
             raise ValueError(f"a step needs exactly one of call/if/repeat/bind: {step!r}")
+        # The runtime trusts these shapes, so a program that breaks them is refused here.
+        for key in ("call", "bind", "until", "if", "to"):
+            if key in step and not isinstance(step[key], str):
+                raise ValueError(f"{key} must be a string: {step!r}")
+        for key in ("then", "else", "repeat", "on_fail"):
+            if key in step and not isinstance(step[key], list):
+                raise ValueError(f"{key} must be a list of steps: {step!r}")
+        if not isinstance(step.get("args", {}), dict):
+            raise ValueError(f"args must be an object: {step!r}")  # noqa: TRY004 - checks raise ValueError
+        if "timeout" in step and (isinstance(step["timeout"], bool) or not isinstance(step["timeout"], (int, float))):
+            raise ValueError(f"timeout must be a number of seconds: {step!r}")
+        if "bind" in step and not isinstance(step.get("to"), str):
+            raise ValueError(f"bind needs an expression in to: {step!r}")
         exprs = [v for k, v in step.items() if k in {"until", "if", "to"} and isinstance(v, str)]
         if "call" in step:
             callee = None
@@ -360,6 +374,10 @@ def check_program(body: list[Any], bound: set[str], library: Library | None = No
                 raise ValueError(f"repeat needs a positive integer max: {step!r}")
             check_program(step["repeat"], bound, library)
         for source in exprs:
+            try:
+                check_calls(source)
+            except ExprError as error:
+                raise ValueError(str(error)) from None
             unbound = names(source) - known_names
             if unbound:
                 raise ValueError(f"unbound name(s) {sorted(unbound)} in {source!r}")
@@ -389,7 +407,9 @@ def start(ctx: Context, library: Library, name: str, args: Mapping[str, Any],
         return (yield from limit(ctx, child, skill.budget, here))
     entities = [v for k, v in values.items()
                 if skill.params.get(k) not in {"number", "string", "condition"}]
-    event = ctx.kb.begin("action", ctx.t, entities, skill=name, args=dict(values), depth=depth)
+    # A written variant's run is also a try of its parent (`relations.tries`).
+    variant = {} if skill.variant_of is None else {"variant_of": skill.variant_of}
+    event = ctx.kb.begin("action", ctx.t, entities, skill=name, args=dict(values), depth=depth, **variant)
     child = run_program(ctx, library, skill.body, dict(values), depth, here)
     outcome = Outcome(INTERRUPTED, "stopped by its caller", here)
     try:
@@ -498,6 +518,10 @@ def limit(ctx: Context, child: SkillRun, budget: float, path: str) -> SkillRun:
                 return stop.value
             except ExprError as error:        # a bad expression fails the skill, not the mind
                 return Outcome(FAILED, f"expression error: {error}", path)
+            except (TypeError, ValueError, KeyError) as error:
+                # A program that passed its checks can still misuse a value at run time (a
+                # written skill passing a number where an entity is expected): it fails.
+                return Outcome(FAILED, f"error: {type(error).__name__}: {error}", path)
             yield command
     finally:
         child.close()

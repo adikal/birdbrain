@@ -59,12 +59,28 @@ class JsonlRunStore:
                 del self._open[event.run_id]
                 del self._summaries[event.run_id]
 
-    def list_runs(self) -> list[dict[str, Any]]:
+    def list_runs(self, limit: int | None = None, include: str | None = None) -> list[dict[str, Any]]:
+        """Run summaries, most recently updated first; with `limit`, only that many (by the
+        run directory's modification time), plus the run `include` if it exists."""
         with self._lock:
             live = {run_id: dict(s) for run_id, s in self._summaries.items()}
-        summaries = [live.get(path.name) or self._read_summary(path)
-                     for path in self.root.iterdir() if path.is_dir()]
+        paths = [path for path in self.root.iterdir() if path.is_dir()]
+        if limit is not None:
+            paths = sorted(paths, key=lambda p: p.stat().st_mtime, reverse=True)[:limit]
+            if include and (self.root / include).is_dir() and self.root / include not in paths:
+                paths.append(self.root / include)
+        summaries = [live.get(path.name) or self._read_summary(path) for path in paths]
         return sorted((s for s in summaries if s), key=lambda s: s.get("updated_at", ""), reverse=True)
+
+    def prune(self, keep: int, protect: set[str] = frozenset()) -> list[str]:
+        """Delete all but the `keep` most recent runs (by modification time); `protect`
+        names runs never deleted (the live one). Returns the deleted run ids."""
+        import shutil
+        paths = sorted((p for p in self.root.iterdir() if p.is_dir()), key=lambda p: p.stat().st_mtime, reverse=True)
+        doomed = [p for p in paths[keep:] if p.name not in protect]
+        for path in doomed:
+            shutil.rmtree(path)
+        return [p.name for p in doomed]
 
     def get_summary(self, run_id: str) -> dict[str, Any] | None:
         run_dir = self.run_dir(run_id)

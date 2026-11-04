@@ -114,13 +114,15 @@ uv pip install --python .venv/bin/python -e ../microduck-lab/microduck_local -e 
 .venv/bin/birdbrain-run --owner wall --episodes 10 --seeds 4 --jobs 4 --out wall.jsonl   # learn an owner's wish
 .venv/bin/python scripts/lifetimes.py wall.jsonl                               # summarize lifetimes
 .venv/bin/python scripts/predictions.py wall.jsonl                             # score predictions
+.venv/bin/birdbrain-run --author --episodes 20 --seeds 2 --jobs 2 --tag mine --out authored.jsonl  # cloud writes skills
 .venv/bin/birdbrain-compare A.jsonl B.jsonl          # paired, seed-matched comparison
 .venv/bin/birdbrain-dashboard --live --seed 3        # the mind, live, at http://127.0.0.1:8790
 .venv/bin/birdbrain-record playroom --brain d0=birdbrain --seconds 120 --out /tmp/rec   # video
 ```
 
 Runs are scored from simulator truth (toys in the basket, falls, grasps) and
-every event the mind produces is recorded under `data/runs/`.
+every event the mind produces is recorded under `data/runs/`. The dashboard's
+replays are in `data/replays/` (the newest 50 are kept).
 
 ## Cloud brain
 
@@ -145,7 +147,7 @@ credentials; model usage is billed to the AWS account.
 
 ## Status
 
-Milestones 0 to 4 are complete (see the report's results, section 6):
+Milestones 0 to 5a are complete (see the report's results, section 6):
 
 - From the robot's own senses, with an explicit task, the mind tidies as
   well as the lab's hand-tuned controller on held-out rooms (E-008).
@@ -166,6 +168,21 @@ Milestones 0 to 4 are complete (see the report's results, section 6):
   seen. Choosing by their means did worse, so decisions still use counts
   (E-017).
 
-Next is letting the rules steer through posterior draws, and learning the
-owner's reactions over the same conditions (Milestone 4a). The roadmap is in
+- Three ways of letting the rules choose were all worse in development:
+  posterior draws explored risky picks, an upper bound on falls paralysed
+  the duck, and the owner model over conditions learned more slowly (E-018).
+- The cloud brain writes skills (`--author`). After each room the duck names
+  the situation where a skill most clearly fails; the cloud brain writes a
+  program for it; the duck tries it against the original and keeps it only
+  on evidence. On 16 held-out lives it kept a written skill in 11, and
+  success in those situations rose 8 to 10 points with no more falls (E-019).
+- Judged fairly (no prior, turns, then Thompson sampling, and under review
+  after keeping), written skills still raised success in their situations
+  by 7 to 10 points, with a task and with an owner. The duck kept 6 of 44
+  and retired 3. With the task the room lost a tenth of a toy, because a
+  better written delivery is slower (E-020).
+
+Next is Milestone 4b (one valence) or Milestone 6 (lifetimes and agents A
+to D); authoring still needs trials scored by success per second and
+trials that finish within a life (H-021). The roadmap is in
 [`docs/design.md`](docs/design.md#9-roadmap).

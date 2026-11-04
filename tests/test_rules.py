@@ -105,3 +105,28 @@ def test_a_moderate_effect_is_recovered_as_a_contrast():
         learner.add("pick", {"rim": "yes" if rim else "no"}, float(rng.random() < (0.35 if rim else 0.65)))
     rule = next(r for r in learner.rules() if r["when"] == "rim yes")
     assert 0.25 < rule["odds"] < 0.4                             # true odds ratio 0.29
+
+
+def test_posterior_draws_spread_with_uncertainty_and_centre_on_the_mean():
+    import numpy as np
+    rng = np.random.default_rng(0)
+    few, many = RuleLearner("x"), RuleLearner("x")
+    teach(few, 8, {"yes": 0.3, "no": 0.9})
+    teach(many, 400, {"yes": 0.3, "no": 0.9}, seed=2)
+    f = {"target by a wall": "yes"}
+    spread = {}
+    for name, learner in (("few", few), ("many", many)):
+        m = learner.model("pick")
+        draws = [m.draw(rng).logit(f) for _ in range(400)]
+        assert abs(float(np.mean(draws)) - m.logit(f)) < 0.15
+        spread[name] = float(np.std(draws))
+    assert spread["few"] > 2 * spread["many"]
+
+
+def test_a_rule_draw_is_shared_by_every_candidate_of_one_decision():
+    mind = Mind(provider=None, needs=True, rules="draw")
+    for k in range(30):
+        mind.rules["effect"].add("pick", {"target by the rim": "yes" if k % 2 else "no"}, float(k % 2 == 0))
+    mind._rule_draws = {}
+    first = mind.predict("pick", {})
+    assert mind.predict("pick", {}) == first and set(mind._rule_draws) == {("effect", "pick"), ("fell", "pick")}

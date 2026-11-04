@@ -24,14 +24,17 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Protocol
 
+import numpy as np
+
+from birdbrain.authoring import Author, Authoring, failure_reasons
 from birdbrain.body import CLASSES, MICRODUCK, STOP, BodyProfile, Command, Observation
 from birdbrain.expr import Evaluator, ExprError
-from birdbrain.goals import Goal, approval_candidates, candidates
+from birdbrain.goals import Goal, approval_candidates, candidates, kinds_owner
 from birdbrain.kr import SELF, KnowledgeBase, Position
 from birdbrain.needs import Needs
 from birdbrain.perception import Perception
 from birdbrain.phrases import load as load_phrases
-from birdbrain.reactions import ReactionModel
+from birdbrain.reactions import ConditionReactionModel, ReactionModel
 from birdbrain.records import SkillRecord
 from birdbrain.relations import attempts, failures, inside, known
 from birdbrain.relations import where as where_is
@@ -198,7 +201,8 @@ class Mind:
                  snapshot_hz: float = 2.0, speculate: bool = False,
                  memory_dir: Path | None = None, needs: bool | str = False,
                  room: tuple[float, float, float, float] | None = None, seed: int = 0,
-                 credit: str = "moments", rules: bool = False) -> None:
+                 credit: str = "moments", rules: str | None = None, owner_model: str = "kinds",
+                 author: Author | None = None) -> None:
         if latency not in {"frozen", "real"}:
             raise ValueError("latency must be 'frozen' or 'real'")
         self.log: Log = log or (lambda kind, payload: None)
@@ -237,6 +241,11 @@ class Mind:
         self.memory_dir = memory_dir
         self.records: dict[str, SkillRecord] = self._load_records()
         #: What the duck believes earns its owner's approval (Milestone 3b), kept for life.
+        if owner_model not in {"kinds", "conditions"}:
+            raise ValueError("owner_model must be 'kinds' or 'conditions'")
+        if rules not in {None, "mean", "draw", "cautious"}:
+            raise ValueError("rules must be None, 'mean', 'draw' or 'cautious'")
+        self.owner_model = owner_model
         self.reactions = self._load_reactions() if self.approval else None
         if self.reactions is not None:
             self.reactions.credit = credit
@@ -244,11 +253,23 @@ class Mind:
         #: Counted outcomes per kind of action (a pick by a wall is not a pick in the open).
         self.kind_records: dict[str, SkillRecord] = self._load_records("kind_records.json") if self.approval else {}
         self.rng = random.Random(seed)              # Thompson draws (reactions.py)
+        self.np_rng = np.random.default_rng(seed)   # posterior draws of logistic models
         #: Causal rules (Milestone 4): how likely each skill's expected effect, and a fall, are
         #: under the conditions the duck believes hold. Always learned and scored; used for
         #: decisions when `rules` is set.
-        self.use_rules = rules
+        self.use_rules = rules                      # None: counts; "mean" or "draw" (E-018)
+        self._rule_draws: dict[tuple[str, str], Any] = {}
         self.rules = {name: self._load_rules(name, outcome, prior, sd) for name, outcome, prior, sd in RULE_OUTCOMES}
+        #: Every scored outcome of the life (skill, features, status, reason, held, fell).
+        self.outcomes: list[dict[str, Any]] = self._load_json("outcomes.json", [])
+        #: Skills written by the cloud brain and their trials (Milestone 5, `authoring.py`).
+        #: Written skills are tried whenever their situation recurs; new ones are requested
+        #: only with an `author`.
+        self.authoring = Authoring(author=author)
+        self.episode: int | None = None             # set by the runner for lifetimes
+        text = self._load_json("authored.json", None, raw=True)
+        if text is not None:
+            self.authoring.load(text, self.library)
         self.phrases = load_phrases() if self.approval else None
         self.stats = {"decisions": 0, "fallbacks": 0, "invalid": 0, "provider_errors": 0, "falls_sensed": 0}
         self._run: SkillRun | None = None
@@ -322,13 +343,50 @@ class Mind:
         if self._run is not None:
             self._run.close()
             self._finish(Outcome("interrupted", "run ended"))
+        self.reflect()
         self._save_records()
         if self.memory_dir is not None:
             for name, learner in self.rules.items():
                 self._write_memory(f"rules_{name}.json", learner.to_json())
+            self._write_memory("outcomes.json", json.dumps(self.outcomes) + "\n")
+            self._write_memory("authored.json", self.authoring.to_json())
         if self.reactions is not None and self.memory_dir is not None:
             self._write_memory("owner_model.json", self.reactions.to_json())
             self._write_memory("kind_records.json", _records_json(self.kind_records))
+
+    # -- reflection (Milestone 5) ---------------------------------------------------
+    def reflect(self) -> None:
+        """Between episodes: keep or retire written skills with enough trials, then, if the
+        rules show a compound skill clearly failing under some condition, ask the author
+        for a skill for that situation (`authoring.py`)."""
+        for review in self.authoring.review(self.rng, self.episode):
+            self.log("SKILL_REVIEWED", {**review, "summary": f"{review['child']}: {review['status']} "
+                                                              f"(p better {review['p_better']:.2f})"})
+        if self.authoring.author is None:
+            return
+        weak = self.authoring.weakness(self.rules["effect"], self.library)
+        if weak is None:
+            return
+        skill, feature, value, evidence = weak
+        entry = self.authoring.propose(skill, feature, value, evidence,
+                                       failure_reasons(self.outcomes, skill, feature, value), self.library,
+                                       episode=self.episode)
+        self.stats["skills_requested"] = self.stats.get("skills_requested", 0) + 1
+        self.stats["skills_written"] = self.stats.get("skills_written", 0) + (entry["status"] == "trial")
+        self.log("SKILL_WRITTEN", {**{k: v for k, v in entry.items() if not k.startswith("answer")},
+                                   "program": self.authoring.skills.get(entry.get("child", "")),
+                                   "summary": f"asked for a skill for {skill} when {feature} {value}: {entry['status']}"
+                                              + (f" ({entry['child']})" if entry.get("child") else "")})
+
+    def _load_json(self, name: str, default: Any, raw: bool = False) -> Any:
+        path = None if self.memory_dir is None else self.memory_dir / name
+        if path is None or not path.is_file():
+            return default
+        text = path.read_text(encoding="utf-8")
+        try:
+            return text if raw else json.loads(text)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"memory file {path} is unreadable ({error}); move it aside to start fresh") from None
 
     # -- the owner (Milestone 3b) -------------------------------------------------
     def _hear(self, obs: Observation) -> None:
@@ -361,6 +419,12 @@ class Mind:
                     f"\"{e.data['said']}\" ("
                     + ("approval" if e.data["valence"] > 0 else "disapproval" if e.data["valence"] < 0
                        else "not a phrase you know") + ")" for e in heard]
+        if isinstance(self.reactions, ConditionReactionModel):
+            learned = self.reactions.rules()[:6]
+            if learned:
+                out.append("Conditions that change how she reacts (credible: at least three standard "
+                           "deviations from no effect):")
+                out += [f"- {r}." for r in learned]
         kinds = self.reactions.summary()
         if kinds:
             out.append("What you have learned about her reactions (each reaction is credited to the "
@@ -379,9 +443,44 @@ class Mind:
 
     # -- causal rules (Milestone 4) -------------------------------------------------
     def predict(self, skill: str, args: dict[str, Any]) -> tuple[float, float]:
-        """(p expected effect holds, p fall) for `skill` on `args` now, from the rules."""
+        """(p expected effect holds, p fall) for `skill` on `args` now, from the rules: their
+        posterior mean, or with `rules="draw"` one model drawn from the posterior per skill
+        and decision, shared by every candidate (Thompson sampling, ledger E-018)."""
         f = features(self.kb, self.ctx.t, args)
-        return self.rules["effect"].predict(skill, f)[0], self.rules["fell"].predict(skill, f)[0]
+        if self.use_rules == "mean":
+            return self.rules["effect"].predict(skill, f)[0], self.rules["fell"].predict(skill, f)[0]
+        out = []
+        for name in ("effect", "fell"):
+            if name == "fell" and self.use_rules == "cautious":
+                # Explore what is wanted, fear what is feared: falls are judged by an upper
+                # credible bound (mean + 2 sd on the log-odds), so a little-known risky
+                # pick is not tried on a lucky draw (ledger H-020).
+                m = self.rules[name].model(skill)
+                out.append(1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, m.logit(f) + 2.0 * m.logit_sd(f))))))
+                continue
+            key = (name, skill)
+            if key not in self._rule_draws:
+                self._rule_draws[key] = self.rules[name].model(skill).draw(self.np_rng)
+            out.append(1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, self._rule_draws[key].logit(f))))))
+        return out[0], out[1]
+
+    def _owner_p(self):
+        """The owner's reaction to an action, one posterior draw, held while the duck
+        holds a toy so a pick and its put are chosen with the same beliefs."""
+        draws = self._thompson_draws()
+        if self.owner_model == "kinds":
+            return kinds_owner(self.reactions, self.rng, draws, self.action_kind)
+
+        def owner(skill: str, args: dict[str, Any]) -> tuple[float, float, float]:
+            f = features(self.kb, self.ctx.t, args)
+            ps = []
+            for valence in (+1, -1):
+                if (valence, skill) not in draws:
+                    draws[(valence, skill)] = self.reactions.learner(valence).model(skill).draw(self.np_rng)
+                z = draws[(valence, skill)].logit(f)
+                ps.append(1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, z)))))
+            return ps[0], ps[1], 0.0
+        return owner
 
     def _predictions(self, skill: str, f: dict[str, str], record: SkillRecord) -> dict[str, Any]:
         """Every predictor's forecast for this action, recorded before it runs, so each can
@@ -427,11 +526,12 @@ class Mind:
         return skill
 
     def _load_reactions(self) -> ReactionModel:
+        cls = ConditionReactionModel if self.owner_model == "conditions" else ReactionModel
         path = None if self.memory_dir is None else self.memory_dir / "owner_model.json"
         if path is None or not path.is_file():
-            return ReactionModel()
+            return cls()
         try:
-            return ReactionModel.from_json(path.read_text(encoding="utf-8"))
+            return cls.from_json(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, TypeError, KeyError) as error:
             raise ValueError(f"memory file {path} is unreadable ({error}); move it aside to start fresh") from None
 
@@ -478,8 +578,9 @@ class Mind:
         if self.needs is not None:
             names = {t.name for t in tools}
             predict = self.predict if self.use_rules else None
-            goals = tuple(approval_candidates(self.kb, self.ctx.t, self.needs, self.records, self.reactions, names,
-                                              self.rng, self.kind_records, self._thompson_draws(), predict=predict)
+            self._rule_draws = {}                   # one posterior draw per skill per decision
+            goals = tuple(approval_candidates(self.kb, self.ctx.t, self.needs, self.records, names,
+                                              self._owner_p(), self.kind_records, predict=predict)
                           if self.approval else
                           candidates(self.kb, self.ctx.t, self.needs, self.records, names, predict=predict))
             tools = _serving(tools, goals)
@@ -517,21 +618,29 @@ class Mind:
         self._goal = goal
         if choice.provider != "reflex":
             self.stats["decisions"] += 1
+        situation = features(self.kb, self.ctx.t, args)
+        kind = self.action_kind(skill, args)
+        ran, trials = self.authoring.choose(skill, situation, self.rng)
+        parent, skill = skill, ran
+        if skill != parent:
+            expect = self.library[skill].expect
+            record = self.records.get(skill, SkillRecord())
         self._action = {
-            "skill": skill, "args": args, "t0": self.ctx.t, "held": held,
+            "skill": skill, "variant_of": parent if skill != parent else None, "written_trials": trials, "args": args, "t0": self.ctx.t, "held": held,
             "confirmed_before": None if self.needs is None else self.needs.confirmed(self.kb),
             "expect": expect, "p_rule": round(record.p, 4), "trials": record.trials,
             "p_model": choice.p if choice.provider not in {"local", "reflex"} else None,
             "provider": choice.provider, "model": choice.model, "reason": choice.reason,
             "goal": None if goal is None else goal.id, "goal_source": None if goal is None else goal.source,
-            "kind": self.action_kind(skill, args),
-            "features": features(self.kb, self.ctx.t, args),
+            "kind": kind,
+            "features": situation,
         }
         self._action["predicted"] = self._predictions(skill, self._action["features"], record)
         if self.reactions is not None:
-            self.reactions.started(self._action["kind"], self.ctx.t)
+            self.reactions.started(self._action["kind"], self.ctx.t, skill=skill,
+                                   features=self._action["features"])
         payload = {
-            **{k: v for k, v in self._action.items() if k != "confirmed_before"}, "fallback": fallback_reason, "latency_s": round(choice.latency_s, 3),
+            **{k: v for k, v in self._action.items() if k not in {"confirmed_before", "written_trials"}}, "fallback": fallback_reason, "latency_s": round(choice.latency_s, 3),
             "usage": choice.usage, "briefing_chars": len(request.briefing),
             "tools": [t.name for t in request.tools], "speculative": speculative,
             "summary": f"{skill}({', '.join(map(str, args.values()))}): {choice.reason}",
@@ -697,6 +806,11 @@ class Mind:
             scores = self._score_predictions(action["predicted"], scored)
             for name, y in scored.items():
                 self.rules[name].add(action["skill"], action["features"], float(y))
+            self.outcomes.append({"skill": action["skill"], "variant_of": action["variant_of"],
+                                  "features": action["features"], "status": outcome.status,
+                                  "reason": outcome.reason, "held": held, "fell": fell, "episode": self.episode,
+                                  "trials": [t.child for t in action["written_trials"]]})
+            self.authoring.record(action["written_trials"], action["skill"], held and not fell, fell)
         if self.reactions is not None:
             self.reactions.ended(action["kind"], self.ctx.t)
             self.kind_records.setdefault(action["kind"], SkillRecord()).record(
@@ -809,6 +923,7 @@ class Mind:
             "view": self.perception.last_view,
             "needs": None if self.needs is None else self.needs.snapshot(),
             "owner_model": None if self.reactions is None else self.reactions.summary(),
+            "written_skills": self.authoring.summary(),
             "rules": [learner.text(r) for learner in self.rules.values() for r in learner.rules()][:12],
             "goal": None if self._goal is None else self._goal.to_dict(),
         }

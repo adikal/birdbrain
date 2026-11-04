@@ -119,3 +119,34 @@ def _category(error: Exception) -> str:
     if "Credential" in name or "NoRegion" in name:
         return "credentials"
     return name
+
+
+class BedrockAuthor:
+    """Writes skills (Milestone 5, `authoring.py`) with the same model and credentials."""
+
+    def __init__(self, provider: BedrockProvider | None = None, max_tokens: int = 4096) -> None:
+        self.provider = provider or BedrockProvider.from_env()
+        self.max_tokens = max_tokens
+
+    @property
+    def model(self) -> str:
+        return self.provider.model
+
+    def write(self, prompt: str) -> tuple[dict[str, Any], dict[str, int]]:
+        from birdbrain.authoring import SYSTEM as AUTHOR_SYSTEM
+        from birdbrain.authoring import write_skill_tool
+        try:
+            response = self.provider.client.converse(
+                modelId=self.provider.model, system=[{"text": AUTHOR_SYSTEM}],
+                messages=[{"role": "user", "content": [{"text": prompt}]}],
+                toolConfig={"tools": [write_skill_tool()], "toolChoice": {"auto": {}}},
+                inferenceConfig={"maxTokens": self.max_tokens})
+        except Exception as error:  # noqa: BLE001 - reduced to a category
+            raise ProviderError(_category(error)) from None
+        usage = response.get("usage", {})
+        tokens = {"input": int(usage.get("inputTokens", 0)), "output": int(usage.get("outputTokens", 0))}
+        call = next((block["toolUse"] for block in response.get("output", {}).get("message", {}).get("content", [])
+                     if "toolUse" in block), None)
+        if call is None:
+            raise ProviderError(f"no_tool_call ({response.get('stopReason', 'unknown')})", 0.0, tokens)
+        return dict(call.get("input") or {}), tokens

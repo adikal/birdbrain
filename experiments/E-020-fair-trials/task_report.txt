@@ -1,0 +1,90 @@
+life-160: w_deliver_far_resight for deliver when basket distance far (after room 9) -> trial; during the trial: written [11.0, 20.0, 3.0], parent [14.0, 24.0, 1.0] [successes, trials, falls]
+life-160: w_pick_refresh_first for pick when target tried before yes (after room 19) -> trial; during the trial: written [1.0, 1.0, 0.0], parent [0.0, 0.0, 0.0] [successes, trials, falls]
+life-161: w_deliver_far_staged for deliver when basket distance far (after room 20) -> trial; during the trial: written [0.0, 0.0, 0.0], parent [0.0, 0.0, 0.0] [successes, trials, falls]
+life-162: w_deliver_far_refresh for deliver when basket distance far (after room 11) -> trial; during the trial: written [9.0, 17.0, 0.0], parent [11.0, 20.0, 2.0] [successes, trials, falls]
+life-163: w_repick_after_reacquire for pick when target last seen a while ago (after room 5) -> trial; during the trial: written [24.0, 36.0, 1.0], parent [14.0, 20.0, 0.0] [successes, trials, falls]
+life-163: w_deliver_far_refresh for deliver when basket distance far (after room 8) -> trial; during the trial: written [12.0, 19.0, 0.0], parent [18.0, 30.0, 0.0] [successes, trials, falls]
+life-164: w_deliver_far for deliver when basket distance far (after room 10) -> retired; during the trial: written [6.0, 15.0, 0.0], parent [12.0, 19.0, 0.0] [successes, trials, falls]
+life-164: w_pick_after_refresh for pick when target tried before yes (after room 16) -> trial; during the trial: written [1.0, 2.0, 0.0], parent [2.0, 2.0, 0.0] [successes, trials, falls]
+life-164: w_deliver_far_refresh for deliver when basket distance far (after room 18) -> trial; during the trial: written [5.0, 6.0, 1.0], parent [3.0, 5.0, 0.0] [successes, trials, falls]
+life-165: w_deliver_staged for deliver when basket distance far (after room 7) -> kept; during the trial: written [24.0, 39.0, 2.0], parent [2.0, 10.0, 0.0] [successes, trials, falls]
+life-165: w_pick_refresh_first for pick when target position vague (after room 18) -> trial; during the trial: written [2.0, 4.0, 0.0], parent [2.0, 3.0, 0.0] [successes, trials, falls]
+life-166: w_pick_restale for pick when target last seen a while ago (after room 10) -> retired; during the trial: written [7.0, 10.0, 0.0], parent [13.0, 14.0, 0.0] [successes, trials, falls]
+life-166: w_deliver_far_staged for deliver when basket distance far (after room 15) -> trial; during the trial: written [8.0, 8.0, 0.0], parent [6.0, 8.0, 0.0] [successes, trials, falls]
+life-166: w_pick_recheck for pick when target tried before yes (after room 18) -> trial; during the trial: written [1.0, 3.0, 0.0], parent [1.0, 3.0, 0.0] [successes, trials, falls]
+life-167: w_deliver_far for deliver when basket distance far (after room 9) -> trial; during the trial: written [11.0, 16.0, 1.0], parent [15.0, 23.0, 1.0] [successes, trials, falls]
+life-168: w_deliver_far_staged for deliver when basket distance far (after room 13) -> trial; during the trial: written [9.0, 13.0, 0.0], parent [5.0, 9.0, 1.0] [successes, trials, falls]
+life-169: w_pick_far_refresh for pick when basket distance far (after room 10) -> trial; during the trial: written [1.0, 2.0, 0.0], parent [1.0, 2.0, 0.0] [successes, trials, falls]
+life-170: w_deliver_far_refresh for deliver when basket distance far (after room 8) -> kept; during the trial: written [22.0, 30.0, 1.0], parent [7.0, 14.0, 0.0] [successes, trials, falls]
+life-171: w_pick_stale for pick when target last seen a while ago (after room 7) -> trial; during the trial: written [8.0, 18.0, 0.0], parent [17.0, 27.0, 0.0] [successes, trials, falls]
+life-171: w_deliver_refresh_far for deliver when basket distance far (after room 8) -> trial; during the trial: written [12.0, 19.0, 0.0], parent [10.0, 18.0, 0.0] [successes, trials, falls]
+life-172: w_deliver_far for deliver when basket distance far (after room 7) -> kept; during the trial: written [23.0, 28.0, 1.0], parent [4.0, 9.0, 0.0] [successes, trials, falls]
+life-172: w_pick_stale for pick when target last seen a while ago (after room 11) -> trial; during the trial: written [9.0, 15.0, 0.0], parent [6.0, 12.0, 0.0] [successes, trials, falls]
+life-173: w_deliver_far for deliver when basket distance far (after room 9) -> retired; during the trial: written [7.0, 20.0, 1.0], parent [18.0, 31.0, 1.0] [successes, trials, falls]
+life-173: w_pick_stale for pick when target last seen a while ago (after room 16) -> trial; during the trial: written [5.0, 7.0, 0.0], parent [3.0, 6.0, 0.0] [successes, trials, falls]
+life-173: w_deliver_far_staged for deliver when basket distance far (after room 19) -> trial; during the trial: written [2.0, 2.0, 0.0], parent [0.0, 1.0, 0.0] [successes, trials, falls]
+life-174: w_pick_after_relocate for pick when target tried before yes (after room 5) -> kept; during the trial: written [11.0, 17.0, 0.0], parent [6.0, 11.0, 0.0] [successes, trials, falls]
+life-174: w_deliver_far_refresh for deliver when basket distance far (after room 8) -> kept; during the trial: written [22.0, 27.0, 0.0], parent [4.0, 9.0, 0.0] [successes, trials, falls]
+life-175: w_pick_restale for pick when target last seen a while ago (after room 20) -> trial; during the trial: written [0.0, 0.0, 0.0], parent [0.0, 0.0, 0.0] [successes, trials, falls]
+
+requests 28, skills written 28, trials by status {'trial': 20, 'retired': 3, 'kept': 5}, lives with a kept skill 4 of 16, authoring tokens 121842
+  all trials, written: 253 of 394 succeeded (64%), 11 falls (2.8%)
+  all trials, parent : 194 of 330 succeeded (59%), 6 falls (1.8%)
+  kept skills, written: 102 of 141 succeeded (72%), 4 falls (2.8%)
+  kept skills, parent : 23 of 53 succeeded (43%), 0 falls (0.0%)
+  success, written minus parent during trials, per life: +0.064 [95% CI -0.018, +0.147], n = 14 lives, higher in 7
+
+in each written skill's situation, after it was written, authoring life against control life:
+  life-160 deliver when basket distance far: authoring 57% of 44, control 56% of 54
+  life-160 pick when target tried before yes: authoring 100% of 1, control 33% of 3
+  life-161 deliver when basket distance far: authoring nan% of 0, control nan% of 0
+  life-162 deliver when basket distance far: authoring 54% of 37, control 51% of 39
+  life-163 pick when target last seen a while ago: authoring 68% of 56, control 65% of 57
+  life-163 deliver when basket distance far: authoring 61% of 49, control 52% of 56
+  life-164 deliver when basket distance far: authoring 58% of 45, control 59% of 46
+  life-164 pick when target tried before yes: authoring 75% of 4, control 67% of 3
+  life-164 deliver when basket distance far: authoring 73% of 11, control 58% of 12
+  life-165 deliver when basket distance far: authoring 53% of 49, control 42% of 53
+  life-165 pick when target position vague: authoring 57% of 7, control 50% of 8
+  life-166 pick when target last seen a while ago: authoring 75% of 32, control 73% of 30
+  life-166 deliver when basket distance far: authoring 88% of 16, control 33% of 33
+  life-166 pick when target tried before yes: authoring 33% of 6, control 67% of 3
+  life-167 deliver when basket distance far: authoring 67% of 39, control 54% of 46
+  life-168 deliver when basket distance far: authoring 64% of 22, control 63% of 30
+  life-169 pick when basket distance far: authoring 50% of 4, control 40% of 5
+  life-170 deliver when basket distance far: authoring 66% of 44, control 50% of 70
+  life-171 pick when target last seen a while ago: authoring 56% of 45, control 55% of 49
+  life-171 deliver when basket distance far: authoring 59% of 37, control 57% of 44
+  life-172 deliver when basket distance far: authoring 73% of 37, control 50% of 46
+  life-172 pick when target last seen a while ago: authoring 56% of 27, control 59% of 27
+  life-173 deliver when basket distance far: authoring 50% of 54, control 50% of 50
+  life-173 pick when target last seen a while ago: authoring 62% of 13, control 46% of 13
+  life-173 deliver when basket distance far: authoring 67% of 3, control 20% of 5
+  life-174 pick when target tried before yes: authoring 61% of 28, control 69% of 29
+  life-174 deliver when basket distance far: authoring 72% of 36, control 58% of 45
+  life-175 pick when target last seen a while ago: authoring nan% of 0, control nan% of 0
+  success, authoring minus control: +0.106 [95% CI +0.025, +0.186], 21 of 26 situations higher, sign-flip p = 0.007
+  fall rate, authoring minus control: -0.000 [95% CI -0.007, +0.007], 8 of 26 situations higher, sign-flip p = 0.956
+  success per life (outcomes pooled, each once), authoring minus control: +0.075 [95% CI +0.038, +0.112], 13 of 14 lives higher, sign-flip p = 0.000
+  fall rate per life, authoring minus control: +0.002 [95% CI -0.009, +0.013], 5 of 14 lives higher, sign-flip p = 0.725
+  success, deliver when basket distance far (first request per life), authoring minus control: +0.113 [95% CI +0.023, +0.203], 11 of 13 lives higher, sign-flip p = 0.001
+  success, pick when target last seen a while ago (first request per life), authoring minus control: +0.033 [95% CI -0.056, +0.123], 4 of 5 lives higher, sign-flip p = 0.438
+  success, pick when target tried before yes (first request per life), authoring minus control: +0.084 [95% CI -0.592, +0.759], 2 of 4 lives higher, sign-flip p = 0.750
+
+kept skills only, in their situation after they were kept, authoring life against control life:
+  life-165 deliver when basket distance far: authoring 61% of 31, control 44% of 32
+  life-170 deliver when basket distance far: authoring 71% of 7, control 50% of 14
+  life-172 deliver when basket distance far: authoring 86% of 14, control 71% of 17
+  life-174 pick when target tried before yes: authoring 45% of 11, control 75% of 12
+  life-174 deliver when basket distance far: authoring 76% of 17, control 65% of 20
+  success, authoring minus control: +0.072 [95% CI -0.187, +0.331], 4 of 5 situations higher, sign-flip p = 0.500
+  fall rate, authoring minus control: +0.003 [95% CI -0.004, +0.010], 2 of 5 situations higher, sign-flip p = 0.500
+  success per life (outcomes pooled, each once), authoring minus control: +0.124 [95% CI -0.060, +0.308], 3 of 4 lives higher, sign-flip p = 0.250
+  fall rate per life, authoring minus control: +0.004 [95% CI -0.006, +0.013], 2 of 4 lives higher, sign-flip p = 0.500
+  success, deliver when basket distance far (first request per life), authoring minus control: +0.164 [95% CI +0.097, +0.230], 4 of 4 lives higher, sign-flip p = 0.125
+
+rooms 11 on, authoring minus control, paired by life:
+  inBasket: A 5.419 · B 5.306 · B-A -0.113 [95% CI -0.221, -0.004] · B higher 2, equal 7, lower 7 · sign-flip p = 0.062 · n = 16
+  falls: A 0.375 · B 0.375 · B-A +0.000 [95% CI -0.058, +0.058] · B higher 3, equal 9, lower 4 · sign-flip p = 1.000 · n = 16
+  pickDecisions: A 8.056 · B 7.912 · B-A -0.144 [95% CI -0.342, +0.055] · B higher 3, equal 3, lower 10 · sign-flip p = 0.164 · n = 16
+  pickDecisionsFailed: A 2.494 · B 2.394 · B-A -0.100 [95% CI -0.279, +0.079] · B higher 4, equal 2, lower 10 · sign-flip p = 0.293 · n = 16

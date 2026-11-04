@@ -159,6 +159,8 @@ h1 { font-size: 19px; }
 .skill-table tr.doubt td { color: var(--faint); font-style: italic; }
 .skill-table { table-layout: fixed; }
 .skill-table td, .skill-table th { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.skill-table td.skill-name { white-space: normal; overflow-wrap: anywhere; }
+.skill-table .written-tag { display: inline-block; white-space: nowrap; color: var(--purple); font: 600 10px var(--sans); letter-spacing: .04em; margin-left: 4px; }
 
 /* Trace */
 .event-list { padding: 6px 10px 10px; }
@@ -190,3 +192,7 @@ h1 { font-size: 19px; }
 @media (max-width: 760px) { .dashboard { grid-template-columns: 1fr; grid-template-areas: "world" "camera" "mind" "decisions" "skills" "beliefs" "needs" "events" "inspector"; padding: 10px; } .facts { grid-template-columns: 1fr; } }
 .rule-list { margin: 8px 16px 12px; padding-left: 18px; color: var(--muted); font-size: 12px; }
 .rule-list li { margin: 2px 0; }
+.written-list li { margin: 6px 0; color: var(--text); }
+.written-list .status-kept { color: var(--blue); font-weight: 700; }
+.written-list .status-retired { color: var(--vermillion); font-weight: 700; }
+.written-list .status-trial { color: var(--purple); font-weight: 700; }

@@ -1,0 +1,331 @@
+{
+  "attempts": {
+    "deliver|basket distance=far": 1
+  },
+  "log": [
+    {
+      "answer_0": {
+        "body": [
+          {
+            "args": {
+              "condition": "holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "if": "not known(basket)",
+            "then": [
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ]
+          },
+          {
+            "bind": "b",
+            "to": "basket"
+          },
+          {
+            "args": {
+              "condition": "b is not none"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "look": "'level'",
+              "stop_at": 1.0,
+              "x": "b"
+            },
+            "call": "walk_toward",
+            "timeout": 40
+          },
+          {
+            "args": {
+              "tolerance": 0.1,
+              "x": "b"
+            },
+            "call": "turn_toward"
+          },
+          {
+            "args": {
+              "seconds": 1.0
+            },
+            "call": "stand"
+          },
+          {
+            "if": "not known(basket)",
+            "then": [
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ]
+          },
+          {
+            "bind": "b2",
+            "to": "basket"
+          },
+          {
+            "args": {
+              "condition": "b2 is not none"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "look": "'level'",
+              "speed": 0.4,
+              "stop_at": 0.5,
+              "x": "b2"
+            },
+            "call": "walk_toward",
+            "timeout": 25
+          },
+          {
+            "args": {
+              "tolerance": 0.08,
+              "x": "b2"
+            },
+            "call": "turn_toward"
+          },
+          {
+            "args": {
+              "seconds": 1.4
+            },
+            "call": "stand"
+          },
+          {
+            "if": "not known(basket)",
+            "then": [
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ]
+          },
+          {
+            "bind": "b3",
+            "to": "basket"
+          },
+          {
+            "args": {
+              "condition": "b3 is not none"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "look": "'level'",
+              "speed": 0.25,
+              "steady_last": 0.06,
+              "stop_at": 0.22,
+              "x": "b3"
+            },
+            "call": "walk_toward",
+            "timeout": 15
+          },
+          {
+            "args": {
+              "state": "open"
+            },
+            "call": "beak"
+          },
+          {
+            "call": "back_off"
+          }
+        ],
+        "doc": "Carry the held toy to a far basket in stages, re-sighting the basket midway so the believed position is fresh before the final approach and drop.",
+        "name": "deliver_far",
+        "reason": "Most far-basket failures are \"basket no longer where it was believed\": the belief goes stale over a long walk. Pausing twice to re-sight the basket and rebinding it before closing in refreshes the target, while the slow final approach is kept to avoid extra falls."
+      },
+      "child": "w_deliver_far",
+      "condition": "basket distance far",
+      "episode": 9,
+      "evidence": {
+        "n": 41,
+        "n_otherwise": 28,
+        "rate": 0.5853658536585366,
+        "rate_otherwise": 0.8928571428571429,
+        "z": -2.0677784875378533
+      },
+      "skill": "deliver",
+      "status": "trial"
+    }
+  ],
+  "skills": {
+    "w_deliver_far": {
+      "body": [
+        {
+          "args": {
+            "condition": "holding(self)"
+          },
+          "call": "require"
+        },
+        {
+          "if": "not known(basket)",
+          "then": [
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ]
+        },
+        {
+          "bind": "b",
+          "to": "basket"
+        },
+        {
+          "args": {
+            "condition": "b is not none"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "look": "'level'",
+            "stop_at": 1.0,
+            "x": "b"
+          },
+          "call": "walk_toward",
+          "timeout": 40
+        },
+        {
+          "args": {
+            "tolerance": 0.1,
+            "x": "b"
+          },
+          "call": "turn_toward"
+        },
+        {
+          "args": {
+            "seconds": 1.0
+          },
+          "call": "stand"
+        },
+        {
+          "if": "not known(basket)",
+          "then": [
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ]
+        },
+        {
+          "bind": "b2",
+          "to": "basket"
+        },
+        {
+          "args": {
+            "condition": "b2 is not none"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "look": "'level'",
+            "speed": 0.4,
+            "stop_at": 0.5,
+            "x": "b2"
+          },
+          "call": "walk_toward",
+          "timeout": 25
+        },
+        {
+          "args": {
+            "tolerance": 0.08,
+            "x": "b2"
+          },
+          "call": "turn_toward"
+        },
+        {
+          "args": {
+            "seconds": 1.4
+          },
+          "call": "stand"
+        },
+        {
+          "if": "not known(basket)",
+          "then": [
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ]
+        },
+        {
+          "bind": "b3",
+          "to": "basket"
+        },
+        {
+          "args": {
+            "condition": "b3 is not none"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "look": "'level'",
+            "speed": 0.25,
+            "steady_last": 0.06,
+            "stop_at": 0.22,
+            "x": "b3"
+          },
+          "call": "walk_toward",
+          "timeout": 15
+        },
+        {
+          "args": {
+            "state": "open"
+          },
+          "call": "beak"
+        },
+        {
+          "call": "back_off"
+        }
+      ],
+      "budget": 105.0,
+      "defaults": {},
+      "doc": "Carry the held toy to a far basket in stages, re-sighting the basket midway so the believed position is fresh before the final approach and drop.",
+      "expect": "inside(held, basket, 0.03, 0)",
+      "params": {}
+    }
+  },
+  "tokens": 3526,
+  "trials": [
+    {
+      "child": "w_deliver_far",
+      "counts": {
+        "deliver": [
+          6.121951219512195,
+          13.0,
+          0.975609756097561
+        ],
+        "w_deliver_far": [
+          20.0,
+          28.0,
+          0.0
+        ]
+      },
+      "feature": "basket distance",
+      "live": {
+        "deliver": [
+          1.0,
+          3.0,
+          0.0
+        ],
+        "w_deliver_far": [
+          20.0,
+          28.0,
+          0.0
+        ]
+      },
+      "opened": 9,
+      "parent": "deliver",
+      "reason": "Most far-basket failures are \"basket no longer where it was believed\": the belief goes stale over a long walk. Pausing twice to re-sight the basket and rebinding it before closing in refreshes the target, while the slow final approach is kept to avoid extra falls.",
+      "status": "kept",
+      "value": "far"
+    }
+  ]
+}

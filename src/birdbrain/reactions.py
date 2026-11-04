@@ -24,6 +24,11 @@ whenever a new one arrives. So a kind that keeps being followed by approval come
 explain it, and coincident kinds are explained away, even for reactions heard before
 the duck knew better.
 
+`ConditionReactionModel` learns the same thing over the conditions the duck
+believes hold when it acts (the features of `rules.py`), in place of hand-chosen
+kinds: a Bayesian logistic model per skill for approval and one for disapproval,
+fitted to the credit EM gives each action (ledger E-018, H-017).
+
 Choosing what to try uses Thompson sampling: each decision values every kind of
 action by one draw from its posterior. A kind the duck knows little about sometimes
 draws high and gets tried; one that has been tried often without approval rarely
@@ -91,7 +96,7 @@ class ReactionModel:
     def belief(self, kind: str) -> KindBelief:
         return self.kinds.get(kind, KindBelief())
 
-    def started(self, kind: str, t: float) -> None:
+    def started(self, kind: str, t: float, **context: Any) -> None:
         self._actions.append([kind, t, None, []])
 
     def moment(self, t: float) -> None:
@@ -167,3 +172,107 @@ class ReactionModel:
         raw: dict[str, Any] = json.loads(text)
         return cls(kinds={k: KindBelief(**v) for k, v in raw["kinds"].items()},
                    history=[(int(v), list(c)) for v, c in raw["history"]])
+
+
+@dataclass
+class ConditionReactionModel(ReactionModel):
+    """Reactions explained by the conditions of each action (ledger E-018, H-017).
+
+    Every action the duck starts is logged with its skill and features. A reaction's
+    possible causes are logged actions, chosen by the same timing rule. EM alternates
+    between credit (each candidate's share, in proportion to its predicted probability
+    of that reaction) and a refit of two `RuleLearner`s, approval and disapproval, on
+    every logged action with its total credit as a soft outcome. The prior rate of
+    each reaction is 1/3, as for kinds."""
+
+    actions: list[dict[str, Any]] = field(default_factory=list)       # kind, skill, features, ended
+    em_iterations: int = 8
+    _learners: dict[int, Any] = field(default_factory=dict)
+
+    def started(self, kind: str, t: float, **context: Any) -> None:
+        self.actions.append({"kind": kind, "skill": context.get("skill", kind),
+                             "features": dict(context.get("features", {})), "ended": False})
+        self._actions.append([len(self.actions) - 1, t, None, []])
+
+    def ended(self, kind: str, t: float) -> None:
+        for a in reversed(self._actions):
+            if a[2] is None:
+                a[2] = t
+                self.actions[a[0]]["ended"] = True
+                break
+        horizon = t - self.window_s - 60.0
+        self._actions = [a for a in self._actions if a[2] is None or a[2] >= horizon]
+
+    def candidates(self, t: float) -> list[int]:                       # indices into `actions`
+        return super().candidates(t)
+
+    def learner(self, valence: int) -> Any:
+        from birdbrain.rules import RuleLearner
+        if valence not in self._learners:
+            self._learners[valence] = RuleLearner("she approves" if valence > 0 else "she disapproves",
+                                                  prior=(PRIOR_HIT, PRIOR_MISS))
+        return self._learners[valence]
+
+    def p(self, valence: int, skill: str, features: dict[str, str]) -> float:
+        return self.learner(valence).predict(skill, features)[0]
+
+    def react(self, valence: int, t: float) -> dict[str, float]:
+        causes = self.candidates(t)
+        self.history.append((valence, causes))
+        self._explain()
+        weights = [self.p(valence, self.actions[i]["skill"], self.actions[i]["features"]) for i in causes]
+        total = sum(weights) + self.background
+        shares: dict[str, float] = {"(nothing I did)": self.background / total}
+        for i, w in zip(causes, weights, strict=True):
+            kind = self.actions[i]["kind"]
+            shares[kind] = shares.get(kind, 0.0) + w / total
+        return {k: round(v, 3) for k, v in shares.items()}
+
+    def _explain(self) -> None:
+        from birdbrain.rules import RuleLearner
+        for _ in range(self.em_iterations):
+            credit = {+1: [0.0] * len(self.actions), -1: [0.0] * len(self.actions)}
+            for valence, causes in self.history:
+                weights = [self.p(valence, self.actions[i]["skill"], self.actions[i]["features"]) for i in causes]
+                total = sum(weights) + self.background
+                for i, w in zip(causes, weights, strict=True):
+                    credit[valence][i] += w / total
+            for valence in (+1, -1):
+                learner = RuleLearner(self.learner(valence).outcome, prior=(PRIOR_HIT, PRIOR_MISS))
+                for i, a in enumerate(self.actions):
+                    if a["ended"] or credit[valence][i] > 0:
+                        learner.add(a["skill"], a["features"], min(1.0, credit[valence][i]))
+                self._learners[valence] = learner
+
+    def summary(self) -> dict[str, dict[str, float]]:
+        """Per kind, for comparison with the kinds model: the mean predicted reaction over
+        that kind's actions."""
+        by_kind: dict[str, list[tuple[float, float]]] = {}
+        for a in self.actions:
+            if a["ended"]:
+                by_kind.setdefault(a["kind"], []).append(
+                    (self.p(1, a["skill"], a["features"]), self.p(-1, a["skill"], a["features"])))
+        out = {}
+        for kind, ps in sorted(by_kind.items()):
+            up, down = sum(p for p, _ in ps) / len(ps), sum(q for _, q in ps) / len(ps)
+            out[kind] = {"trials": len(ps), "p_approve": round(up, 3), "p_disapprove": round(down, 3),
+                         "expected": round(up - down, 3)}
+        return out
+
+    def rules(self) -> list[str]:
+        out = []
+        for valence in (+1, -1):
+            learner = self.learner(valence)
+            out += [learner.text(r) for r in learner.rules()]
+        return out
+
+    def to_json(self) -> str:
+        return json.dumps({"over": "conditions", "actions": self.actions, "history": self.history},
+                          sort_keys=True) + "\n"
+
+    @classmethod
+    def from_json(cls, text: str) -> ConditionReactionModel:
+        raw: dict[str, Any] = json.loads(text)
+        model = cls(actions=raw["actions"], history=[(int(v), [int(i) for i in c]) for v, c in raw["history"]])
+        model._explain()
+        return model

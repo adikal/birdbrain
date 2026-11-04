@@ -3,7 +3,7 @@
 import random
 
 from birdbrain.body import Observation
-from birdbrain.goals import approval_candidates
+from birdbrain.goals import approval_candidates, kinds_owner
 from birdbrain.kr import SELF, KnowledgeBase, Position
 from birdbrain.mind import Mind
 from birdbrain.needs import Needs
@@ -220,7 +220,9 @@ def test_learned_disapproval_of_picking_stops_picks_and_approval_of_a_put_starts
         rng = random.Random(0)
         picks = 0
         for _ in range(50):
-            goals = approval_candidates(kb, 1.0, needs, records, m, tools, rng)
+            owner = kinds_owner(m, rng, {}, lambda skill, args: f"pick from {where(kb, 1.0, args['x'])}"
+                                if skill == "pick" else skill)
+            goals = approval_candidates(kb, 1.0, needs, records, tools, owner)
             picks += goals[0].kind == "pick"
         return picks
 
@@ -249,3 +251,38 @@ def test_owner_beliefs_persist_across_episodes(tmp_path):
     mind.close()
     again = Mind(needs="approval", room=BOUNDS, memory_dir=tmp_path)
     assert again.reactions.belief("deliver").approved > 0.8
+
+
+def test_the_owner_model_over_conditions_learns_what_kinds_cannot_tell_apart():
+    """E-018 (H-017): she dislikes picks of toys within 0.2 m of a wall, and does not
+    mind picks of toys 0.2 to 0.3 m out. Both are "pick from wall" as a kind; the finer
+    condition separates them."""
+    from birdbrain.reactions import ConditionReactionModel
+    model = ConditionReactionModel()
+    t = 0.0
+    for k in range(60):
+        close = k % 2 == 0
+        f = {"target from the wall": "0.1 to 0.2 m" if close else "0.2 to 0.3 m"}
+        model.started("pick from wall", t, skill="pick", features=f)
+        model.moment(t + 5.0)
+        model.ended("pick from wall", t + 6.0)
+        if close:
+            model.react(-1, t + 7.0)
+        t += 20.0
+    down = lambda band: model.p(-1, "pick", {"target from the wall": band})
+    assert down("0.1 to 0.2 m") > 0.6 and down("0.2 to 0.3 m") < 0.25
+    again = ConditionReactionModel.from_json(model.to_json())
+    assert abs(again.p(-1, "pick", {"target from the wall": "0.1 to 0.2 m"}) - down("0.1 to 0.2 m")) < 0.01
+    assert model.summary()["pick from wall"]["trials"] == 60
+
+
+def test_the_mind_runs_with_the_owner_model_over_conditions(tmp_path):
+    mind = Mind(needs="approval", room=BOUNDS, memory_dir=tmp_path, owner_model="conditions", rules="draw")
+    for k in range(300):
+        heard = ("nice",) if k == 250 else ()
+        mind.step(Observation(t=k * 0.02, odom=(0.0, 0.0, 0.0), speed=0.0, holding=False, reflex=None,
+                              bumped=False, heard=heard))
+    mind.close()
+    assert (tmp_path / "owner_model.json").is_file()
+    again = Mind(needs="approval", room=BOUNDS, memory_dir=tmp_path, owner_model="conditions")
+    assert again.reactions.history and again.reactions.actions

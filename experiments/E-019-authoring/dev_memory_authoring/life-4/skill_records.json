@@ -1,0 +1,135 @@
+{
+  "deliver": {
+    "done": 74,
+    "effect_held": 79,
+    "falls": 7,
+    "recent": [
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "seconds": 1844.4600000001144,
+    "trials": 111
+  },
+  "explore": {
+    "done": 29,
+    "effect_held": 39,
+    "falls": 0,
+    "recent": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "seconds": 545.7399999999302,
+    "trials": 39
+  },
+  "look_around": {
+    "done": 72,
+    "effect_held": 75,
+    "falls": 0,
+    "recent": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "seconds": 748.4199999999817,
+    "trials": 75
+  },
+  "pick": {
+    "done": 98,
+    "effect_held": 98,
+    "falls": 0,
+    "recent": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true
+    ],
+    "seconds": 1686.2200000001928,
+    "trials": 162
+  },
+  "rest": {
+    "done": 8,
+    "effect_held": 11,
+    "falls": 0,
+    "recent": [
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "seconds": 91.77999999995777,
+    "trials": 11
+  },
+  "w_deliver_far": {
+    "done": 24,
+    "effect_held": 22,
+    "falls": 1,
+    "recent": [
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ],
+    "seconds": 704.9800000001252,
+    "trials": 28
+  },
+  "w_pick_retried_target": {
+    "done": 10,
+    "effect_held": 10,
+    "falls": 0,
+    "recent": [
+      false,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true
+    ],
+    "seconds": 378.00000000004115,
+    "trials": 13
+  }
+}

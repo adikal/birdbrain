@@ -6,9 +6,10 @@
 `--lives`: memory directories of finished lives; prints, per skill and condition, the
 median effect on the log-odds (against the other values of the feature) across lives,
 how many lives agree on its sign, and the credible rules found in each life.
-`--counts`/`--rules`: rows of the same lives deciding with counts and with rules;
-prints each owner arm's own measure, falls, failed picks, and toys lost to picks per
-room (rooms 6 on), rules minus counts, paired by life.
+`--counts`/`--rules`: rows of the same lives under two configurations (A, then B; for
+E-017, deciding with counts and with rules); prints each owner arm's own measure, falls,
+failed picks, toys lost to picks, and approvals and disapprovals per room (rooms 6 on),
+B minus A, paired by life.
 """
 
 import argparse
@@ -45,7 +46,7 @@ def learned(lives: list[Path]) -> None:
 
 
 def deciding(counts: list[str], rules: list[str]) -> None:
-    print("== deciding with rules minus deciding with counts, rooms 6 on, paired by life")
+    print("== B minus A, rooms 6 on, paired by life")
     for c_path, r_path in zip(counts, rules, strict=True):
         arms = {}
         for label, path in (("counts", c_path), ("rules", r_path)):
@@ -54,9 +55,11 @@ def deciding(counts: list[str], rules: list[str]) -> None:
             arms[label] = {s: {"seed": s, **{m: fmean(f(r) for r in rows if r["seed"] == s and r["episode"] >= 6)
                                              for m, f in (("own", OWN[arm]), ("falls", lambda r: r["falls"]),
                                                           ("failed picks", lambda r: r["pickDecisionsFailed"]),
-                                                          ("lost by pick", lambda r: r["lostByPick"]))}}
+                                                          ("lost by pick", lambda r: r["lostByPick"]),
+                                                          ("approvals", lambda r: r["ownerApprovals"]),
+                                                          ("disapprovals", lambda r: r["ownerDisapprovals"]))}}
                            for s in sorted({r["seed"] for r in rows})}
-        for measure in ("own", "falls", "failed picks", "lost by pick"):
+        for measure in ("own", "falls", "failed picks", "lost by pick", "approvals", "disapprovals"):
             print(f"  {arm:<7} " + report(paired(arms["counts"], arms["rules"], measure)))
 
 

@@ -1,0 +1,677 @@
+{
+  "attempts": {
+    "deliver|basket distance=far": 1,
+    "pick|target distance=mid": 1
+  },
+  "log": [
+    {
+      "answer_0": {
+        "body": [
+          {
+            "args": {
+              "condition": "holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "if": "not known(basket)",
+            "then": [
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ]
+          },
+          {
+            "bind": "b",
+            "to": "basket"
+          },
+          {
+            "args": {
+              "condition": "b is not none"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "look": "'level'",
+              "stop_at": 1.0,
+              "x": "b"
+            },
+            "call": "walk_toward",
+            "on_fail": [
+              {
+                "args": {
+                  "x": "b"
+                },
+                "call": "doubt"
+              },
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ],
+            "timeout": 40
+          },
+          {
+            "args": {
+              "seconds": 0.8
+            },
+            "call": "stand"
+          },
+          {
+            "if": "not known(basket)",
+            "then": [
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ]
+          },
+          {
+            "bind": "b2",
+            "to": "basket"
+          },
+          {
+            "args": {
+              "condition": "b2 is not none"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "tolerance": 0.08,
+              "x": "b2"
+            },
+            "call": "turn_toward"
+          },
+          {
+            "args": {
+              "look": "'level'",
+              "stop_at": 0.42,
+              "x": "b2"
+            },
+            "call": "walk_toward",
+            "on_fail": [
+              {
+                "args": {
+                  "x": "b2"
+                },
+                "call": "doubt"
+              },
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ],
+            "timeout": 30
+          },
+          {
+            "bind": "b3",
+            "to": "basket"
+          },
+          {
+            "args": {
+              "condition": "b3 is not none"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "tolerance": 0.08,
+              "x": "b3"
+            },
+            "call": "turn_toward"
+          },
+          {
+            "args": {
+              "seconds": 1.4
+            },
+            "call": "stand"
+          },
+          {
+            "args": {
+              "look": "'level'",
+              "speed": 0.25,
+              "steady_last": 0.06,
+              "stop_at": 0.22,
+              "x": "b3"
+            },
+            "call": "walk_toward",
+            "timeout": 15
+          },
+          {
+            "args": {
+              "state": "open"
+            },
+            "call": "beak"
+          },
+          {
+            "call": "back_off"
+          }
+        ],
+        "doc": "Deliver the held toy to a far basket by approaching in stages and re-sighting the basket midway so the belief is fresh before the final approach and drop.",
+        "name": "deliver_far",
+        "reason": "Most far failures were \"basket no longer where believed\": the belief goes stale over a long walk. Stopping at 1.0 m, standing to look, and re-binding the basket gives a fresh position before the final approach; on a failed walk it doubts the stale belief and searches again."
+      },
+      "child": "w_deliver_far",
+      "condition": "basket distance far",
+      "episode": 6,
+      "evidence": {
+        "n": 36,
+        "n_otherwise": 20,
+        "rate": 0.4166666666666667,
+        "rate_otherwise": 0.85,
+        "z": -2.228195173150777
+      },
+      "skill": "deliver",
+      "status": "trial"
+    },
+    {
+      "answer_0": {
+        "body": [
+          {
+            "args": {
+              "condition": "not holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "tolerance": 0.1,
+              "x": "x"
+            },
+            "call": "turn_toward"
+          },
+          {
+            "if": "known(basket) and near(x, basket, 0.33)",
+            "then": [
+              {
+                "bind": "s",
+                "to": "beyond(x, basket, 0.45)"
+              },
+              {
+                "args": {
+                  "avoid": "basket",
+                  "look": "level",
+                  "stop_at": 0.06,
+                  "x": "s"
+                },
+                "call": "walk_toward",
+                "timeout": 25
+              }
+            ]
+          },
+          {
+            "args": {
+              "avoid": "basket",
+              "avoid_r": 0.3,
+              "stop_at": 0.3,
+              "x": "x"
+            },
+            "call": "walk_toward",
+            "timeout": 25
+          },
+          {
+            "args": {
+              "seconds": 0.5
+            },
+            "call": "stand"
+          },
+          {
+            "args": {
+              "tolerance": 0.05,
+              "x": "x"
+            },
+            "call": "turn_toward"
+          },
+          {
+            "args": {
+              "seconds": 0.3
+            },
+            "call": "stand"
+          },
+          {
+            "args": {
+              "condition": "known(x)"
+            },
+            "call": "require"
+          },
+          {
+            "args": {
+              "aim_left": 0.014,
+              "avoid": "basket",
+              "avoid_r": 0.3,
+              "steady_last": 0.5,
+              "stop_at": 0.07,
+              "x": "x"
+            },
+            "call": "walk_toward",
+            "timeout": 25
+          },
+          {
+            "args": {
+              "seconds": 0.6
+            },
+            "call": "stand"
+          },
+          {
+            "args": {
+              "name": "ground_pick"
+            },
+            "call": "reflex"
+          },
+          {
+            "args": {
+              "seconds": 0.3
+            },
+            "call": "stand"
+          },
+          {
+            "args": {
+              "condition": "holding(self)"
+            },
+            "call": "require",
+            "on_fail": [
+              {
+                "args": {
+                  "x": "x"
+                },
+                "call": "doubt"
+              },
+              {
+                "args": {
+                  "seconds": 1.0,
+                  "vx": -0.4,
+                  "vy": 0.0,
+                  "wz": 0.0
+                },
+                "call": "move"
+              },
+              {
+                "args": {
+                  "condition": "false"
+                },
+                "call": "require"
+              }
+            ]
+          }
+        ],
+        "doc": "Approach the toy in two stages, re-facing and re-observing it at mid range before the final approach and ground pick.",
+        "name": "pick_restep",
+        "reason": "Most mid-distance failures were \"toy no longer where believed\", i.e. stale position beliefs. Stopping at 0.3 m to re-face and re-observe the toy refreshes its position before the final approach and grasp."
+      },
+      "child": "w_pick_restep",
+      "condition": "target distance mid",
+      "episode": 7,
+      "evidence": {
+        "n": 25,
+        "n_otherwise": 37,
+        "rate": 0.4,
+        "rate_otherwise": 0.7567567567567568,
+        "z": -2.1535199743614406
+      },
+      "skill": "pick",
+      "status": "trial"
+    }
+  ],
+  "skills": {
+    "w_deliver_far": {
+      "body": [
+        {
+          "args": {
+            "condition": "holding(self)"
+          },
+          "call": "require"
+        },
+        {
+          "if": "not known(basket)",
+          "then": [
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ]
+        },
+        {
+          "bind": "b",
+          "to": "basket"
+        },
+        {
+          "args": {
+            "condition": "b is not none"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "look": "'level'",
+            "stop_at": 1.0,
+            "x": "b"
+          },
+          "call": "walk_toward",
+          "on_fail": [
+            {
+              "args": {
+                "x": "b"
+              },
+              "call": "doubt"
+            },
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ],
+          "timeout": 40
+        },
+        {
+          "args": {
+            "seconds": 0.8
+          },
+          "call": "stand"
+        },
+        {
+          "if": "not known(basket)",
+          "then": [
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ]
+        },
+        {
+          "bind": "b2",
+          "to": "basket"
+        },
+        {
+          "args": {
+            "condition": "b2 is not none"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "tolerance": 0.08,
+            "x": "b2"
+          },
+          "call": "turn_toward"
+        },
+        {
+          "args": {
+            "look": "'level'",
+            "stop_at": 0.42,
+            "x": "b2"
+          },
+          "call": "walk_toward",
+          "on_fail": [
+            {
+              "args": {
+                "x": "b2"
+              },
+              "call": "doubt"
+            },
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ],
+          "timeout": 30
+        },
+        {
+          "bind": "b3",
+          "to": "basket"
+        },
+        {
+          "args": {
+            "condition": "b3 is not none"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "tolerance": 0.08,
+            "x": "b3"
+          },
+          "call": "turn_toward"
+        },
+        {
+          "args": {
+            "seconds": 1.4
+          },
+          "call": "stand"
+        },
+        {
+          "args": {
+            "look": "'level'",
+            "speed": 0.25,
+            "steady_last": 0.06,
+            "stop_at": 0.22,
+            "x": "b3"
+          },
+          "call": "walk_toward",
+          "timeout": 15
+        },
+        {
+          "args": {
+            "state": "open"
+          },
+          "call": "beak"
+        },
+        {
+          "call": "back_off"
+        }
+      ],
+      "budget": 105.0,
+      "defaults": {},
+      "doc": "Deliver the held toy to a far basket by approaching in stages and re-sighting the basket midway so the belief is fresh before the final approach and drop.",
+      "expect": "inside(held, basket, 0.03, 0)",
+      "params": {}
+    },
+    "w_pick_restep": {
+      "body": [
+        {
+          "args": {
+            "condition": "not holding(self)"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "tolerance": 0.1,
+            "x": "x"
+          },
+          "call": "turn_toward"
+        },
+        {
+          "if": "known(basket) and near(x, basket, 0.33)",
+          "then": [
+            {
+              "bind": "s",
+              "to": "beyond(x, basket, 0.45)"
+            },
+            {
+              "args": {
+                "avoid": "basket",
+                "look": "level",
+                "stop_at": 0.06,
+                "x": "s"
+              },
+              "call": "walk_toward",
+              "timeout": 25
+            }
+          ]
+        },
+        {
+          "args": {
+            "avoid": "basket",
+            "avoid_r": 0.3,
+            "stop_at": 0.3,
+            "x": "x"
+          },
+          "call": "walk_toward",
+          "timeout": 25
+        },
+        {
+          "args": {
+            "seconds": 0.5
+          },
+          "call": "stand"
+        },
+        {
+          "args": {
+            "tolerance": 0.05,
+            "x": "x"
+          },
+          "call": "turn_toward"
+        },
+        {
+          "args": {
+            "seconds": 0.3
+          },
+          "call": "stand"
+        },
+        {
+          "args": {
+            "condition": "known(x)"
+          },
+          "call": "require"
+        },
+        {
+          "args": {
+            "aim_left": 0.014,
+            "avoid": "basket",
+            "avoid_r": 0.3,
+            "steady_last": 0.5,
+            "stop_at": 0.07,
+            "x": "x"
+          },
+          "call": "walk_toward",
+          "timeout": 25
+        },
+        {
+          "args": {
+            "seconds": 0.6
+          },
+          "call": "stand"
+        },
+        {
+          "args": {
+            "name": "ground_pick"
+          },
+          "call": "reflex"
+        },
+        {
+          "args": {
+            "seconds": 0.3
+          },
+          "call": "stand"
+        },
+        {
+          "args": {
+            "condition": "holding(self)"
+          },
+          "call": "require",
+          "on_fail": [
+            {
+              "args": {
+                "x": "x"
+              },
+              "call": "doubt"
+            },
+            {
+              "args": {
+                "seconds": 1.0,
+                "vx": -0.4,
+                "vy": 0.0,
+                "wz": 0.0
+              },
+              "call": "move"
+            },
+            {
+              "args": {
+                "condition": "false"
+              },
+              "call": "require"
+            }
+          ]
+        }
+      ],
+      "budget": 75.0,
+      "defaults": {},
+      "doc": "Approach the toy in two stages, re-facing and re-observing it at mid range before the final approach and ground pick.",
+      "expect": "holding(self, x)",
+      "params": {
+        "x": "toy"
+      }
+    }
+  },
+  "tokens": 7688,
+  "trials": [
+    {
+      "child": "w_deliver_far",
+      "counts": {
+        "deliver": [
+          6.166666666666667,
+          12.0,
+          0.0
+        ],
+        "w_deliver_far": [
+          31.0,
+          34.0,
+          1.0
+        ]
+      },
+      "feature": "basket distance",
+      "live": {
+        "deliver": [
+          2.0,
+          2.0,
+          0.0
+        ],
+        "w_deliver_far": [
+          31.0,
+          34.0,
+          1.0
+        ]
+      },
+      "opened": 6,
+      "parent": "deliver",
+      "reason": "Most far failures were \"basket no longer where believed\": the belief goes stale over a long walk. Stopping at 1.0 m, standing to look, and re-binding the basket gives a fresh position before the final approach; on a failed walk it doubts the stale belief and searches again.",
+      "status": "kept",
+      "value": "far"
+    },
+    {
+      "child": "w_pick_restep",
+      "counts": {
+        "pick": [
+          40.0,
+          58.0,
+          0.0
+        ],
+        "w_pick_restep": [
+          0.0,
+          2.0,
+          0.0
+        ]
+      },
+      "feature": "target distance",
+      "live": {
+        "pick": [
+          36.0,
+          48.0,
+          0.0
+        ],
+        "w_pick_restep": [
+          0.0,
+          2.0,
+          0.0
+        ]
+      },
+      "opened": 7,
+      "parent": "pick",
+      "reason": "Most mid-distance failures were \"toy no longer where believed\", i.e. stale position beliefs. Stopping at 0.3 m to re-face and re-observe the toy refreshes its position before the final approach and grasp.",
+      "status": "trial",
+      "value": "mid"
+    }
+  ]
+}

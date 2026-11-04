@@ -1,0 +1,217 @@
+{
+  "attempts": {
+    "deliver|basket distance=far": 1
+  },
+  "log": [
+    {
+      "answer_0": {
+        "body": [
+          {
+            "args": {
+              "condition": "holding(self)"
+            },
+            "call": "require"
+          },
+          {
+            "if": "not known(basket)",
+            "then": [
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ]
+          },
+          {
+            "bind": "b",
+            "to": "basket"
+          },
+          {
+            "args": {
+              "condition": "b is not none"
+            },
+            "call": "require"
+          },
+          {
+            "if": "distance(self, basket) > 0.9",
+            "then": [
+              {
+                "args": {
+                  "look": "'level'",
+                  "stop_at": 0.8,
+                  "x": "b"
+                },
+                "call": "walk_toward",
+                "timeout": 40
+              },
+              {
+                "args": {
+                  "tolerance": 0.1,
+                  "x": "b"
+                },
+                "call": "turn_toward"
+              },
+              {
+                "args": {
+                  "seconds": 0.6
+                },
+                "call": "stand"
+              },
+              {
+                "args": {
+                  "x": "b"
+                },
+                "call": "doubt"
+              },
+              {
+                "call": "look_around",
+                "until": "known(basket)"
+              }
+            ]
+          },
+          {
+            "args": {
+              "condition": "known(basket)"
+            },
+            "call": "require"
+          },
+          {
+            "call": "deliver"
+          }
+        ],
+        "doc": "Approach a far basket to mid-range, re-sight it freshly (discarding the stale belief), then run deliver.",
+        "name": "deliver_far",
+        "reason": "Most far failures were \"basket no longer where believed\", i.e. a stale long-range estimate. Walking to mid-range and doubting then re-seeing the basket refreshes the belief before the final approach, so deliver starts from an accurate position."
+      },
+      "child": "w_deliver_far",
+      "condition": "basket distance far",
+      "episode": 6,
+      "evidence": {
+        "n": 31,
+        "n_otherwise": 16,
+        "rate": 0.5483870967741935,
+        "rate_otherwise": 1.0,
+        "z": -2.2157818113529144
+      },
+      "skill": "deliver",
+      "status": "trial"
+    }
+  ],
+  "skills": {
+    "w_deliver_far": {
+      "body": [
+        {
+          "args": {
+            "condition": "holding(self)"
+          },
+          "call": "require"
+        },
+        {
+          "if": "not known(basket)",
+          "then": [
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ]
+        },
+        {
+          "bind": "b",
+          "to": "basket"
+        },
+        {
+          "args": {
+            "condition": "b is not none"
+          },
+          "call": "require"
+        },
+        {
+          "if": "distance(self, basket) > 0.9",
+          "then": [
+            {
+              "args": {
+                "look": "'level'",
+                "stop_at": 0.8,
+                "x": "b"
+              },
+              "call": "walk_toward",
+              "timeout": 40
+            },
+            {
+              "args": {
+                "tolerance": 0.1,
+                "x": "b"
+              },
+              "call": "turn_toward"
+            },
+            {
+              "args": {
+                "seconds": 0.6
+              },
+              "call": "stand"
+            },
+            {
+              "args": {
+                "x": "b"
+              },
+              "call": "doubt"
+            },
+            {
+              "call": "look_around",
+              "until": "known(basket)"
+            }
+          ]
+        },
+        {
+          "args": {
+            "condition": "known(basket)"
+          },
+          "call": "require"
+        },
+        {
+          "call": "deliver"
+        }
+      ],
+      "budget": 105.0,
+      "defaults": {},
+      "doc": "Approach a far basket to mid-range, re-sight it freshly (discarding the stale belief), then run deliver.",
+      "expect": "inside(held, basket, 0.03, 0)",
+      "params": {}
+    }
+  },
+  "tokens": 3461,
+  "trials": [
+    {
+      "child": "w_deliver_far",
+      "counts": {
+        "deliver": [
+          21.483870967741936,
+          40.0,
+          4.32258064516129
+        ],
+        "w_deliver_far": [
+          17.0,
+          31.0,
+          2.0
+        ]
+      },
+      "feature": "basket distance",
+      "live": {
+        "deliver": [
+          16.0,
+          30.0,
+          4.0
+        ],
+        "w_deliver_far": [
+          17.0,
+          31.0,
+          2.0
+        ]
+      },
+      "opened": 6,
+      "parent": "deliver",
+      "reason": "Most far failures were \"basket no longer where believed\", i.e. a stale long-range estimate. Walking to mid-range and doubting then re-seeing the basket refreshes the belief before the final approach, so deliver starts from an accurate position.",
+      "status": "trial",
+      "value": "far"
+    }
+  ]
+}

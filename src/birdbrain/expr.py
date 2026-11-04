@@ -76,6 +76,24 @@ def names(source: str) -> set[str]:
             and n.id not in CONSTANTS}
 
 
+def check_calls(source: str) -> None:
+    """Every relation an expression calls exists and gets an acceptable number of
+    arguments (checked when a skill is loaded, so a written skill is refused with a
+    reason its author can act on)."""
+    import inspect
+
+    for node in ast.walk(parse(source)):
+        if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Name) or node.func.id in SPECIAL:
+            continue
+        name = node.func.id
+        if name not in FUNCTIONS:
+            raise ExprError(f"unknown relation {name!r}")
+        try:
+            inspect.signature(FUNCTIONS[name]).bind(None, 0.0, *node.args)
+        except TypeError as error:
+            raise ExprError(f"{name}() called with {len(node.args)} argument(s): {error}") from None
+
+
 class Evaluator:
     def __init__(self, kb: KnowledgeBase, classes: set[str]) -> None:
         self.kb, self.classes = kb, classes
@@ -137,7 +155,12 @@ class Evaluator:
             args = [self.entity(self._eval(a, env, t), t) for a in node.args]
             if any(a is None for a in args):
                 return NONE_ON_MISSING.get(name, False)
-            return FUNCTIONS[name](self.kb, t, *args)
+            if name not in FUNCTIONS:
+                raise ExprError(f"unknown relation {name!r}")
+            try:
+                return FUNCTIONS[name](self.kb, t, *args)
+            except TypeError as error:        # wrong arguments: the skill fails, the mind goes on
+                raise ExprError(f"{name}: {error}") from None
         raise ExprError(f"cannot evaluate {type(node).__name__}")
 
     def _special(self, name: str, args: list[ast.AST], env: dict[str, Any], t: float) -> Any:
