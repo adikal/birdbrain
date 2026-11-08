@@ -148,6 +148,24 @@ Entry ids: `E-###` experiments, `H-###` hypotheses, `L-###` lessons.
   measured, not assumed; fix one, test it, keep it if it helps. (E-034,
   E-035)
 
+- **L-030. A prior is worth what its description carries.** Told an
+  object's colour and largest extent, the language model judged 9 cm
+  sticks impossible to hold (they are 1.5 cm wide and easy) and black
+  objects safe (they weigh 150 g), with confidence, and the duck learned
+  more slowly than with no prior. The cloud brain's knowledge helps when
+  the question holds what the answer depends on. (E-036)
+
+- **L-031. Experience is worth what memory can tell apart.** Without a
+  task, the agent that counted outcomes per skill gained nothing from 10
+  rooms of experience: a heavy box and a cube were the same "pick" to it.
+  The agent whose rules kept conditions apart gained 11.5 points, most on
+  kinds it had never met. With a task, memory bought safety, not
+  throughput: 4.6 fewer failed picks and 0.6 fewer falls a room. (E-038)
+- **L-032. A test of recovery needs a change the measure can see.** Two
+  owner preferences that agree on most toys, and a duck that tidies one
+  toy a room, gave a recovery measure with a spread of half a toy; the
+  test could neither show recovery nor rule it out. (E-038)
+
 ## Known defects
 
 Found by review, in the code, each pinned by a strict expected-failure test
@@ -283,12 +301,404 @@ Ordered by what to test next. Resolved ones keep their verdict.
 - **H-008** (Milestone 4). Without a confirmation step, missed or stale
   detections produce a large share of measured surprises and pull curiosity
   toward sensor noise.
-- **H-009** (Milestone 4). The language model's priors reduce the number of
+- **H-009** (Milestone 4) **Refuted in development** (E-036), for priors
+  from colour and largest extent: they were confidently wrong where the
+  description was short. As first stated: The language model's priors reduce the number of
   trials needed to reach a reliable rule for an unfamiliar object.
 - **H-005** (Milestone 6). Choosing experiments by expected learning progress
   gains more competence per episode than choosing by novelty.
+- **H-026** (Milestone 6) **Supported** (E-038). The developmental agent
+  (needs, deciding with its rules, deferring what a credible rule speaks
+  against) gains more from experience than the proactive one (needs,
+  counts per skill): +0.145 [+0.063, +0.228] of possible objects tidied,
+  rooms 11 to 20, on fresh lives.
+- **H-027** (Milestone 6) **Not supported, test too weak** (E-038). After
+  the owner's preference changes mid-life, the duck recovers her measure
+  within 5 rooms. Next test: basket owner to leave-it owner, agent D, 15
+  rooms after the change.
+- **H-029** (Milestone 6). The duck values a pick and the put after it by
+  the net change they make to what the owner reacts to, not as two acts
+  each with its own reaction. Then a duck learns the leave-it owner in
+  World 2, and recovers when she replaces the basket owner. *Test:* E-039's
+  arms, toys lost to picks and her measure, rooms 16 to 25.
+- **H-030** (Milestone 6) **Supported** (E-040). With approval as the
+  only social need, the developmental agent gains more from experience
+  than the proactive one in what it does for its owner: her measure +0.51
+  [+0.04, +0.97] a room with the basket owner, +0.30 [−0.12, +0.72] with
+  the owner who wants her blue things left alone, fresh lives.
+- **H-028** (Milestone 6). Discounting the owner model's evidence by a
+  half-life helps after a change. *Refuted in development* (E-038) at a
+  half-life of 3 rooms: worse with a stable owner and with a changing one;
+  reactions are too sparse to discard.
 
 ## Experiments
+
+### E-040 · 2026-11-08 · Agents C and D learning from an owner (pre-registered; supported)
+
+**Question.** E-038 compared agents C and D with the hand-given tidiness
+need (Milestone 3), a baseline, not the north star. When approval is the
+only social need, so the duck must learn what to do from its owner's
+reactions, does the developmental agent still gain more from experience
+than the proactive one?
+
+**Change** (`163b6c6`). Agent D now defers poor prospects with an owner
+too, through the same filter as without one: a toy is a poor prospect if
+a credible rule speaks against picking it, or against every way the duck
+has of putting it down (deliver, put by a wall, drop). Without an owner
+the only way is deliver, so E-038's agent D is unchanged (checked, room
+for room).
+
+**Development** (lives 0 to 7, World 2, every kind from room 11, 20
+rooms; each agent with a twin that keeps no memory; rooms 11 to 20;
+`experiments/E-040-owner-agents/dev/`).
+
+| Owner | Her measure: C's gain | D's gain | D's gain minus C's | D minus C, falls |
+|---|---|---|---|---|
+| Basket | +0.29 [−0.13, +0.71] | +1.16 [+0.49, +1.83] | +0.88 [+0.49, +1.26], 8 of 8 | +0.15 [−0.11, +0.41] |
+| Her blue things left alone | +0.46 [+0.03, +0.89] | +1.06 [+0.38, +1.75] | +0.60 [−0.15, +1.35], 6 of 8 | +0.31 [−0.05, +0.67] |
+
+With the second owner D also moved more of her blue things than C
+(+0.11 [+0.03, +0.20]): it tidies more of everything, hers included.
+
+**Predictions** (lives 700 to 715, never used; rooms 11 to 20, paired by
+life):
+1. (H-030) Basket owner: D's gain from experience minus C's, her measure
+   gained a room: CI lower bound above 0.
+2. (H-030) Her-things owner: the same, above 0 (point estimate).
+3. D's gain from experience, her measure, each owner: CI lower bound
+   above 0.
+4. D minus C, falls a room, each owner: CI upper bound below +0.7.
+
+Reported without prediction: her things moved, D minus C, with the
+second owner.
+
+**Method.** Commit `5317692` (registration). `--world world2 --kinds late
+--seeds 16 --seed0 700 --episodes 20`, `--agent C|D`, `--owner basket|hers`,
+each with `--no-memory` twins. Tags `e040-<owner>-<agent>[-twin]`; rows in
+`experiments/E-040-owner-agents/`.
+
+**Result** (`report_gain_<owner>.txt`, `report_D_vs_C_<owner>.txt`).
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | basket owner: D's gain minus C's, her measure | +0.51 [+0.04, +0.97], 11 of 16 lives | met |
+| 2 | her-things owner: the same | +0.30 [−0.12, +0.72], 9 of 16 | met (point estimate; CI includes 0) |
+| 3 | D's gain, her measure | basket +0.88 [+0.48, +1.28]; her-things +0.53 [+0.17, +0.89] | met |
+| 4 | D minus C, falls a room | basket +0.22 [−0.01, +0.45]; her-things −0.02 [−0.24, +0.20] | met |
+
+C also gained from experience with an owner (her measure +0.38 [+0.12,
++0.63] and +0.23 [−0.03, +0.50]), unlike without one (E-038): what it
+learns about her is per kind of action, and that is enough to start. D
+gained about twice as much. D's costs: with the basket owner, falls
+holding heavy objects +0.19 [+0.08, +0.29] against C, because it tidies
+more of everything; with the second owner, her blue things moved +0.06
+[−0.04, +0.15], not clear of zero.
+
+**Analysis.** H-030 supported for the basket owner, and in the same
+direction, not clear of zero, for the owner whose preference depends on
+colour. With approval as the only social need the result of E-038 holds:
+an agent whose rules tell objects apart turns experience into more of
+what its owner wants. The gains are about half their development size
+(+0.88 to +0.51, +0.60 to +0.30), as L-028 expects. What D does not yet
+learn well is the exception in her wish: it moves her things a little
+more than C. A likely reason, not yet checked in the logs: it picks
+more, and its deferral reads only its rules about its own outcomes, not
+what it has learned of her disapproval.
+
+**Decision.** This is Milestone 6's criterion tested on the north star's
+terms, and it holds. Next: H-029 (value a pick and its put by the net
+change they make), which the leave-it owner needs and which would also
+let D's deferral use what she thinks.
+
+### E-039 · 2026-11-08 · A change the duck must act on (development)
+
+**Question.** E-038 could not see a recovery (L-032). With a change that
+reverses what the duck should do (the basket owner for rooms 1 to 10, then
+the leave-it owner, who dislikes every pick), agent D, and 15 rooms after
+the change, does the duck recover?
+
+**Development** (lives 0 to 7, development kinds, 25 rooms; control: the
+leave-it owner from birth; `experiments/M6-dev/dev_leave*.jsonl`). Her
+measure a room, changed against control (paired, n = 8):
+
+| Rooms | Changed | Control | Difference | Toys lost to picks, changed / control |
+|---|---|---|---|---|
+| 1 to 10 | +1.26 (basket owner) | −2.29 | | 0.03 / 2.6 |
+| 11, 12 | −3.19 | −2.38 | −0.81 [−1.36, −0.27] | 2.8 / 2.3 |
+| 13 to 15 | −3.42 | −2.04 | −1.38 [−2.41, −0.34] | 3.3 / 2.6 |
+| 16 to 20 | −2.80 | −1.78 | −1.03 [−1.49, −0.56] | 2.7 / 2.6 |
+| 21 to 25 | −2.48 | −1.70 | −0.78 [−1.64, +0.09] | 2.7 / 2.7 |
+
+The change is felt at once and the gap narrows, about 0.07 a room from
+rooms 13 to 15 on. The control is the problem: a duck that knew the leave-it owner
+from birth still lost 2.6 of her toys a room in rooms 21 to 25, as many as
+in its first rooms. It never learned her.
+
+*Why.* Over 25 rooms its owner model, summed over lives, credited picks
+in the open with 3 to 12 approvals and 21 to 35 disapprovals per kind
+(70 to 180 trials each), which is right,
+and drops with 64.5 approvals over 324 trials. She approves a drop when it
+puts a toy back within 10 cm of where it was: the drop undoes the pick's
+harm. The kinds model credits the drop with approval of its own, so a pick
+followed by a drop is valued at about what it costs, by this reading of
+the model's numbers, and the duck keeps picking for
+curiosity and learning progress (71 of 269 picks in rooms 21 to 25 were
+followed by a drop). In World 2 picks are split over 18 kinds (colour and
+place), so each kind's dislike is learned from a sixth of the evidence the
+playroom's three kinds had (E-015, E-018).
+
+**Analysis.** Recovery cannot be tested against an owner the duck cannot
+learn. The leave-it owner in World 2 exposes a gap in credit: approval for
+undoing one's own harm is not approval of the undoing. The reaction
+answers the room's state, back where she wants it, and the duck's model
+should value a pick and its put by the state they leave, not as two
+rewarded acts.
+
+**Decision.** No held-out run. Next (H-029): value a pick together with
+the put that follows by the net change it makes to the room's state as she
+judges it, or learn the owner's reactions to states rather than to acts;
+then rerun this test.
+
+### E-038 · 2026-11-08 · Milestone 6: agents A to D, and an owner who changes her mind (pre-registered; criterion met, recovery not shown)
+
+**Question.** Does the developmental agent gain more from its experience
+than the proactive one? And when the owner's preference changes mid-life,
+does the duck recover?
+
+**Agents** (`--agent`, World 2, every kind from room 11, 20 rooms a life).
+- A: a task, no memory between rooms (B with `--no-memory`).
+- B: a task, memory kept: the mind of E-033.
+- C: no task; needs and self-generated goals, memory kept. Its scorecard
+  values each goal by counts per skill (Milestone 3).
+- D: C deciding with its rules (`--rules mean`): each toy is valued by the
+  rules' prediction for its pick and for its delivery as if holding it,
+  and a toy a credible rule speaks against is offered, or kept as a goal,
+  only when no other toy is left (as the task policy does, E-023, E-029).
+
+Gain from experience: an agent's measure minus that of its twin with no
+memory (`--no-memory`), on the same rooms, rooms 11 to 20, per life
+(`scripts/m6_report.py`).
+
+**Development** (lives 0 to 7, `experiments/M6-dev/`).
+- D, first with deferral alone (counts in the scorecard): possible objects
+  tidied +0.064 [−0.03, +0.16] over C. A coding slip showed why it was
+  small: without rules the per-toy delivery code never ran (`predict` was
+  None), so D decided by counts like C.
+- C with rules (`--rules mean`, no deferral): +0.103 [+0.06, +0.14] over
+  C, 8 of 8 lives; falls +0.25 [−0.01, +0.51].
+- D as above: +0.138 [+0.05, +0.23] over C, 8 of 8 lives; falls +0.01.
+  Over C with rules: +0.034 [−0.03, +0.10], falls −0.24 [−0.63, +0.15].
+  The rules carry most of the gain; deferral keeps the falls down.
+- Gain from experience: C +0.027 [−0.03, +0.08], with more falls (+0.25)
+  and more failed picks (+0.98 [+0.14, +1.81]) than its twin; D +0.190
+  [+0.13, +0.25], 8 of 8 lives; D's minus C's +0.162 [+0.07, +0.25].
+  C's counts per skill pool every toy, so experience makes it bolder
+  about every toy at once; D's rules tell toys apart.
+
+*The changing owner* (agent C, development kinds; she wants every toy in
+the basket in rooms 1 to 10, then from room 11 her blue things left alone
+and the rest in the basket, `--owner basket --owner-change 11:hers`;
+control: that second preference from birth). Her measure a room, changed
+against control: rooms 11 and 12 −0.12 against +0.44; rooms 13 to 15
++0.54 against +0.46; rooms 16 to 20 +0.70 against +0.90 (−0.20 [−0.80,
++0.40]). Her things moved, rooms 11 to 20: 0.25 against 0.13 (7 of 8
+lives higher). After ten rooms of approval for moving blue things the
+owner model, summed over the 8 lives at room 20, credited "pick blue
+from the open" with 1.3 approvals and 10.1 disapprovals over 82 trials:
+it had learned the change, from counts that never fade.
+
+*Forgetting, tried and reverted.* Evidence about the owner discounted
+with a half-life of 3 rooms (a discounted Beta, chosen before running):
+with the changing owner her measure in rooms 11 to 20 fell by 0.25
+[−0.89, +0.39]; with the stable owner by 0.34 [−0.67, −0.00], and her
+things moved rose by 0.08 [+0.02, +0.15], 7 of 8 lives. With reactions
+this sparse (about one a room), forgetting discards evidence the duck
+cannot spare.
+
+**Predictions** (lives 600 to 615, never used; rooms 11 to 20, paired by
+life; 300 s rooms; development gains are expected to shrink, L-028):
+1. (H-026, the milestone's criterion) D's gain from experience minus
+   C's, possible objects tidied: CI lower bound above 0.
+2. D's gain from experience, possible objects tidied: CI lower bound
+   above 0.
+3. D minus C, possible objects tidied: CI lower bound above 0.
+4. D minus C, falls a room: CI upper bound below +0.5.
+5. (H-027) The changed owner's measure, rooms 11 and 12, changed minus
+   control: below −0.2 (the duck acts on what she used to want).
+6. (H-027, recovery within 5 rooms) Her measure, rooms 16 to 20, changed
+   minus control: CI lower bound above −0.6.
+7. Her things moved, rooms 16 to 20, changed minus control: above 0 (the
+   old evidence still weighs).
+
+Reported without a prediction: B's gain from experience (B minus A), and
+B against D (a task against needs).
+
+**Method.** Commit `d7a3531` (registration). Lives 600 to 615, `--seeds 16
+--seed0 600 --episodes 20 --world world2`; agents with `--kinds late`; the
+owner arms with `--kinds dev --agent C`. Tags `e038-A`, `e038-B`, `e038-C`,
+`e038-C-twin`, `e038-D`, `e038-D-twin`, `e038-change`, `e038-hers`; rows in
+`experiments/E-038-m6/`.
+
+**Result** (rows and reports in `experiments/E-038-m6/`: `report_gain.txt`,
+`report_D_vs_C.txt`, `report_B_vs_A.txt`, `report_B_vs_D.txt`,
+`report_owner.txt`).
+
+| Prediction | Measure, rooms 11 to 20 unless stated | Result | Verdict |
+|---|---|---|---|
+| 1 | D's gain from experience minus C's, possible objects tidied | +0.145 [+0.063, +0.228], 13 of 16 lives | met |
+| 2 | D's gain from experience | +0.115 [+0.046, +0.184], 14 of 16 | met |
+| 3 | D minus C, possible objects tidied | +0.164 [+0.087, +0.241], 14 of 16 | met |
+| 4 | D minus C, falls a room | +0.08 [−0.16, +0.32] | met |
+| 5 | changed owner, her measure, rooms 11 and 12, changed minus control | +0.06 [−0.44, +0.57] | not met |
+| 6 | her measure, rooms 16 to 20, changed minus control | −0.29 [−0.83, +0.26] | not met |
+| 7 | her things moved, rooms 16 to 20, changed minus control | +0.012 [−0.10, +0.12] | met, by a hair |
+
+*What experience buys each agent* (each against its twin with no memory):
+
+| Agent | Possible objects tidied | Of kinds never met | Falls a room | Falls holding heavy | Failed picks a room |
+|---|---|---|---|---|---|
+| B, a task | +0.002 [−0.04, +0.04] | +0.047 | −0.59 [−0.79, −0.39], 15 of 16 | −0.59 [−0.75, −0.42] | −4.56 [−5.12, −4.01], 16 of 16 |
+| C, needs, counts | −0.030 [−0.08, +0.02] | −0.053 | +0.04 | +0.02 | 0.00 |
+| D, needs, rules | +0.115 [+0.05, +0.18] | +0.135 [+0.05, +0.22] | +0.03 | −0.16 [−0.28, −0.03] | +0.71 [+0.07, +1.35] |
+
+With a task, experience made the duck no more productive and much safer:
+without memory it tried every object (12 to 13 picks a room) and fell
+from what it should have left; with memory it made 7. Without a task,
+C's experience bought nothing, and D's bought more tidying, including of
+kinds it had never met, by trying more of the right objects. B tidied
+more than D (+0.108 [+0.04, +0.18]), with more falls (+0.26 [−0.04,
++0.55]): a task keeps the duck at it; needs share its time with
+curiosity and rest.
+
+*The changing owner.* Her measure a room, changed against control: rooms
+1 to 10 +0.89 against +0.29 (the basket owner is easier to please); 11
+and 12 +0.34 against +0.28; 13 to 15 +0.50 against +0.58; 16 to 20 +0.21
+against +0.50. After the change she disapproved 0.34 times a room (0.02
+before), toys she disliked lost to picks rose from 0.02 to 0.29 a room,
+and the duck tidied less: 0.68 toys a room in rooms 16 to 20 against 0.94
+in the control.
+
+**Analysis.**
+- *H-026 supported.* Milestone 6's criterion is met on lives that
+  informed nothing: the developmental agent gains more from experience
+  than the proactive one, by 14.5 points of the objects it could carry,
+  and the gain is largest for kinds it had never met. Experience is worth
+  what the memory can tell apart: C's counts per skill pool every object,
+  so its experience of a heavy box speaks equally against a cube; D's
+  rules keep conditions apart, so its experience points it at the objects
+  that work. The gain shrank from development (+0.162 to +0.145), as
+  expected (L-028).
+- *H-027 not supported, and not refuted.* The test could not see a
+  recovery. Both preferences want most toys in the basket and differ only
+  for blue things, so the change was barely felt in rooms 11 and 12, and
+  the duck tidies about one toy a room with an owner, so her measure moves
+  by fractions of a toy with a spread of half a toy. What the logs do show
+  is not recovery: in rooms 16 to 20 the changed duck tidied a quarter
+  less than the control. One reading, not yet checked in the owner
+  model's credit: her new disapprovals, shared among the picks near each
+  one, made it more cautious about picking in general.
+
+**Decision.** Milestone 6's first criterion is met; agent D (`--agent D`)
+is the developmental agent. The recovery criterion is open: the next test
+needs a change the duck must act on (from the basket owner to the leave-it
+owner, who dislikes every pick), agent D, which tidies more, and more rooms
+after the change.
+
+### E-037 · 2026-11-08 · The cloud brain decides in World 2 (development)
+
+**Question.** In World 2 the duck decides with the local policy: its
+rules, deferral of what a credible rule speaks against, and the scorecard.
+Does the cloud brain (Claude Sonnet 5.5 on Bedrock, `--provider bedrock`),
+given the same briefing, choose better, in particular among kinds of object
+it has not met?
+
+**Change.** The briefing lists each object's believed colour and size
+(`f24dcb8`). After the first development run, also what the duck's rules
+predict for it: the chance a pick works, the chance its delivery works
+without a fall, and whether a credible rule speaks against either
+(`Mind._prospect`). The local policy never reads the briefing; its
+decisions are unchanged (behaviour fingerprint identical).
+
+**Development** (lives 0 to 3, the cloud brain against the local policy
+on the same lives; rows in `experiments/E-037-cloud/`).
+
+| Run | Rooms, kinds | Possible objects tidied, cloud minus local | Falls a room | Falls holding heavy |
+|---|---|---|---|---|
+| 1: colour and size | 1 to 10, development | −0.016 [−0.15, +0.12], 1 of 4 higher | +0.33 | +0.33 [+0.02, +0.63] |
+| 2: and the rules' prediction | 1 to 10, development | +0.017 [−0.09, +0.13], 1 of 4 higher | +0.40 [+0.11, +0.69] | +0.30 [+0.01, +0.59] |
+| 3: as 2 | 11 to 20, every kind from room 11 | −0.019 [−0.04, +0.01], 0 of 4 higher | +0.05 | +0.25 [−0.13, +0.63] |
+
+Between runs 1 and 2, the per-object prediction cut failed picks a room by
+1.2 [0.1, 2.3] and wide objects grasped by 0.32 [0.13, 0.50] (4 of 4 lives
+each): the cloud brain had read the rules but had not applied them to each
+object. In run 3, objects of new kinds tidied 0.37 against the local 0.40.
+
+*What its reasons show.* The cloud brain cites the rules ("4 cm, outside
+the 5 to 7.5 cm range where picks mostly fail"; "not black, so delivery is
+safer"), and otherwise prefers the nearest object seen most recently. It
+picks heavy objects more often than the local policy (heavy grasped per
+heavy object +0.37 in run 2, +0.18 in run 3), which costs falls. It treats
+a credible rule as one reason among several; the local policy defers.
+
+*Cost.* About 2,700 tokens a decision, 52,000 a room (2.1 million for
+40 rooms), and 40 to 80 s of wall time a room against 2 to 10 s locally.
+
+**Analysis.** Given the duck's own measurements, the cloud brain chooses
+about as well as the local policy in World 2, not better, and falls more
+often holding heavy things. Its language knowledge adds nothing where the
+briefing does not say what matters (L-030): what a black object weighs is
+known only from the duck's outcomes, and the local policy already uses
+them more strictly. The cloud brain's demonstrated value remains
+authoring skills from measured failures (E-019, E-020).
+
+**Decision.** No held-out run: development shows no gain to test, and the
+cloud brain costs more. The per-object prediction stays in the briefing;
+it helped the cloud brain and does not touch local decisions.
+
+### E-036 · 2026-11-08 · The cloud brain's prior about unfamiliar objects (development, refuted)
+
+**Question** (H-009). Does the language model's prior about an object it
+has never handled, from how the object looks, cut the trials the duck
+needs before it handles that kind of object well?
+
+**Change** (`advice.py`, `providers/bedrock.py` `BedrockJudge`, `--advice`).
+When the duck first sees an appearance (a colour, and a size bin from its
+own estimate), it asks the cloud brain once, with what the duck could
+know: the colour, the largest extent, and its body (0.74 kg biped, a beak
+that opens 3.6 cm, a basket with a 6 cm rim). The answer (chance a pick
+holds it, chance a delivery works, chance of a fall while carrying it, and
+how many of the duck's own trials it is worth, capped at 5) enters the
+rules as weighted pseudo-outcomes of those conditions; the duck's outcomes
+then add to them. 24 questions a life, 230k tokens over 8 lives.
+
+**Development** (lives 0 to 7, development kinds, task, against E-033's
+development lives, the same mind without advice).
+- *The judgements.* Sensible from the description and wrong where the
+  description is short. Every "over 7.5 cm" object was judged nearly
+  impossible to hold (p 0.05, worth 6 to 8 trials): the duck reports only
+  an object's largest extent, and World 2's 9 cm sticks are 1.5 cm wide and
+  among the easiest to carry. Falls while carrying were judged 0.05 to 0.15
+  for every colour (black objects make the duck fall 70% of the time; no
+  description says they weigh 150 g).
+- *What the duck did.* Wide objects grasped per wide object, rooms 1 to 5:
+  1.14 against 0.79 (+0.34 [+0.16, +0.53], 7 of 8 lives higher). Heavy
+  objects grasped, rooms 11 to 20: +0.11 [+0.04, +0.19], falls holding one
+  +0.13. Possible objects tidied unchanged (+0.000).
+- *Why wide objects got worse.* Rules weigh each size bin against the
+  others: with sticks wrongly marked as hopeless, the 5 to 7.5 cm bin
+  (World 2's wide boxes) looked less bad by comparison, and the size rule
+  that had deferred them came later.
+
+**Analysis.** H-009 is refuted in this form. A prior is worth what its
+description carries: told only colour and largest extent, the language
+model could not know what the duck's own outcomes reveal in a few tries,
+and a confident wrong prior on one condition shifted the duck's judgement
+of another. The cloud brain's general knowledge would need either a richer
+description (shape, both extents, what an object is) or to be asked about
+outcomes the duck has already met, as authoring does (E-019).
+
+**Decision.** `--advice` stays as an option, off by default. No held-out
+run: development showed harm on the measures it was meant to improve.
 
 ### E-035 · 2026-11-07 · The review fixes, reconsidered (development, reverted)
 

@@ -26,10 +26,11 @@ from typing import Any, Protocol
 
 import numpy as np
 
+from birdbrain.advice import Advice, appearance
 from birdbrain.authoring import Author, Authoring, failure_reasons
 from birdbrain.body import CLASSES, MICRODUCK, STOP, BodyProfile, Command, Observation
 from birdbrain.expr import Evaluator, ExprError
-from birdbrain.goals import Goal, approval_candidates, candidates, kinds_owner
+from birdbrain.goals import PUTS, Goal, approval_candidates, candidates, kinds_owner
 from birdbrain.kr import SELF, KnowledgeBase, Position
 from birdbrain.needs import Needs
 from birdbrain.occupancy import CELL
@@ -241,7 +242,7 @@ class Mind:
                  memory_dir: Path | None = None, needs: bool | str = False,
                  room: tuple[float, float, float, float] | None = None, seed: int = 0,
                  credit: str = "moments", rules: str | None = None, owner_model: str = "kinds",
-                 author: Author | None = None) -> None:
+                 author: Author | None = None, judge: Any = None, develop: bool = False) -> None:
         if latency not in {"frozen", "real"}:
             raise ValueError("latency must be 'frozen' or 'real'")
         self.log: Log = log or (lambda kind, payload: None)
@@ -255,6 +256,9 @@ class Mind:
         self.needs = Needs(social=social) if needs else None
         self.approval = bool(needs) and social == "approval"
         self.local = NeedsPolicy() if needs else LocalPolicy(self.ctx, judge=self.judge)
+        #: The developmental agent (Milestone 6): with needs, its predictions act on its choices
+        #: as the task policy's do, deferring and reconsidering what a credible rule speaks against.
+        self.develop = develop
         self.provider: Provider = provider or self.local
         if needs and goal == TIDY_GOAL:
             goal = APPROVAL_GOAL if self.approval else NEEDS_GOAL
@@ -309,12 +313,16 @@ class Mind:
         text = self._load_json("authored.json", None, raw=True)
         if text is not None:
             self.authoring.load(text, self.library)
+        #: The cloud brain's prior about objects it has not handled, from how they look (E-036).
+        text = self._load_json("advice.json", None, raw=True)
+        self.advice = None if judge is None and text is None else (
+            Advice.from_json(text, judge) if text is not None else Advice(judge))
         self.phrases = load_phrases() if self.approval else None
         self.stats = {"decisions": 0, "fallbacks": 0, "invalid": 0, "provider_errors": 0, "falls_sensed": 0}
         self._run: SkillRun | None = None
         self._action: dict[str, Any] | None = None
         self._snapshot_every = 1.0 / snapshot_hz if snapshot_hz > 0 else math.inf
-        self._next_map = self._next_look = 0.0     # MAP events (E-030); reconsidering (E-023)
+        self._next_map = self._next_look = self._next_advice = 0.0   # MAP (E-030), reconsidering (E-023), advice (E-036)
         self._next_snapshot = 0.0
         self.recent: list[dict[str, Any]] = []
 
@@ -331,6 +339,7 @@ class Mind:
                 pass
             self._run.close()
             self._finish(Outcome("failed", "fell"))
+        self._advise(obs.t)
         self._reconsider(obs.t)
         if self.reactions is not None:
             # The duck's own changes to the room, as its body senses them (E-016).
@@ -373,6 +382,23 @@ class Mind:
             self.log("MAP", {"cell": CELL, "occupied": [list(c) for c in cells]})
         return command
 
+    def _advise(self, t: float) -> None:
+        """A newly seen appearance (colour and size) is judged by the cloud brain once, and
+        its judgement added to the rules as weighted pseudo-outcomes (E-036)."""
+        if self.advice is None or self.advice.judge is None or t < self._next_advice:
+            return
+        self._next_advice = t + 1.0
+        for e in self.kb.of_class("toy"):
+            seen = appearance(features(self.kb, t, {"x": e}), "target") if self.kb.position(e) else None
+            if seen is None or self.advice.asked(*seen):
+                continue
+            pseudo = self.advice.pseudo_outcomes(*seen)
+            for name, skill, conditions, y, w in pseudo:
+                self.rules[name].add(skill, conditions, y, w)
+            self.stats["advice_asked"] = self.stats.get("advice_asked", 0) + 1
+            self.log("ADVICE", {"colour": seen[0], "size": seen[1], "answer": self.advice.answers.get("|".join(seen)),
+                                "summary": f"asked the cloud brain about {seen[0]} {seen[1]} objects"})
+
     def _reconsider(self, t: float) -> None:
         """On the way to a toy the duck sees it better (its colour within 1 m). If the
         rules now credibly judge it a poor prospect (E-023), or, with an owner, the pick
@@ -397,6 +423,13 @@ class Mind:
             worth, credible = self.local.worth(toy)
             if credible and self.local.better_than(toy):
                 why = f"now judged a poor prospect ({worth:.2f})"
+        if why is None and self.develop:
+            puts = self._puts()
+            if self.poor_prospect(toy, puts) and any(
+                    e != toy and known(self.kb, t, e) and not self.poor_prospect(e, puts)
+                    and (self.approval or not any(inside(self.kb, t, e, b) for b in self.kb.of_class("basket")))
+                    for e in self.kb.of_class("toy")):
+                why = "now judged a poor prospect"
         if why is None:
             return
         self._run.close()
@@ -430,6 +463,8 @@ class Mind:
                 self._write_memory(f"rules_{name}.json", learner.to_json())
             self._write_memory("outcomes.json", json.dumps(self.outcomes) + "\n")
             self._write_memory("authored.json", self.authoring.to_json())
+            if self.advice is not None:
+                self._write_memory("advice.json", self.advice.to_json())
         if self.reactions is not None and self.memory_dir is not None:
             self._write_memory("owner_model.json", self.reactions.to_json())
             self._write_memory("kind_records.json", _records_json(self.kind_records))
@@ -522,11 +557,12 @@ class Mind:
         return self._draws
 
     # -- causal rules (Milestone 4) -------------------------------------------------
-    def predict(self, skill: str, args: dict[str, Any]) -> tuple[float, float]:
-        """(p expected effect holds, p fall) for `skill` on `args` now, from the rules: their
-        posterior mean, or with `rules="draw"` one model drawn from the posterior per skill
-        and decision, shared by every candidate (Thompson sampling, ledger E-018)."""
-        f = features(self.kb, self.ctx.t, args)
+    def predict(self, skill: str, args: dict[str, Any], held: str | None = None) -> tuple[float, float]:
+        """(p expected effect holds, p fall) for `skill` on `args` now, optionally as if
+        holding `held`, from the rules: their posterior mean, or with `rules="draw"` one model
+        drawn from the posterior per skill and decision, shared by every candidate (Thompson
+        sampling, ledger E-018)."""
+        f = features(self.kb, self.ctx.t, args, held=held)
         if self.use_rules == "mean":
             return self.rules["effect"].predict(skill, f)[0], self.rules["fell"].predict(skill, f)[0]
         out = []
@@ -543,6 +579,26 @@ class Mind:
                 self._rule_draws[key] = self.rules[name].model(skill).draw(self.np_rng)
             out.append(1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, self._rule_draws[key].logit(f))))))
         return out[0], out[1]
+
+    def _prospect(self, toy: str) -> str:
+        """What the duck's rules predict for `toy`, for the briefing (E-037): the cloud brain
+        read the rules' text but did not apply them to each object."""
+        pick, pick_against = self.judge("pick", {"x": toy})
+        deliver, deliver_against = self.judge("deliver", {}, held=toy)
+        against = [what for what, flag in (("picking", pick_against), ("delivering", deliver_against)) if flag]
+        return (f"; your rules predict a pick works {pick:.0%} and a delivery of it works without a fall "
+                f"{deliver:.0%}" + (f"; a credible rule speaks against {' and '.join(against)} it"
+                                     if against else ""))
+
+    def poor_prospect(self, toy: str, puts: tuple[str, ...] = ("deliver",)) -> bool:
+        """A credible rule speaks against picking `toy`, or against every way of putting it
+        down that the duck has (E-023, E-029; with an owner, Milestone 6)."""
+        return (self.judge("pick", {"x": toy})[1]
+                or all(self.judge(put, {}, held=toy)[1] for put in puts))
+
+    def _puts(self) -> tuple[str, ...]:
+        """The ways of putting a toy down that serve the duck's goals now."""
+        return tuple(name for name in PUTS if name in self.library) if self.approval else ("deliver",)
 
     def judge(self, skill: str, args: dict[str, Any], held: str | None = None) -> tuple[float, bool]:
         """The rules' chance that `skill` on `args` works (its expected effect holds) without
@@ -673,11 +729,14 @@ class Mind:
             names = {t.name for t in tools}
             predict = self.predict if self.use_rules else None
             self._rule_draws = {}                   # one posterior draw per skill per decision
+            puts = self._puts()
+            poor = (lambda e: self.poor_prospect(e, puts)) if self.develop else None
             goals = tuple(approval_candidates(self.kb, self.ctx.t, self.needs, self.records, names,
                                               self._owner_p(), self.kind_records, predict=predict,
-                                              kind_of=self.action_kind)
+                                              kind_of=self.action_kind, poor=poor)
                           if self.approval else
-                          candidates(self.kb, self.ctx.t, self.needs, self.records, names, predict=predict))
+                          candidates(self.kb, self.ctx.t, self.needs, self.records, names, predict=predict,
+                                     poor=poor))
             tools = _serving(tools, goals)
         return DecisionRequest(self.ctx.t, self.goal, self.briefing(goals), tuple(tools), goals)
 
@@ -949,6 +1008,11 @@ class Mind:
             where = (f"{e} at ({p.x:+.2f}, {p.y:+.2f}) m, uncertainty {p.sigma:.2f} m, "
                      f"{p.distance(me):.2f} m from you, last seen {t - a.t_obs:.0f} s ago")
             if kb.cls(e) == "toy":
+                looks = [v for v in (kb.value("color", e),
+                                     None if kb.value("size", e) is None else f"{kb.value('size', e) * 100:.0f} cm across")
+                         if v]
+                if looks:
+                    where += f"; looks {', '.join(looks)}"
                 tries = attempts(kb, t, "pick", e)
                 fails = failures(kb, t, "pick", e)
                 if self.approval:
@@ -959,6 +1023,8 @@ class Mind:
                     where += "; in the basket" if in_basket else "; not in the basket"
                 if tries:
                     where += f"; pick tried {tries} times, failed {fails}"
+                if held is None and not self.approval:
+                    where += self._prospect(e)
             objects.append(f"- {where}.")
         lines += ["Objects you know about:", *(objects or ["- none yet."])]
         if self.recent:

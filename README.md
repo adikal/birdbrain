@@ -116,6 +116,8 @@ uv pip install --python .venv/bin/python -e ../microduck-lab/microduck_local -e 
 .venv/bin/python scripts/predictions.py wall.jsonl                             # score predictions
 .venv/bin/birdbrain-run --author --episodes 20 --seeds 2 --jobs 2 --tag mine --out authored.jsonl  # cloud writes skills
 .venv/bin/birdbrain-run --world world2 --kinds late --episodes 20 --seeds 2 --jobs 2 --tag w2 --out w2.jsonl  # World 2
+.venv/bin/birdbrain-run --world world2 --kinds late --agent D --episodes 20 --seeds 2 --jobs 2 --tag d --out d.jsonl  # Milestone 6 agent D
+.venv/bin/birdbrain-run --world world2 --agent D --owner basket --owner-change 11:leave --episodes 20 --seeds 2 --tag oc --out oc.jsonl  # she changes her mind
 .venv/bin/python scripts/world2_report.py w2.jsonl                              # World 2 measures by room band
 .venv/bin/birdbrain-compare A.jsonl B.jsonl          # paired, seed-matched comparison
 .venv/bin/birdbrain-dashboard --live --seed 3        # the mind, live, at http://127.0.0.1:8790
@@ -149,7 +151,7 @@ credentials; model usage is billed to the AWS account.
 
 ## Status
 
-Milestones 0 to 5a and World 2 are complete (see the report's results, section 6):
+Milestones 0 to 5a and World 2 are complete, and Milestone 6's first criterion is met (see the report's results, section 6):
 
 - From the robot's own senses, with an explicit task, the mind tidies as
   well as the lab's hand-tuned controller on held-out rooms (E-008).
@@ -201,6 +203,23 @@ Milestones 0 to 5a and World 2 are complete (see the report's results, section 6
   explores the edge of what it has seen; and with an owner it values her
   reactions correctly and no longer sits idle.
 
-Next: falls at the basket rim and the inner wall's doorway, then
-Milestone 6 (lifetimes and agents A to D). The roadmap is in
+- The cloud brain's general knowledge did not help in World 2: as a prior
+  about unfamiliar objects it was confidently wrong (E-036), and deciding
+  from the duck's own measurements it did as well as the local policy, at
+  about 52,000 tokens a room (E-037).
+- Milestone 6 (`--agent A|B|C|D`): on fresh lives, the developmental agent
+  (needs, deciding with its rules) gains 11.5 points of tidying from ten
+  rooms of experience, and 14.5 more than the proactive agent, whose
+  counts per skill gain nothing. The same holds when the duck must learn
+  what to do from its owner: D's experience adds 0.51 more to her measure
+  a room than C's with the basket owner, and 0.30 (not clear of zero)
+  with the owner who wants her blue things left alone (E-040). With a
+  task, experience buys safety:
+  4.6 fewer failed picks and 0.6 fewer falls a room. Recovery after the
+  owner changes her preference (`--owner-change 11:hers`) was not shown;
+  that test was too weak (E-038).
+
+Next: a stronger test of recovery after the owner's change (agent D,
+basket owner to leave-it owner), then curiosity driven by learning
+progress in agent D (H-005). The roadmap is in
 [`docs/design.md`](docs/design.md#9-roadmap).

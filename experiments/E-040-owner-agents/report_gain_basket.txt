@@ -1,0 +1,28 @@
+gain from experience, rooms 11 on, experiments/E-040-owner-agents/basket-C.jsonl minus its twin:
+  tidied, possible: A 0.000 · B 0.053 · B-A +0.053 [95% CI +0.016, +0.089] · B higher 12, equal 2, lower 2 · sign-flip p = 0.007 · n = 16
+  tidied, known kinds: A 0.000 · B 0.055 · B-A +0.055 [95% CI +0.014, +0.096] · B higher 10, equal 4, lower 2 · sign-flip p = 0.013 · n = 16
+  tidied, new kinds: A 0.000 · B 0.043 · B-A +0.043 [95% CI -0.005, +0.091] · B higher 7, equal 6, lower 3 · sign-flip p = 0.080 · n = 16
+  falls: A 0.000 · B 0.244 · B-A +0.244 [95% CI +0.065, +0.422] · B higher 12, equal 2, lower 2 · sign-flip p = 0.013 · n = 16
+  falls holding heavy: A 0.000 · B 0.075 · B-A +0.075 [95% CI -0.021, +0.171] · B higher 10, equal 3, lower 3 · sign-flip p = 0.153 · n = 16
+  failed pick decisions: A 0.000 · B 0.244 · B-A +0.244 [95% CI -0.258, +0.746] · B higher 9, equal 1, lower 6 · sign-flip p = 0.325 · n = 16
+  owner's measure gained: A 0.000 · B 0.375 · B-A +0.375 [95% CI +0.119, +0.631] · B higher 12, equal 2, lower 2 · sign-flip p = 0.008 · n = 16
+  her things moved: A 0.000 · B 0.066 · B-A +0.066 [95% CI -0.033, +0.164] · B higher 10, equal 2, lower 4 · sign-flip p = 0.178 · n = 16
+gain from experience, rooms 11 on, experiments/E-040-owner-agents/basket-D.jsonl minus its twin:
+  tidied, possible: A 0.000 · B 0.123 · B-A +0.123 [95% CI +0.067, +0.179] · B higher 12, equal 1, lower 3 · sign-flip p = 0.001 · n = 16
+  tidied, known kinds: A 0.000 · B 0.131 · B-A +0.131 [95% CI +0.067, +0.195] · B higher 11, equal 1, lower 4 · sign-flip p = 0.001 · n = 16
+  tidied, new kinds: A 0.000 · B 0.108 · B-A +0.108 [95% CI +0.040, +0.175] · B higher 13, equal 1, lower 2 · sign-flip p = 0.004 · n = 16
+  falls: A 0.000 · B 0.331 · B-A +0.331 [95% CI +0.108, +0.555] · B higher 12, equal 1, lower 3 · sign-flip p = 0.006 · n = 16
+  falls holding heavy: A 0.000 · B 0.169 · B-A +0.169 [95% CI +0.042, +0.296] · B higher 11, equal 3, lower 2 · sign-flip p = 0.019 · n = 16
+  failed pick decisions: A 0.000 · B -1.050 · B-A -1.050 [95% CI -1.612, -0.488] · B higher 2, equal 0, lower 14 · sign-flip p = 0.001 · n = 16
+  owner's measure gained: A 0.000 · B 0.881 · B-A +0.881 [95% CI +0.481, +1.281] · B higher 12, equal 1, lower 3 · sign-flip p = 0.001 · n = 16
+  her things moved: A 0.000 · B 0.123 · B-A +0.123 [95% CI +0.043, +0.203] · B higher 11, equal 2, lower 3 · sign-flip p = 0.006 · n = 16
+
+experiments/E-040-owner-agents/basket-D.jsonl's gain minus experiments/E-040-owner-agents/basket-C.jsonl's, paired by life:
+  tidied, possible: A 0.053 · B 0.123 · B-A +0.070 [95% CI +0.006, +0.134] · B higher 11, equal 0, lower 5 · sign-flip p = 0.033 · n = 16
+  tidied, known kinds: A 0.055 · B 0.131 · B-A +0.076 [95% CI +0.005, +0.146] · B higher 10, equal 2, lower 4 · sign-flip p = 0.032 · n = 16
+  tidied, new kinds: A 0.043 · B 0.108 · B-A +0.065 [95% CI -0.008, +0.137] · B higher 9, equal 1, lower 6 · sign-flip p = 0.076 · n = 16
+  falls: A 0.244 · B 0.331 · B-A +0.087 [95% CI -0.151, +0.326] · B higher 9, equal 2, lower 5 · sign-flip p = 0.497 · n = 16
+  falls holding heavy: A 0.075 · B 0.169 · B-A +0.094 [95% CI -0.030, +0.218] · B higher 11, equal 0, lower 5 · sign-flip p = 0.157 · n = 16
+  failed pick decisions: A 0.244 · B -1.050 · B-A -1.294 [95% CI -2.023, -0.564] · B higher 2, equal 0, lower 14 · sign-flip p = 0.003 · n = 16
+  owner's measure gained: A 0.375 · B 0.881 · B-A +0.506 [95% CI +0.043, +0.970] · B higher 11, equal 0, lower 5 · sign-flip p = 0.037 · n = 16
+  her things moved: A 0.066 · B 0.123 · B-A +0.057 [95% CI -0.046, +0.161] · B higher 9, equal 2, lower 5 · sign-flip p = 0.247 · n = 16

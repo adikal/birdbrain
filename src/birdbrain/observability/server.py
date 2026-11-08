@@ -266,8 +266,16 @@ def main() -> None:
     ap.add_argument("--rules", choices=["mean", "draw", "cautious"], default=None)
     ap.add_argument("--memory", type=Path, default=None,
                     help="lifetime memory directory to start from (it is updated when the run ends)")
+    ap.add_argument("--agent", choices=["B", "C", "D"], default=None,
+                    help="Milestone 6: B a task; C needs; D needs, deciding with its rules (--rules mean) and "
+                         "deferring what a credible rule speaks against")
     ap.add_argument("--no-camera", action="store_true", help="do not render head-camera images")
     args = ap.parse_args()
+    develop = args.agent == "D"
+    if args.agent is not None:
+        args.needs = args.agent in {"C", "D"}
+        if develop and args.rules is None:
+            args.rules = "mean"
     if not _is_loopback(args.host):
         ap.error("--host must be a loopback address (127.0.0.1 or ::1); use an SSH tunnel for remote viewing")
     args.runs_dir.mkdir(parents=True, exist_ok=True)
@@ -279,7 +287,7 @@ def main() -> None:
         title = args.title or _live_title(args)
         session = PlayroomSession(args.seed, provider=args.provider, journal=journal, needs=args.needs, room=args.room, owner=args.owner,
                                   memory_dir=args.memory, author=args.author, rules=args.rules,
-                                  title=title, world=args.world, kinds=args.kinds)
+                                  title=title, world=args.world, kinds=args.kinds, develop=develop)
         camera = None
         if not args.no_camera:
             from birdbrain.observability.camera import HeadCamera

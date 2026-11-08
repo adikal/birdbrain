@@ -69,14 +69,25 @@ class Goal:
                 "U": round(self.utility, 3), **{k: round(v, 3) for k, v in self.terms.items()}}
 
 
-#: predict(skill, args) -> (probability the expected effect holds, probability of a fall),
-#: from causal rules learned under conditions (Milestone 4, `rules.py`).
-Predict = Callable[[str, dict[str, Any]], tuple[float, float]]
+#: predict(skill, args, held) -> (probability the expected effect holds, probability of a
+#: fall), optionally as if holding `held`, from causal rules learned under conditions
+#: (Milestone 4, `rules.py`).
+Predict = Callable[..., tuple[float, float]]
+
+
+def _prospects(toys: list[str], poor: Callable[[str], bool] | None) -> list[str]:
+    """The toys worth offering: those no credible rule speaks against, unless none is left."""
+    if poor is None:
+        return toys
+    return [e for e in toys if not poor(e)] or toys
 
 
 def candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
-               tools: set[str], give_up_after: int = 3, predict: Predict | None = None) -> list[Goal]:
-    """Every goal the duck could pursue now, scored."""
+               tools: set[str], give_up_after: int = 3, predict: Predict | None = None,
+               poor: Callable[[str], bool] | None = None) -> list[Goal]:
+    """Every goal the duck could pursue now, scored. With `poor` (the developmental agent,
+    Milestone 6), each toy is judged by its own prospects: its delivery as if holding it, and
+    a toy a credible rule speaks against is offered only when no other toy is (E-023, E-029)."""
     pressure = needs.pressure
     _, doubted = needs.beliefs(kb, t)
     relief = needs.p.tidiness_weight / max(needs.known_toys(kb), 1)     # one more toy in the basket
@@ -95,11 +106,12 @@ def candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
             last = p if p is not None else last
         return path / MICRODUCK.walk_speed / HORIZON_S
 
-    def stats(skill: str, args: dict[str, Any] | None = None) -> tuple[float, float, float, float]:
+    def stats(skill: str, args: dict[str, Any] | None = None,
+              held: str | None = None) -> tuple[float, float, float, float]:
         r = records.get(skill)
         if r is None:
             r = SkillRecord()
-        p, fall = predict(skill, args or {}) if predict is not None else (r.p, r.fall_rate)
+        p, fall = predict(skill, args or {}, held=held) if predict is not None else (r.p, r.fall_rate)
         return (p, r.progress, (r.seconds / r.trials if r.trials else 30.0) / HORIZON_S,
                 fall * needs.p.safety_per_fall * (1.0 + pressure["safety"]))
 
@@ -110,13 +122,14 @@ def candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
                         {"dV": relief * p, "LP": lp, "IG": 0.0, "C": c, "R": risk}))
     if held is None and "pick" in tools:
         p_del, lp_del, c_del, r_del = stats("deliver")
-        for e in kb.of_class("toy"):
+        toys = [e for e in kb.of_class("toy")
+                if kb.get("at", e) is not None and known(kb, t, e) and not any(inside(kb, t, e, b) for b in baskets)
+                and failures(kb, t, "pick", e) < give_up_after]
+        for e in _prospects(toys, poor):
             a = kb.get("at", e)
-            if a is None or not known(kb, t, e) or any(inside(kb, t, e, b) for b in baskets):
-                continue
-            if failures(kb, t, "pick", e) >= give_up_after:
-                continue
             p_pick, lp_pick, c_pick, r_pick = stats("pick", {"x": e})
+            if poor is not None:
+                p_del, lp_del, c_del, r_del = stats("deliver", held=e)
             travel = walk(a.value, kb.position(basket) if basket else None)
             out.append(Goal(f"tidy:{e}", "tidy", "tidiness", f"inside({e!r}, basket)",
                             (("pick", (("x", e),)),),
@@ -169,8 +182,10 @@ def kinds_owner(reactions: Any, rng: Any, draws: dict[str, Any], kind_of: Callab
 def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
                         tools: set[str], owner_p: Owner, kind_records: dict[str, Any] | None = None,
                         give_up_after: int = 3, predict: Predict | None = None,
-                        kind_of: Callable[[str, dict[str, Any]], str] | None = None) -> list[Goal]:
-    """Goals when the social need is approval (Milestone 3b, design section 4.3).
+                        kind_of: Callable[[str, dict[str, Any]], str] | None = None,
+                        poor: Callable[[str], bool] | None = None) -> list[Goal]:
+    """Goals when the social need is approval (Milestone 3b, design section 4.3). With
+    `poor` (the developmental agent, Milestone 6), toys are offered as in `candidates`.
 
     No goal names a state of the room. Each goal is a way of acting, valued by what the
     duck has learned about its owner's reactions to that kind of action, plus whatever
@@ -220,10 +235,10 @@ def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[s
     elif "pick" in tools and puts:
         # A pick is followed by the put that looks best: its value, cost and risk.
         _, best_value, _, _, _, put_cost, put_risk = max(puts, key=lambda m: m[1])
-        for e in kb.of_class("toy"):
+        toys = [e for e in kb.of_class("toy")
+                if kb.get("at", e) is not None and known(kb, t, e) and failures(kb, t, "pick", e) < give_up_after]
+        for e in _prospects(toys, poor):
             a = kb.get("at", e)
-            if a is None or not known(kb, t, e) or failures(kb, t, "pick", e) >= give_up_after:
-                continue
             kind = kind_of("pick", {"x": e}) if kind_of is not None else f"pick from {where(kb, t, e)}"
             value, unsure = owner("pick", {"x": e})
             p_pick, lp_pick, c_pick, r_pick = kind_stats(kind, "pick", {"x": e})

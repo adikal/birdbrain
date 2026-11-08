@@ -22,6 +22,7 @@ from statistics import fmean
 from typing import Any
 
 from birdbrain.observability import EventJournal, JsonlRunStore
+from birdbrain.owner import PREFERENCES as OWNERS
 
 
 class PlayroomSession:
@@ -39,7 +40,7 @@ class PlayroomSession:
                  owner: str | None = None, episode: int | None = None, lifetime: int | None = None,
                  credit: str = "moments", rules: str | None = None, owner_model: str = "kinds",
                  author: bool = False, title: str | None = None, world: str = "playroom",
-                 kinds: str = "dev") -> None:
+                 kinds: str = "dev", advice: bool = False, develop: bool = False) -> None:
         from microduck_local.brain.brain_env import POLICIES_DIR, onnx_infer
         from microduck_local.world import World, make_playroom
 
@@ -108,7 +109,8 @@ class PlayroomSession:
                                     speculate=speculate, memory_dir=memory_dir, needs=needs,
                                     room=self.bounds if needs == "approval" else None, seed=seed,
                                     credit=credit, rules=rules, owner_model=owner_model,
-                                    author=self._author(model) if author else None)
+                                    author=self._author(model) if author else None,
+                                    judge=self._judge(model) if advice else None, develop=develop)
         self.mind = self.brain.mind
         self.mind.episode = episode
         self._falls = self._attempts = 0
@@ -264,6 +266,11 @@ class PlayroomSession:
         }
 
     @staticmethod
+    def _judge(model: str | None) -> Any:
+        from birdbrain.providers.bedrock import BedrockJudge, BedrockProvider
+        return BedrockJudge(BedrockProvider.from_env(model=model))
+
+    @staticmethod
     def _author(model: str | None) -> Any:
         from birdbrain.providers.bedrock import BedrockAuthor, BedrockProvider
         return BedrockAuthor(BedrockProvider.from_env(model=model))
@@ -322,6 +329,7 @@ class PlayroomSession:
             **mind.stats, "tokens": mind.tokens_used, **self.perception_metrics(),
             "simSeconds": round(self.world.t, 1), "wallSeconds": round(wall_seconds, 1),
             "writtenSkills": mind.authoring.summary(), "authoringTokens": mind.authoring.tokens,
+            "adviceTokens": 0 if mind.advice is None else mind.advice.tokens,
             "rules": mind.use_rules, "ownerModelKind": mind.owner_model if mind.reactions is not None else None,
             **self.owner_metrics(), **self.world_metrics(),
         }
@@ -344,7 +352,7 @@ def run_one(seed: int, *, toys: int = 6, seconds: float = 300.0, provider: str =
             owner: str | None = None, episode: int | None = None, lifetime: int | None = None,
             credit: str = "moments", rules: str | None = None, owner_model: str = "kinds",
             author: bool = False, title: str | None = None, world: str = "playroom",
-            kinds: str = "dev") -> dict[str, Any]:
+            kinds: str = "dev", advice: bool = False, develop: bool = False) -> dict[str, Any]:
     life = "" if episode is None else f"-L{lifetime}e{episode}"
     run_id = f"{tag or 'run'}{life}-s{seed}-{provider}-{int(time.time() * 1000) % 10**9}"
     store = JsonlRunStore(runs_dir) if runs_dir else None
@@ -354,7 +362,7 @@ def run_one(seed: int, *, toys: int = 6, seconds: float = 300.0, provider: str =
                               memory_dir=memory_dir, needs=needs, room=room,
                               owner=owner, episode=episode, lifetime=lifetime, credit=credit,
                               rules=rules, owner_model=owner_model, author=author, title=title,
-                              world=world, kinds=kinds)
+                              world=world, kinds=kinds, advice=advice, develop=develop)
     head = None
     if camera and store is not None:
         from birdbrain.observability.camera import HeadCamera
@@ -389,17 +397,22 @@ def room_seed(lifetime: int, episode: int) -> int:
     return 100 * lifetime + episode
 
 
-def run_lifetime(lifetime: int, episodes: int, memory_root: Path, **kwargs: Any) -> list[dict[str, Any]]:
+def run_lifetime(lifetime: int, episodes: int, memory_root: Path | None,
+                 owner_change: tuple[int, str] | None = None, **kwargs: Any) -> list[dict[str, Any]]:
     """One life: `episodes` rooms in a row, with the duck's memory kept between them
-    (design section 5). Rows carry the lifetime as `seed` and the episode number."""
-    memory = memory_root / f"life-{lifetime}"
-    if memory.exists() and any(memory.iterdir()):
+    (design section 5), or none (`memory_root` None: agent A, Milestone 6). With
+    `owner_change` (room, preference), the owner wants something else from that room on
+    (Milestone 6); the duck is not told. Rows carry the lifetime as `seed` and the episode."""
+    memory = None if memory_root is None else memory_root / f"life-{lifetime}"
+    if memory is not None and memory.exists() and any(memory.iterdir()):
         raise ValueError(f"{memory} already holds a life; choose a fresh --memory directory")
     rows = []
     for e in range(1, episodes + 1):
-        row = run_one(room_seed(lifetime, e), **{**kwargs, "memory_dir": memory, "episode": e,
+        owner = owner_change[1] if owner_change is not None and e >= owner_change[0] else kwargs.get("owner")
+        row = run_one(room_seed(lifetime, e), **{**kwargs, "owner": owner, "memory_dir": memory, "episode": e,
                                                 "lifetime": lifetime})
-        rows.append({**row, "room_seed": row["seed"], "seed": lifetime, "episode": e})
+        rows.append({**row, "room_seed": row["seed"], "seed": lifetime, "episode": e, "memoryKept": memory is not None,
+                     **({"ownerChangedAt": owner_change[0]} if owner_change is not None else {})})
     return rows
 
 
@@ -443,9 +456,12 @@ def main() -> None:
                     help="messy: toys scattered; tidy: every toy starts in the basket")
     ap.add_argument("--memory", type=Path, default=None,
                     help="lifetime memory directory: seeds run in order as episodes of one life (forces --jobs 1)")
-    ap.add_argument("--owner", choices=["none", "basket", "wall", "leave", "hers"], default=None,
+    ap.add_argument("--owner", choices=["none", *OWNERS], default=None,
                     help="Milestone 3b: the social need is approval; a scripted owner with this hidden "
                          "preference reacts with phrases (none: the control, nobody there)")
+    ap.add_argument("--owner-change", default=None, metavar="ROOM:PREFERENCE",
+                    help="Milestone 6, with --owner and --episodes: from this room of each life the owner "
+                         "has this preference instead, e.g. 11:hers")
     ap.add_argument("--credit", choices=["moments", "underway"], default="moments",
                     help="Milestone 3b: credit the owner's reactions to the duck's own changes to the room "
                          "(grasp, release, bump; E-016) or to any action under way (E-015)")
@@ -472,6 +488,16 @@ def main() -> None:
                     help="world2: many kinds of object with hidden properties, furniture, inner walls (E-021)")
     ap.add_argument("--kinds", choices=["dev", "all", "late"], default="dev",
                     help="World 2's object kinds: development only, all, or new kinds from room 11 of a life")
+    ap.add_argument("--advice", action="store_true",
+                    help="the cloud brain (Bedrock) judges each newly seen appearance of object once; its "
+                         "judgement enters the rules as a prior (E-036)")
+    ap.add_argument("--agent", choices=["A", "B", "C", "D"], default=None,
+                    help="Milestone 6: A reactive (task, no memory between rooms); B task with memory; "
+                         "C proactive (needs, memory); D developmental (C deciding with its rules, --rules mean: "
+                         "each toy judged by its own pick and delivery, deferring what a credible rule speaks against)")
+    ap.add_argument("--no-memory", action="store_true",
+                    help="with --episodes: nothing is kept between rooms (agent A is B with this), so each "
+                         "agent has a twin that measures what its experience bought (Milestone 6)")
     ap.add_argument("--jobs", type=int, default=1)
     ap.add_argument("--out", required=True, help="rows are appended here as JSON lines")
     ap.add_argument("--tag", default="")
@@ -484,10 +510,25 @@ def main() -> None:
               "token_budget": args.token_budget, "model": args.model, "camera": args.camera,
               "speculate": args.speculate, "memory_dir": args.memory, "needs": args.needs, "room": args.room,
               "owner": args.owner, "credit": args.credit, "rules": args.rules, "owner_model": args.owner_model,
-              "author": args.author, "title": args.title, "world": args.world, "kinds": args.kinds}
+              "author": args.author, "title": args.title, "world": args.world, "kinds": args.kinds,
+              "advice": args.advice, "develop": False}
+    if args.agent is not None:
+        if args.episodes is None:
+            ap.error("--agent compares lives: give --episodes")
+        kwargs["needs"] = args.agent in {"C", "D"}
+        kwargs["develop"] = args.agent == "D"
+        if args.agent == "D" and args.rules is None:
+            kwargs["rules"] = "mean"        # its scorecard judges each toy by the rules (Milestone 4)
+    if args.owner_change is not None:
+        room, _, preference = args.owner_change.partition(":")
+        if args.owner in (None, "none") or args.episodes is None or not room.isdigit() or preference not in OWNERS:
+            ap.error("--owner-change ROOM:PREFERENCE needs --owner and --episodes, and a preference from "
+                     f"{', '.join(OWNERS)}")
+        kwargs["owner_change"] = (int(room), preference)
     memory_root = None
     if args.episodes is not None:
-        memory_root = args.memory or Path("data/lifetimes") / (args.tag or "untagged")
+        memory_root = (None if args.agent == "A" or args.no_memory
+                       else args.memory or Path("data/lifetimes") / (args.tag or "untagged"))
         kwargs.pop("memory_dir")
     elif args.memory is not None:
         args.jobs = 1
@@ -496,7 +537,7 @@ def main() -> None:
     with out.open("a", encoding="utf-8") as stream:
         def keep(row: dict[str, Any]) -> None:
             rows.append(row)
-            stream.write(json.dumps({**row, "tag": args.tag}) + "\n")
+            stream.write(json.dumps({**row, "tag": args.tag, "agent": args.agent}) + "\n")
             stream.flush()
             life = f" episode {row['episode']}" if row.get("episode") else ""
             owner = (f" · owner {row['owner']}: liked {row.get('sat_' + row['owner'], '-')}"

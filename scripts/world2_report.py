@@ -49,8 +49,8 @@ def load(path: str) -> list[dict]:
 
 def _derive(r: dict) -> None:
     """Measures computed from other fields of a row."""
-    if r.get("owner") == "hers":
-        r["owner_gain"] = r["sat_hers"] - r["sat_hers_start"]
+    if r.get("owner") not in (None, "none"):     # against what she wants in this room (Milestone 6)
+        r["owner_gain"] = r[f"sat_{r['owner']}"] - r[f"sat_{r['owner']}_start"]
     r.setdefault("hers_n", 0)
 
 

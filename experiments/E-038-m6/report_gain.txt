@@ -1,0 +1,22 @@
+gain from experience, rooms 11 on, experiments/E-038-m6/C.jsonl minus its twin:
+  tidied, possible: A 0.000 · B -0.030 · B-A -0.030 [95% CI -0.076, +0.015] · B higher 6, equal 0, lower 10 · sign-flip p = 0.174 · n = 16
+  tidied, known kinds: A 0.000 · B -0.025 · B-A -0.025 [95% CI -0.078, +0.029] · B higher 5, equal 3, lower 8 · sign-flip p = 0.342 · n = 16
+  tidied, new kinds: A 0.000 · B -0.053 · B-A -0.053 [95% CI -0.116, +0.010] · B higher 4, equal 1, lower 11 · sign-flip p = 0.094 · n = 16
+  falls: A 0.000 · B 0.038 · B-A +0.038 [95% CI -0.124, +0.199] · B higher 8, equal 1, lower 7 · sign-flip p = 0.688 · n = 16
+  falls holding heavy: A 0.000 · B 0.019 · B-A +0.019 [95% CI -0.100, +0.137] · B higher 5, equal 4, lower 7 · sign-flip p = 0.831 · n = 16
+  failed pick decisions: A 0.000 · B 0.000 · B-A +0.000 [95% CI -0.737, +0.737] · B higher 9, equal 0, lower 7 · sign-flip p = 1.000 · n = 16
+gain from experience, rooms 11 on, experiments/E-038-m6/D.jsonl minus its twin:
+  tidied, possible: A 0.000 · B 0.115 · B-A +0.115 [95% CI +0.046, +0.184] · B higher 14, equal 0, lower 2 · sign-flip p = 0.005 · n = 16
+  tidied, known kinds: A 0.000 · B 0.101 · B-A +0.101 [95% CI +0.023, +0.179] · B higher 14, equal 1, lower 1 · sign-flip p = 0.015 · n = 16
+  tidied, new kinds: A 0.000 · B 0.135 · B-A +0.135 [95% CI +0.051, +0.218] · B higher 12, equal 1, lower 3 · sign-flip p = 0.005 · n = 16
+  falls: A 0.000 · B 0.025 · B-A +0.025 [95% CI -0.163, +0.213] · B higher 6, equal 2, lower 8 · sign-flip p = 0.833 · n = 16
+  falls holding heavy: A 0.000 · B -0.156 · B-A -0.156 [95% CI -0.282, -0.030] · B higher 3, equal 3, lower 10 · sign-flip p = 0.025 · n = 16
+  failed pick decisions: A 0.000 · B 0.706 · B-A +0.706 [95% CI +0.068, +1.345] · B higher 13, equal 0, lower 3 · sign-flip p = 0.035 · n = 16
+
+experiments/E-038-m6/D.jsonl's gain minus experiments/E-038-m6/C.jsonl's, paired by life:
+  tidied, possible: A -0.030 · B 0.115 · B-A +0.145 [95% CI +0.063, +0.228] · B higher 13, equal 0, lower 3 · sign-flip p = 0.003 · n = 16
+  tidied, known kinds: A -0.025 · B 0.101 · B-A +0.126 [95% CI +0.047, +0.205] · B higher 13, equal 0, lower 3 · sign-flip p = 0.005 · n = 16
+  tidied, new kinds: A -0.053 · B 0.135 · B-A +0.187 [95% CI +0.072, +0.302] · B higher 13, equal 1, lower 2 · sign-flip p = 0.005 · n = 16
+  falls: A 0.038 · B 0.025 · B-A -0.012 [95% CI -0.234, +0.209] · B higher 9, equal 1, lower 6 · sign-flip p = 0.956 · n = 16
+  falls holding heavy: A 0.019 · B -0.156 · B-A -0.175 [95% CI -0.351, +0.001] · B higher 4, equal 1, lower 11 · sign-flip p = 0.061 · n = 16
+  failed pick decisions: A 0.000 · B 0.706 · B-A +0.706 [95% CI +0.005, +1.408] · B higher 10, equal 1, lower 5 · sign-flip p = 0.053 · n = 16

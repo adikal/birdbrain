@@ -150,3 +150,50 @@ class BedrockAuthor:
         if call is None:
             raise ProviderError(f"no_tool_call ({response.get('stopReason', 'unknown')})", 0.0, tokens)
         return dict(call.get("input") or {}), tokens
+
+
+JUDGE_SYSTEM = """You advise a small two-legged duck robot about objects it has just seen, before it has
+tried to handle them. Answer with what you would expect from the object's appearance and the
+robot's body, as a careful engineer would. Say how many trials of the robot's own experience your
+judgement is worth: little if appearance says little, more if the answer follows from the body."""
+
+
+def judge_tool() -> dict[str, Any]:
+    p = {"type": "number", "minimum": 0, "maximum": 1}
+    return {"toolSpec": {
+        "name": "judge_object",
+        "description": "Your expectation about the robot handling this object.",
+        "inputSchema": {"json": {"type": "object", "properties": {
+            "p_hold": {**p, "description": "probability that a pick leaves the object held in the beak"},
+            "p_delivered": {**p, "description": "probability that, once held, carrying it to the basket and "
+                                                "dropping it in works"},
+            "p_fall": {**p, "description": "probability that the robot falls while carrying it to the basket"},
+            "worth_trials": {"type": "number", "minimum": 0, "maximum": 10,
+                             "description": "how many of the robot's own trials this judgement is worth"},
+            "reason": {"type": "string", "description": "one sentence"}},
+            "required": ["p_hold", "p_delivered", "p_fall", "worth_trials", "reason"]}}}}
+
+
+class BedrockJudge:
+    """The cloud brain's prior about an object, from how it looks (ledger E-036, H-009)."""
+
+    def __init__(self, provider: BedrockProvider | None = None, max_tokens: int = 512) -> None:
+        self.provider = provider or BedrockProvider.from_env()
+        self.max_tokens = max_tokens
+
+    def judge(self, prompt: str) -> tuple[dict[str, Any], dict[str, int]]:
+        try:
+            response = self.provider.client.converse(
+                modelId=self.provider.model, system=[{"text": JUDGE_SYSTEM}],
+                messages=[{"role": "user", "content": [{"text": prompt}]}],
+                toolConfig={"tools": [judge_tool()], "toolChoice": {"auto": {}}},
+                inferenceConfig={"maxTokens": self.max_tokens})
+        except Exception as error:  # noqa: BLE001 - reduced to a category
+            raise ProviderError(_category(error)) from None
+        usage = response.get("usage", {})
+        tokens = {"input": int(usage.get("inputTokens", 0)), "output": int(usage.get("outputTokens", 0))}
+        call = next((block["toolUse"] for block in response.get("output", {}).get("message", {}).get("content", [])
+                     if "toolUse" in block), None)
+        if call is None:
+            raise ProviderError(f"no_tool_call ({response.get('stopReason', 'unknown')})", 0.0, tokens)
+        return dict(call.get("input") or {}), tokens

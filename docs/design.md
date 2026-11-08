@@ -903,6 +903,47 @@ varied, did worse than leaving them (E-034, E-035), so the mind stays at
 E-033's code and the defects are recorded as expected-failure tests, to be
 fixed one at a time (L-029).
 
+### 6.14 The cloud brain in World 2, and Milestone 6 (E-036 to E-040)
+
+*The cloud brain's knowledge* (E-036, E-037, development). Asked once
+about each new appearance (colour and largest extent), the language model
+judged 9 cm sticks impossible to hold and black objects safe; as a prior
+in the rules this slowed learning (L-030). Deciding in World 2 from the
+duck's briefing, with each object's measured prospects, it tidied as well
+as the local policy (−0.02 [−0.04, +0.01] with kinds never met) and fell
+more often holding heavy objects, at about 52,000 tokens a room. Neither
+went to a held-out run.
+
+*Agents A to D* (E-038, lives 600 to 615, World 2, every kind from room
+11, rooms 11 to 20). Each agent is compared with its twin that keeps no
+memory between rooms:
+
+| Agent | Possible objects tidied | Gain from experience | Falls a room |
+|---|---|---|---|
+| A, task, no memory | 0.43 | (B's twin) | 1.49 |
+| B, task | 0.43 | +0.002 [−0.04, +0.04]; failed picks −4.6, falls −0.59 | 0.91 |
+| C, needs, counts | 0.16 | −0.030 [−0.08, +0.02] | 0.57 |
+| D, needs, rules | 0.32 | +0.115 [+0.05, +0.18] | 0.65 |
+
+D's gain minus C's: +0.145 [+0.063, +0.228], 13 of 16 lives, the
+milestone's criterion. Experience is worth what memory can tell apart
+(L-031): counts per skill pool every object, rules keep them apart. With
+a task, memory bought safety, not throughput.
+
+These agents had the hand-given tidiness need, a baseline. With
+approval as the only social need, so that what to do is learned from the
+owner (E-040, fresh lives 700 to 715), D's gain from experience minus C's
+in her measure was +0.51 [+0.04, +0.97] a room with the basket owner and
++0.30 [−0.12, +0.72] with the owner who wants her blue things left alone;
+D's own gain was +0.88 and +0.53, both clear of zero.
+
+*An owner who changes her mind* (agent C, basket owner to the owner who
+wants her blue things left alone, from room 11). Her measure in rooms 16
+to 20 was −0.29 [−0.83, +0.26] against a duck that had known the second
+preference from birth; the two preferences agree on most toys and the
+measure is too noisy to show recovery or rule it out (L-032).
+Discounting old evidence (half-life 3 rooms) was worse in development.
+
 ## 7. Discussion
 
 **Ground the beliefs before tuning the behavior.** The largest gains in
@@ -1001,13 +1042,16 @@ the architecture learns.
 | 5 | Skills composed by the cloud brain | A compound skill the cloud brain wrote is kept on measured merit and does something no hand-written skill does, or does it better | met (E-019) |
 | 5a | Authoring, sharpened | Keep decisions judged on fresh outcomes (L-023); kept skills become parents; authoring in the owner arms | met: gains hold with fair trials and with the owner; no skill was built on another; a small whole-room cost with the task (E-020) |
 | W | World 2: a harder world | The mind meets 24 kinds of object with hidden properties, furniture and inner walls; measure what breaks, fix it one change at a time on held-out lives, and check the kept changes together on fresh lives | done (E-021 to E-025) |
-| 6 | Lifetimes, agents A to D, changing owners | The developmental agent beats the proactive one on competence gained per room; after the owner's preference changes mid-life the duck recovers within a stated number of rooms | planned |
+| 6 | Lifetimes, agents A to D, changing owners | The developmental agent beats the proactive one on competence gained per room; after the owner's preference changes mid-life the duck recovers within a stated number of rooms | first criterion met, with a hand-given need (E-038) and learning from the owner (E-040); recovery not shown (E-038, E-039) |
 | 7 | Hardware | On-device keyword spotting for the phrase lists, toy and basket detection, a wall map from the range sensor; the same mind drives the physical Microduck under supervision | planned |
 
-The agents of Milestone 6 are: A, reactive (explicit task, no memory); B,
-with persistent beliefs and skill records; C, proactive (needs and
-self-generated goals); and D, developmental (C plus predictions, surprise,
-reflection, and experiments chosen for expected learning progress).
+The agents of Milestone 6 (`--agent`) are: A, reactive (explicit task, no
+memory between rooms); B, with persistent beliefs, rules and skill
+records; C, proactive (needs and self-generated goals, valued by counts
+per skill); and D, developmental (C deciding with its rules, which judge
+each object by its own pick and delivery, and deferring what a credible
+rule speaks against). Choosing experiments by expected learning progress
+(H-005) is not yet part of D.
 
 Open questions that the roadmap does not yet settle:
 
