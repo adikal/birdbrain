@@ -1,0 +1,76 @@
+== e025-old-task: 160 rooms from room 11
+  pick: 1645 (10.3 a room)
+     44.1%  failed: requirement not met
+     35.3%  done
+     12.5%  failed: X is no longer where it was believed
+      2.8%  interrupted: run ended
+      2.5%  failed: blocked
+      1.1%  failed: fell
+      1.0%  failed: X position unknown
+      0.7%  timeout: walk_toward took over 35 s
+  deliver: 2179 (13.6 a room)
+     57.8%  failed: X is no longer where it was believed
+     14.9%  done
+     13.8%  failed: requirement not met
+      6.7%  failed: fell
+      3.7%  interrupted: run ended
+      1.7%  failed: blocked
+      0.7%  timeout: walk_toward took over 40 s
+      0.6%  timeout: over budget 20.0 s
+    basket lost: 57.8%
+== e025-new-task: 160 rooms from room 11
+  pick: 1843 (11.5 a room)
+     36.7%  done
+     21.4%  failed: requirement not met
+     16.3%  interrupted: reconsidered
+     16.1%  failed: X is no longer where it was believed
+      3.2%  failed: blocked
+      2.6%  interrupted: run ended
+      2.1%  failed: fell
+      1.2%  failed: X position unknown
+  deliver: 883 (5.5 a room)
+     47.6%  done
+     19.7%  failed: fell
+     13.1%  failed: X is no longer where it was believed
+      6.7%  interrupted: run ended
+      5.1%  failed: blocked
+      3.7%  failed: not known(basket) or not holding(self) after 4 iterations
+      2.9%  timeout: walk_toward took over 40 s
+      1.1%  failed: requirement not met
+    basket lost: 16.9%
+== e025-old-hers: 160 rooms from room 11
+  pick: 595 (3.7 a room)
+     47.4%  done
+     39.0%  failed: requirement not met
+      7.9%  failed: X is no longer where it was believed
+      2.4%  interrupted: run ended
+      1.8%  failed: blocked
+      0.7%  failed: fell
+      0.5%  timeout: walk_toward took over 35 s
+      0.3%  failed: X position unknown
+  deliver: 69 (0.4 a room)
+     59.4%  failed: X is no longer where it was believed
+     23.2%  done
+      8.7%  interrupted: run ended
+      5.8%  timeout: walk_toward took over 40 s
+      1.4%  failed: requirement not met
+      1.4%  failed: fell
+    basket lost: 59.4%
+== e025-new-hers: 160 rooms from room 11
+  pick: 560 (3.5 a room)
+     39.5%  done
+     32.1%  failed: requirement not met
+     10.2%  failed: X is no longer where it was believed
+      9.1%  interrupted: reconsidered
+      4.6%  interrupted: run ended
+      1.6%  failed: blocked
+      1.6%  failed: fell
+      0.7%  failed: X position unknown
+  deliver: 29 (0.2 a room)
+     51.7%  done
+     20.7%  failed: fell
+     13.8%  failed: X is no longer where it was believed
+      6.9%  failed: requirement not met
+      3.4%  timeout: walk_toward took over 40 s
+      3.4%  interrupted: run ended
+    basket lost: 13.8%

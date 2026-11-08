@@ -219,13 +219,17 @@ def live_loop(session: Any, seconds: float, speed: float, stop: threading.Event,
 def _live_title(args: Any) -> str:
     """A plain description of what a live run shows."""
     brain = "cloud brain (Bedrock)" if args.provider == "bedrock" else "local policy"
-    if args.owner:
+    if args.owner == "hers":
+        what = "owner who wants her blue things left alone"
+    elif args.owner:
         what = "no owner (control)" if args.owner == "none" else f"owner who likes toys {OWNER_TEXT[args.owner]}"
         what = f"Milestone 3b · {what}"
     elif args.needs:
         what = f"Milestone 3 · no task, needs only, {args.room} room"
     else:
         what = "Milestone 1 · task: tidy the room"
+    if args.world == "world2":
+        what = f"World 2 · {what if (args.owner or args.needs) else 'task: tidy the room'}"
     if args.memory:
         what += f" · memory {args.memory.name}"
     if args.author:
@@ -252,8 +256,11 @@ def main() -> None:
     ap.add_argument("--provider", choices=["local", "bedrock"], default="local")
     ap.add_argument("--needs", action="store_true", help="no task: the duck acts on its needs (Milestone 3)")
     ap.add_argument("--room", choices=["messy", "tidy"], default="messy")
-    ap.add_argument("--owner", choices=["none", "basket", "wall", "leave"], default=None,
-                    help="Milestone 3b: a scripted owner with this hidden preference")
+    ap.add_argument("--owner", choices=["none", "basket", "wall", "leave", "hers"], default=None,
+                    help="Milestone 3b: a scripted owner with this hidden preference (hers: World 2)")
+    ap.add_argument("--world", choices=["playroom", "world2"], default="playroom",
+                    help="world2: many kinds of object with hidden properties, furniture, inner walls (E-021)")
+    ap.add_argument("--kinds", choices=["dev", "all", "late"], default="all", help="World 2's object kinds")
     ap.add_argument("--author", action="store_true",
                     help="Milestone 5: when the run ends, the cloud brain may write a skill (needs --memory)")
     ap.add_argument("--rules", choices=["mean", "draw", "cautious"], default=None)
@@ -272,7 +279,7 @@ def main() -> None:
         title = args.title or _live_title(args)
         session = PlayroomSession(args.seed, provider=args.provider, journal=journal, needs=args.needs, room=args.room, owner=args.owner,
                                   memory_dir=args.memory, author=args.author, rules=args.rules,
-                                  title=title)
+                                  title=title, world=args.world, kinds=args.kinds)
         camera = None
         if not args.no_camera:
             from birdbrain.observability.camera import HeadCamera

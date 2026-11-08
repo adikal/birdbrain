@@ -103,15 +103,25 @@ class BodyProfile:
     cam_ahead: float = 0.064          # camera ahead of the trunk origin (m)
     fov_h: float = np.deg2rad(116.0)
     fov_v: float = np.deg2rad(60.0)
-    # Range sensor. `brain/tidy.py`: a held toy fills the bottom-centre zones.
+    # Range sensor. `brain/tidy.py`: a held toy fills the bottom-centre zones. It sits
+    # beside the camera and looks the same way (lab `sensors/tof.py`: 8x8 zones, 45 deg).
     hold_blind_m: float = 0.12
     blocked_m: float = 0.25
+    range_fov: float = np.deg2rad(45.0)
+    range_zones: int = 8
+    # Half the body's width, by which obstacles are grown to plan a way round them (E-030).
+    half_width: float = 0.15
     # Object classes the detector reports: centre height above the floor (m).
     class_height: dict[str, float] = field(
         default_factory=lambda: {"toy": 0.015, "basket": 0.08, "ball": 0.035, "duck": 0.12, "person": 0.9}
     )
     # Class sizes the duck is told about (footprint half-width, m).
     class_half_width: dict[str, float] = field(default_factory=lambda: {"basket": 0.15})
+    # Classes of one known size: the radius that the detector's apparent width implies
+    # (range x tan(width / 2)), measured against truth in World 2 (ledger E-022), with
+    # the width's relative error.
+    class_width_radius: dict[str, float] = field(default_factory=lambda: {"basket": 0.12})
+    width_sigma_frac: float = 0.11
 
 
 MICRODUCK = BodyProfile()

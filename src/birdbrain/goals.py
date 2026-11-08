@@ -168,7 +168,8 @@ def kinds_owner(reactions: Any, rng: Any, draws: dict[str, Any], kind_of: Callab
 
 def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[str, Any],
                         tools: set[str], owner_p: Owner, kind_records: dict[str, Any] | None = None,
-                        give_up_after: int = 3, predict: Predict | None = None) -> list[Goal]:
+                        give_up_after: int = 3, predict: Predict | None = None,
+                        kind_of: Callable[[str, dict[str, Any]], str] | None = None) -> list[Goal]:
     """Goals when the social need is approval (Milestone 3b, design section 4.3).
 
     No goal names a state of the room. Each goal is a way of acting, valued by what the
@@ -207,25 +208,28 @@ def approval_candidates(kb: KnowledgeBase, t: float, needs: Any, records: dict[s
             return stats(skill, args)
         return stats(kind) if kind in kind_records and kind_records[kind].trials else stats(skill)
 
+    # The owner's reaction to a kind of action is learned per action of that kind, whether
+    # it worked or not, so it already prices failure in: it is not multiplied by the
+    # chance of success again (E-027). A pick's own reaction is its own; the put's
+    # reaction follows only if the pick worked.
     puts = [(name, *owner(name), *stats(name)) for name in PUTS if name in tools]
     if held is not None:
-        for name, value, unsure, p, lp, c, risk in puts:
+        for name, value, unsure, _, lp, c, risk in puts:
             out.append(Goal(f"approval:{name}", "put", "approval", "true", ((name, ()),),
-                            {"dV": value * p, "LP": lp, "IG": 0.0, "C": c, "R": risk, "sd": unsure}))
+                            {"dV": value, "LP": lp, "IG": 0.0, "C": c, "R": risk, "sd": unsure}))
     elif "pick" in tools and puts:
         # A pick is followed by the put that looks best: its value, cost and risk.
-        _, put_value, _, put_p, _, put_cost, put_risk = max(puts, key=lambda m: m[1] * m[3])
-        best_value = put_value * put_p
+        _, best_value, _, _, _, put_cost, put_risk = max(puts, key=lambda m: m[1])
         for e in kb.of_class("toy"):
             a = kb.get("at", e)
             if a is None or not known(kb, t, e) or failures(kb, t, "pick", e) >= give_up_after:
                 continue
-            kind = f"pick from {where(kb, t, e)}"
+            kind = kind_of("pick", {"x": e}) if kind_of is not None else f"pick from {where(kb, t, e)}"
             value, unsure = owner("pick", {"x": e})
             p_pick, lp_pick, c_pick, r_pick = kind_stats(kind, "pick", {"x": e})
             travel = 0.0 if here is None else here.distance(a.value) / MICRODUCK.walk_speed / HORIZON_S
             out.append(Goal(f"approval:pick:{e}", "pick", "approval", "true", (("pick", (("x", e),)),),
-                            {"dV": p_pick * (value + best_value), "LP": lp_pick, "IG": 0.0,
+                            {"dV": value + p_pick * best_value, "LP": lp_pick, "IG": 0.0,
                              "C": c_pick + put_cost + travel, "R": r_pick + put_risk, "sd": unsure}))
     for goal in candidates(kb, t, needs, records, tools & {"look_around", "explore", "rest"}, predict=predict):
         # Exploring and resting also carry whatever the owner has been seen to think of them.

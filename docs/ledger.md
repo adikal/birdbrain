@@ -123,6 +123,59 @@ Entry ids: `E-###` experiments, `H-###` hypotheses, `L-###` lessons.
   succeeded more often and took longer, won its trials, and cost the
   room a tenth of a toy where time was short. A trial's score should be
   the same currency as the goal. (E-020)
+- **L-026. A measured parameter holds where it was measured.** The basket's
+  detection rate (0.96) was measured in a room where it was never more
+  than 2 m away. In a larger room the same number made the duck stop
+  believing in a basket it was walking toward. Re-measure the body's
+  parameters when the world changes, before blaming the mind. (E-022)
+- **L-027. Let a strong effect be strong.** A normal prior on each
+  condition's effect, right for the many weak ones, held a fall rate of 70%
+  to a prediction of 22%, and the duck kept doing what it knew made it
+  fall. A heavy-tailed prior shrinks weak effects as much and strong ones
+  far less. (E-026)
+
+- **L-028. Gains shrink on the way out.** A change is kept because its
+  development lives looked good, so its development gain is biased up;
+  then the held-out lives it is checked on are used again and again. E-033
+  went from +3.3 points in development to +1.0 held out; the second round
+  from +5.6 on lives 400 to 415 to +3.0 on fresh ones (E-032). Quote the
+  fresh number. (E-032, E-033)
+
+- **L-029. A correction is a hypothesis too.** A reviewer found real
+  defects in the map (a doorway the planner could close, low boxes that hid
+  what the camera saw over). Fixed together, the duck did worse, held out
+  and in development, and the fixes were reverted. A defect's cost is
+  measured, not assumed; fix one, test it, keep it if it helps. (E-034,
+  E-035)
+
+## Known defects
+
+Found by review, in the code, each pinned by a strict expected-failure test
+(`tests/test_world2_mind.py`, `tests/test_occupancy.py`) unless noted. Fixing
+them together did worse (E-034, E-035); each needs its own experiment.
+
+- *The planner can close a 0.6 m doorway*: obstacles are grown by 2 cells
+  (0.2 m) for a 0.15 m half-width.
+- *The frontier has no exemption round the duck*: beside a wall, exploring
+  falls back to wandering.
+- *A rule about the situation defers every toy*: a credible condition such
+  as "basket unknown", the same for every toy, makes them all poor
+  prospects at once; the ledger (E-029) means conditions of the toy.
+- *Routing drops the basket's detour*, whose low rim is not on the map.
+- *Map occlusion ignores height*: a low box hides what the camera sees
+  over it.
+- *The Cauchy fit stops at a saddle point* (H-024).
+- Not pinned by a test: cells within 0.25 m of the camera are skipped when
+  judging what it can see; a range return is placed on the zone's centre
+  ray, a quarter of a zone above the sub-rays that report it, so low edges
+  read about 2 cm high; the map uses the last camera frame's head pose
+  and keeps mapping during reflexes; the imagined delivery in judging a
+  pick bins the basket distance from where the duck stands, not from the
+  toy; apparent width is computed with three range conventions
+  (`_appearance`, `detection_rate`, the probe).
+- Tuned to this world: the map's 7 cm floor sits above the 6 cm basket rim;
+  the rules' size bins fall between World 2's shapes; the frontier search
+  stops after about 40 m².
 
 ## Open hypotheses
 
@@ -142,6 +195,36 @@ Ordered by what to test next. Resolved ones keep their verdict.
   With fair trials and on fresh lives, success there rose 7.5 points per
   life with a task and 10 with the basket owner, with no more falls; the
   duck kept 6 of 44 and retired 3 (E-020).
+- **H-023** (World 2) **Supported in part, for another reason** (E-027).
+  The duck was idle because the scorecard counted failure twice: her
+  reaction to a kind of action is learned per attempt, and was multiplied
+  by the chance of success again. Counted once, approvals rose 4-fold and
+  her measure +0.26. As first stated: with an owner in a large room the duck mostly looks,
+  explores and rests, because the curiosity term of the scorecard outbids
+  the small, uncertain value of pleasing her. Exploration valued by what it
+  finds (objects confirmed per second, measured), in place of a fixed
+  bonus for uncertainty, raises her measure. *Test:* her measure, World 2
+  held-out lives.
+- **H-025** (perception). Misses of one object from one viewpoint are not
+  independent, so a calibrated per-frame detection rate overcounts the
+  evidence of absence; counting misses once per change of viewpoint (or
+  per second) with the calibrated rate does better than E-028's
+  accidentally low rate. *Test:* the playroom and World 2, toys forgotten
+  and tidying.
+- **H-024** (rules). The Cauchy prior's fit stops at the symmetric split of
+  an effect between a feature's collinear indicators, a saddle point
+  (E-034 review). Reference coding, with the Laplace covariance from the
+  exact Hessian at the mode, gives strong effects their full size and an
+  honest sd. *Test:* offline replay Brier scores (`rules_replay.py`), then
+  deferral and falls in World 2.
+- **H-022** (World 2) **Supported in part.** With a heavy-tailed prior on
+  each condition's effect the duck believed the strong ones: falls holding
+  heavy objects −0.16 a room, heavy grasps −0.19 per object (E-026). As
+  first stated: the duck avoids heavy objects only weakly, because
+  its rules add one effect per condition and a heavy kind shares its colour
+  or size with kinds that are fine. A condition for colour and size
+  together, or memory per object, makes heavy objects poor prospects.
+  *Test:* falls while holding a heavy object, World 2 held-out lives.
 - **H-021** (authoring). Scoring a written skill's trial by successes per
   second, where the room is short of time, removes E-020's whole-room cost
   without losing the gain in its situation. *Test:* the task setting of
@@ -206,6 +289,1144 @@ Ordered by what to test next. Resolved ones keep their verdict.
   gains more competence per episode than choosing by novelty.
 
 ## Experiments
+
+### E-035 · 2026-11-07 · The review fixes, reconsidered (development, reverted)
+
+**Question.** E-034's bundle did worse with the task. Which part?
+
+**Development** (lives 0 to 7, against E-033's development lives):
+- (a) Mapping while the head is steady (its last two camera poses agree)
+  instead of within 50 ms of a camera frame: the map holds 119 to 164
+  occupied cells in three rooms (99% to 100% precise). Task tidying +0.002
+  [−0.041, +0.045]; owner −0.35 [−1.01, +0.31]; falls +0.21.
+- (b) Mapping with the latest camera pose, as in E-033, keeping every other
+  fix: 132 to 213 cells (98% to 100% precise). Task −0.044 [−0.113,
+  +0.024]; owner −0.34 [−0.83, +0.16].
+
+**Analysis.** No version of the review's fixes did better than E-033's
+code on the measures that matter, in development or held out (E-034). Some
+were corrections of real defects (the doorway can close in the planner;
+low boxes hide what the camera sees over; the basket's rim is not avoided
+while routing), and correcting them still did not help: the defects may
+cost less than the changes that removed them, or interact (opening the
+doorway sends the duck through it more, where it falls and loses the
+basket; height-aware occlusion lets more misses count, as in H-025).
+
+**Decision.** Revert the mind to E-033's code, and keep the defects as
+strict expected-failure tests, each failing on its own assertion. The
+defects stay open (listed under *Known defects*): each fix needs its own
+experiment, one at a time.
+
+**Cleanup after the final review** (`semantic-review/2026-11-07-230647-pr-local.md`;
+no change to behaviour: six fingerprint rooms, World 2 with and without the
+owner and the playroom, reproduce exactly). The probe, which still called
+a reverted method, now applies the mind's actual visibility test (range
+sensor, then the map) to objects and to the basket. The superseded
+`detection_by_range.py` is gone. The playroom's toy table by range, never
+read since E-028, is gone. The range sensor's geometry and the duck's
+half-width live once, in `BodyProfile`; the two bare 0.15 m spares are
+named; classes of varied size are those with a width table, not "toy" by
+name. Mind modules may not import the owner. Tests now cover reconsidering
+(the credible stop, no stop after the reflex, the owner's colour stop),
+stopped actions in both owner models, E-027's value, appearance, the
+Cauchy prior's direction, and World 2's measures.
+
+### E-034 · 2026-11-07 · Review of the second round (pre-registered)
+
+**Review** (`semantic-review/2026-11-07-201521-pr-local.md`, a clean-context
+reading of `4e28859..HEAD`). No truth reaches the mind. Findings, checked:
+- *The doorway was closed for planning* (confirmed). Obstacles were grown by
+  2 cells (0.2 m) for a 0.15 m half-width, leaving a 0.6 m doorway one free
+  cell or none, so routes and the frontier could not pass it. Now grown by
+  1.5 cells; a test puts a doorway between two walls at four grid offsets.
+- *Routing dropped the basket detour* (confirmed). The basket's 6 cm rim is
+  not mapped, and `walk_toward` used the waypoint instead of the detour.
+  The detour now applies on the way to the waypoint.
+- *Phantom obstacles* (likely). A return was placed on the zone's centre
+  ray, a quarter of a zone above the sub-rays that report it, so a 6 cm rim
+  read as 7.4 to 8.3 cm; and the head pose came from the last camera frame,
+  up to 130 ms old. Returns are now placed on the lower sub-row, mapping
+  uses a camera frame within 50 ms, and nothing is mapped during a reflex.
+  Precision against true obstacles in three rooms: 100% (was 97% to 99%).
+- *Map occlusion ignored height* (likely). Any mapped cell hid what lay
+  behind it, low boxes and the basket's own rim included. Each cell now
+  keeps the top of what was hit, and hides an object only if it stands
+  above the line of sight there; the object's own footprint plus a cell is
+  not in its way.
+- *Waypoints could be overshot* between re-plans; re-planning now also
+  happens when one is reached or falls behind.
+- *The object detection table was measured with hidden objects counted as
+  misses* (likely), and with a different range than the mind uses.
+  Re-measured with a true ray cast and the mind's range: 0.12 at 1 to 1.5
+  degrees, 0.47 at 2 to 2.5, 0.83 at 3 to 3.5, 0.96 from 3.5.
+- *The Cauchy fit stops at a saddle point* (confirmed). A feature's centred
+  indicator columns are collinear; under the Cauchy prior the symmetric
+  split of an effect between them is a saddle, not the mode, so strong
+  effects are shrunk more than intended and their sd understated (in the
+  reviewer's example, contrast −2.80 with sd 0.94 against −3.87 with sd 1.76
+  at the mode). E-026 measured the learner as it is. Fixing it (reference
+  coding, exact Hessian) changes which rules are credible, so it is left as
+  its own experiment (H-024).
+
+**Development** (lives 0 to 7, against E-033's development lives; the
+playroom against E-031's, since E-033 left it unchanged).
+- With every fix: possible objects −0.044 [−0.081, −0.006] (6 of 8 lives
+  lower), the playroom −0.23 [−0.42, −0.03].
+- With every fix but the re-measured detection table (E-028's kept):
+  possible objects +0.007 [−0.053, +0.066], the playroom −0.05 [−0.15,
+  +0.05]. The drop came from the table.
+- The table measured with true line of sight, and again under the mind's
+  own visibility test (0.11 at 1 to 1.5 degrees, 0.44 at 2 to 2.5, 0.79 at
+  3 to 3.5, 0.93 from 3.5), is higher at small widths than E-028's, which
+  counted hidden objects as misses. The more accurate rate did worse. A
+  likely reason: the miss model treats frames as independent, and misses
+  of one object from one viewpoint are not, so a calibrated per-frame rate
+  counts the same evidence many times; E-028's lower rate discounted it by
+  accident (H-025). E-028's table is kept until that is tested.
+
+**Predictions** (lives 400 to 415, rooms 11 to 20, against E-033's arms; the
+fixes with E-028's table, commit `b4e234b`):
+1. Task: possible objects in the basket, CI lower bound above −0.03.
+2. Task: deliveries across the inner wall end `done` at least 42% of the
+   time, pooled (E-033: 42%).
+3. Owner: her measure gained a room, CI lower bound above −0.3.
+4. Playroom toys in the basket: CI lower bound above −0.15.
+
+**Result** (tags `e034-task`, `e034-hers`, `e034-playroom`; `report_task.txt`,
+`report_hers.txt`).
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | task: possible objects in the basket | −0.019 [−0.050, +0.013], 8 of 16 lives lower | missed |
+| 2 | task: deliveries across the inner wall `done` | 36% (E-033: 42%) | missed |
+| 3 | owner: her measure gained a room | +0.19 [−0.08, +0.47], 13 of 16 higher | met |
+| 4 | playroom toys in the basket | +0.006 [−0.039, +0.052] | met |
+
+**Diagnosis.** Requiring a camera frame within 50 ms of each range frame
+left about half the range frames unmapped: in three rooms the map held 78,
+183 and 100 occupied cells against E-033's 162, 232 and 168 (all within
+0.2 m of a true obstacle, against 98%). A sparser map routes less well.
+
+**Decision.** Keep the fixes that are corrections (the doorway, the basket
+detour, height-aware occlusion, re-planning at waypoints); replace the
+freshness rule by one that keeps more of the map (E-035).
+
+### E-033 · 2026-11-07 · Searching for the basket where it has not looked (pre-registered)
+
+**Question.** On E-032's fresh lives, deliveries with the inner wall
+between the duck and the basket ended `done` 34% of the time, and 40% lost
+the basket: 21 of 119 failed deliver's own search ("not known(basket)
+after 4 iterations"). The search walked for 6 s in whatever direction the
+duck faced, then looked around.
+
+**Change** (`library/deliver.json`). The search walks to the frontier, as
+exploring does (E-031).
+
+**Development** (lives 0 to 7, against E-031's development lives).
+Possible objects tidied +0.033 [+0.002, +0.065], 6 of 8 lives higher.
+Deliveries across the inner wall `done` 22% against 15%, basket lost 31%
+against 37%. With the owner: her measure +0.13 [−0.13, +0.38], falls
+−0.13.
+
+**Predictions** (lives 400 to 415, rooms 11 to 20, against E-031's arms):
+1. Task: possible objects in the basket, CI lower bound above −0.01.
+2. Owner: her measure gained a room, CI lower bound above −0.2.
+3. Playroom toys in the basket: CI lower bound above −0.1.
+
+**Result** (tags `e033-task`, `e033-hers`, `e033-playroom`; `report_task.txt`,
+`report_hers.txt`).
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | task: possible objects in the basket | +0.010 [−0.006, +0.027] | met |
+| 2 | owner: her measure gained a room | −0.02 [−0.17, +0.13] | met |
+| 3 | playroom toys in the basket | identical | met |
+
+Deliveries across the inner wall: `done` 42% against 36%, basket lost 23%
+against 36% (95 and 107 deliveries). Falls unchanged.
+
+**Analysis.** The search now finds the basket behind the inner wall more
+often, as intended; the room's total moved by a point, within noise,
+because such deliveries are a tenth of all. The development gain (+3.3)
+did not hold at that size.
+
+**Decision.** Keep it: the same frontier walk now serves exploring and
+searching, so there is one way of looking for something, and nothing
+measured got worse.
+
+### E-032 · 2026-11-07 · The second round on fresh lives (pre-registered)
+
+**Question.** E-026 to E-031 were each checked on lives 400 to 415. Do the
+six kept changes, together, hold on lives that informed nothing?
+
+**Arms.** E-025's mind (commit `4e28859`, from a worktree; the world code
+is the same) against the current mind, on lives 500 to 515 (rooms 50001 to
+51520): World 2 with the task, World 2 with the owner, and the playroom.
+On lives 400 to 415 the cumulative differences, against the baseline of
+`../E-026-baseline/`, were: possible objects +0.056, wide objects grasped
+−0.34 per object (new wide kinds −0.56), falls −0.18; her measure +0.36,
+falls with her +0.25; playroom toys +0.31.
+
+**Predictions** (rooms 11 to 20, paired by life):
+1. Task: possible objects in the basket, CI lower bound above 0.
+2. Task: wide objects of new kinds grasped per object, CI upper bound below
+   −0.2.
+3. Task: falls, CI upper bound below +0.15.
+4. Owner: her measure gained a room, CI lower bound above −0.1.
+5. Owner: falls, reported with no prediction.
+6. Playroom: toys in the basket, CI lower bound above 0.
+
+**Method.** The new mind at the pre-registration commit (later commits
+changed only documentation), `4e28859` from a worktree for the
+old. Six arms of 16 lives × 20 rooms. Reports: `report_task.txt`,
+`report_hers.txt`.
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | task: possible objects in the basket | 0.41 against 0.38: +0.030 [−0.018, +0.078], 12 of 16 lives higher | missed |
+| 2 | task: new wide kinds grasped per object | −0.20 [−0.40, −0.01] | missed (bound −0.2) |
+| 3 | task: falls a room | 0.83 against 1.11: −0.28 [−0.55, −0.00] | met |
+| 4 | owner: her measure gained a room | +0.27 against −0.13: +0.40 [+0.22, +0.59], 13 of 16 higher | met |
+| 5 | owner: falls a room | 0.51 against 0.31: +0.20 [+0.01, +0.40] | reported |
+| 6 | playroom toys in the basket | 5.56 against 5.26: +0.29 [+0.21, +0.38], 16 of 16 higher | met |
+
+- *Task, in detail.* Plain objects +0.072 [+0.003, +0.140]; objects of
+  kinds never met +0.099 [+0.044, +0.154]; heavy objects grasped −0.27 per
+  object (new heavy kind −0.22), falls holding one −0.27; wide −0.16;
+  objects never found −0.039.
+- *Owner.* Possible objects put away 0.085 against 0.011; objects never
+  found 33% against 46%; her blue things moved +0.045 [−0.016, +0.106].
+
+**Analysis.** On lives that informed nothing, the second round made the
+duck fall a quarter less with the task, avoid what it has learned it
+cannot carry, carry that to kinds it never met, and work for its owner,
+whose measure went from slightly negative to clearly positive. The
+playroom gained more than at any time since Milestone 1, in every life.
+The gain in tidying with the task (+3 points) is smaller than on lives 400
+to 415 (+5.6) and its interval includes zero: the size of that gain was
+overstated by the lives the changes were tuned on. With the owner the duck
+falls more, because it now does things.
+
+**Decision.** The second round stands as a whole. Next: deliveries across
+the inner wall (33% `done`), falls at the basket rim, and falls with the
+owner.
+
+### E-031 · 2026-11-07 · Exploring where it has not looked (pre-registered)
+
+**Question.** After E-030, 28% of objects in a task room and 40% with the
+owner are never found, most of them in parts of the room the duck never
+came within a metre of (E-028: 297 of 531 unfound objects). Exploring was
+a walk in a straight line, turning away from obstacles, then a look
+around: it goes wherever the duck happens to face.
+
+**Change** (`occupancy.py`, `skills.py`, `library/explore.json`).
+Exploring walks to the nearest *frontier*: a cell of floor the map has seen
+free, at least 0.8 m away by a free path, next to a cell never seen
+(breadth-first through free cells round grown obstacles), using the same
+routed walk as everything else (E-030). It wanders as before when there is
+no frontier.
+
+**Development** (lives 0 to 7, against E-030's development lives). With
+the owner, who leaves the duck time to explore: objects never found −0.09
+[−0.19, +0.00], possible objects put away +0.057 [−0.019, +0.133], her
+measure +0.30 [−0.15, +0.75] (6 of 8 higher), falls +0.24 [−0.15,
++0.62]. With the task: never found −0.03, tidying −0.003 [−0.021,
++0.015]. The playroom: −0.012 [−0.04, +0.02].
+
+**Predictions** (lives 400 to 415, rooms 11 to 20, against E-030's arms):
+1. With the owner, objects never found: CI upper bound below 0.
+2. With the owner, her measure gained a room: CI lower bound above −0.2.
+3. With the task, possible objects in the basket: CI lower bound above −0.03.
+4. Playroom toys in the basket: CI lower bound above −0.1.
+
+**Method.** Commit `e6148a7` (`e031-hers`, `e031-task`,
+`e031-playroom`, lives 400 to 415) against E-030's arms (`report_hers.txt`,
+`report_task.txt`).
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | owner: objects never found | 33% against 40%: −0.069 [−0.112, −0.025], 12 of 16 lower | met |
+| 2 | owner: her measure gained a room | +0.000 [−0.35, +0.35] | missed |
+| 3 | task: possible objects in the basket | +0.003 [−0.022, +0.029] | met |
+| 4 | playroom toys in the basket | identical | met |
+
+With the task, objects never found −0.018 [−0.047, +0.011]. The playroom
+was identical: there the frontier is reached in the first room's first
+minutes, and exploring after that is as before.
+
+**Analysis.** The duck now finds more of what is there, and with the owner
+markedly so. Finding is not putting away: her measure did not move, so
+what limits it is what the duck does with what it finds.
+
+**Decision.** Keep it: it is a more general way to explore, it costs
+nothing measured, and it is what the next owner experiment builds on.
+
+### E-030 · 2026-11-07 · A map of what is in the way (pre-registered)
+
+**Question.** Deliveries fail when something stands between the duck and
+the basket. In E-028's held-out lives, with a clear line 76% of
+deliveries ended `done`; with furniture between, 29%; with the inner wall
+between, 8%, most with the basket lost. And 31% of objects were never
+found, most behind the inner wall. The duck walks straight at its target,
+turns away when the range sensor shows something close, and keeps no
+memory of what it has seen in the way.
+
+**Change** (`occupancy.py`, `perception.py`, `skills.py`).
+- *The map.* Each range-sensor frame is folded into a grid of 10 cm cells
+  in the odometry frame: the cells a zone's ray crosses are free, and where
+  it ends, if it ends 7 to 50 cm above the floor, something stands
+  (log-odds, bounded). The floor, toys and the basket's 6 cm rim stay
+  below. Measured against the true walls and furniture in three rooms,
+  97% to 99% of the cells it calls occupied lie within 0.2 m of one.
+- *Walking.* `walk_toward` re-plans twice a second: if the straight line to
+  its target crosses mapped obstacles (grown by the duck's half-width), it
+  heads for the furthest point of a shortest way round (A* over the grid,
+  unseen cells taken as free) that it can walk to in a straight line.
+- *Seeing.* A frame without an object that the map shows behind a wall or
+  furniture is no evidence against it, as for the range sensor's own view
+  (E-022), now beyond its narrow field.
+
+**Development** (lives 0 to 7, against E-029's development lives).
+Possible objects tidied +0.030 [+0.005, +0.054], 7 of 8 higher; plain
+objects +0.050. Deliveries with furniture between ended `done` 59% of the
+time (E-029: 19%), with the inner wall between 19% (13%); falls −0.09
+[−0.55, +0.37]. Routing alone (without the change to seeing) gave
++0.035 [−0.002, +0.073]. The playroom: +0.075 [−0.012, +0.162]. With the
+owner, against E-027's development lives (which lack E-028 and E-029):
+her measure −0.08 [−0.47, +0.32], falls −0.16.
+
+**Predictions** (lives 400 to 415, rooms 11 to 20, paired by life, against
+E-029's mind on the same lives; for the owner, E-029's mind run from a
+worktree, `owner_ctl.jsonl`):
+1. Possible objects in the basket: CI lower bound above 0.
+2. Deliveries with furniture between the duck and the basket end `done` at
+   least 40% of the time, pooled (E-028: 29%).
+3. Playroom toys in the basket: CI lower bound above −0.1.
+4. With the owner, her measure gained a room: CI lower bound above −0.3.
+
+**Method.** Commit `31b691e`. Tags `e030-task`, `e030-playroom`,
+`e030-hers`, and `e030-owner-ctl` (E-029's mind from a worktree), lives
+400 to 415. Reports: `report_task.txt`, `report_hers.txt`.
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | possible objects in the basket | 0.45 against 0.40: +0.054 [+0.023, +0.085], 14 of 16 lives higher | met |
+| 2 | deliveries with furniture between, ending `done` | 54% (E-029 on the same lives: 30%) | met |
+| 3 | playroom toys in the basket | −0.006 [−0.056, +0.043] | met |
+| 4 | her measure gained a room | +0.000 [−0.20, +0.20] | met |
+
+With the inner wall between, deliveries ended `done` 33% of the time
+(E-029: 9%). Objects never found fell from 32% to 28% (−0.041 [−0.080,
+−0.002]). Falls +0.14 [−0.09, +0.37].
+
+**Analysis.** A memory of what is in the way, from a sensor the robot
+already has, let the duck walk round furniture and through the doorway.
+Tidying in World 2 rose by 5 points, the largest single gain since E-022.
+The owner's measure did not change: with her, the duck carries less.
+
+**Decision.** Keep it.
+
+### E-029 · 2026-11-07 · Credible evidence, no bar (pre-registered)
+
+**Question.** A toy is deferred when a credible rule speaks against it *and*
+its predicted chance of working is below 0.1 (E-023). Wide objects
+predicted at 0.2 (observed 0.07) sat just above the bar, and in E-026's
+lives 26% of picks were still of wide objects. Is the bar needed?
+
+**Change** (`mind.py`). A toy is a poor prospect when a credible condition
+of it lowers the chance a pick or its delivery works, or raises the chance
+of a fall. The bar (`NOT_WORTH = 0.1`) is removed. Deferral is unchanged:
+nearest first among the rest, a poor prospect once nothing better is known.
+
+**Development** (lives 0 to 7, against E-028's development lives).
+Possible objects tidied +0.016 [−0.003, +0.034] (3 lives higher, 5 equal,
+0 lower), falls holding heavy objects −0.075 [−0.134, −0.016], heavy
+grasped −0.07, wide unchanged; the playroom's toys identical.
+
+**Predictions** (lives 400 to 415, rooms 11 to 20, against E-028's arms):
+1. Possible objects in the basket: CI lower bound above −0.02.
+2. Falls while holding a heavy object: CI upper bound below +0.05.
+3. Playroom toys in the basket: CI lower bound above −0.1.
+
+**Method.** Commit `7583ba6`. Tags `e029-task`, `e029-playroom` on lives
+400 to 415, against E-028's arms (`report.txt`).
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | possible objects in the basket | +0.001 [−0.009, +0.011] | met |
+| 2 | falls while holding a heavy object | −0.05 [−0.13, +0.03] | met |
+| 3 | playroom toys in the basket | +0.000 [−0.02, +0.02] (14 of 16 identical) | met |
+
+Falls a room fell: 0.76 against 0.91, −0.15 [−0.29, −0.01], 8 of 16 lower.
+
+**Decision.** Keep it: the rule is simpler (one constant fewer), the
+duck falls less, and nothing else moved.
+
+### E-028 · 2026-11-07 · Small things are hard to see (pre-registered)
+
+**Question.** In E-026's held-out lives, 39% of picks of plain 2.5 cm cubes
+failed with the toy "no longer where it was believed" (blocks 9%, sticks
+5%). Why?
+
+**Diagnosis.** The perception model's detection rate for toys was a table
+by range, measured in the playroom on its three toys (E-013): 0.97 within
+0.25 m, 0.41 at 1.1 m, 0.11 at 1.9 m. The detector's limits are in pixels,
+so what matters is how wide an object looks. Measured in 32 World 2 rooms
+against the detector's own frames (`scripts/detection_probe.py`, true
+identities read only by the probe), on frames the model calls visible:
+0.08 at 1 to 1.5 degrees, 0.33 at 2 to 2.5, 0.68 at 3 to 3.5, 0.91 at 4
+to 4.5, 0.94 beyond. A cube 1 m away looks 1.4 degrees wide and is seen 8%
+of the time; the table said 41%, so each frame without it erased belief
+in a cube that was there (L-026 again).
+
+**Change** (`perception.py`). Objects (class toy) are detected by apparent
+width, from the object's believed size (4 cm until it has been seen) and
+its range, with the measured table. The basket stays by range (one size).
+
+**Development** (lives 0 to 7 against E-026's development lives).
+- Picks of plain cubes: `done` 69% against 43%, "no longer believed" 9%
+  against 36%.
+- Possible objects tidied +0.010 [−0.030, +0.050]; heavy objects grasped
+  +0.13 [−0.02, +0.28] (heavy cubes are now found too), falls +0.16
+  [−0.10, +0.42].
+- Playroom: toys in the basket +0.26 [+0.06, +0.46], 6 of 8 lives higher
+  (its 3.2 cm bricks were over-expected too).
+
+**Predictions** (lives 400 to 415, rooms 11 to 20, against E-026's arms on
+the same lives, paired by life):
+1. Picks of plain cubes ending with the toy no longer believed: below 20%
+   (E-026: 39%).
+2. Possible objects in the basket: CI lower bound above −0.03.
+3. Playroom toys in the basket: CI lower bound above −0.1.
+4. Falls a room: CI upper bound below +0.3.
+
+**Method.** Commit `ee6f7d4`. Tags `e028-task`, `e028-playroom` on lives
+400 to 415, against `../E-026-heavy-tails/{task,playroom}.jsonl`
+(`report.txt`).
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | picks of plain cubes ending with the toy no longer believed | 6% (E-026: 39%); `done` 72% | met |
+| 2 | possible objects in the basket | +0.006 [−0.020, +0.033] | met |
+| 3 | playroom toys in the basket | 5.61 against 5.30: +0.31 [+0.17, +0.45], 14 of 16 lives higher | met |
+| 4 | falls a room | +0.02 [−0.17, +0.21] | met |
+
+Wide objects were grasped less (−0.19 [−0.32, −0.07] per object):
+believed longer, their sizes are known better. Heavy objects tidied fell
+(−0.045), plain ones rose (+0.017).
+
+**Analysis.** The same lesson as E-022, for objects: the detection model
+held a number measured on three toys of one size. Detection by apparent
+width is the general form, and it is what the camera does. In the playroom
+it was worth a third of a toy a room, the largest gain there since
+Milestone 1: its 3.2 cm bricks had been doubted the way World 2's cubes
+were. In World 2 the cubes are now picked, but the room's total did not
+move: deliveries, falls and the hard objects take the time saved.
+
+**Decision.** Keep it.
+
+### E-027 · 2026-11-07 · Pricing the owner's reactions once (pre-registered)
+
+**Question.** With an owner, the duck mostly looks around, explores and
+rests (E-025: 2,149 of 4,047 decisions in rooms 11 to 20 were to explore,
+1,178 to rest). Why (H-023)?
+
+**Diagnosis** (E-025's fresh owner lives, from the scorecards logged with
+every decision). The best pick goal had a median utility of −0.04, the
+best put −0.02, exploring +0.004. A pick's value was
+`p_pick × (her reaction to the pick + p_put × her reaction to the put)`.
+But her reaction to a kind of action is learned per action of that kind,
+whether it worked or not: the duck's belief that a delivery earns approval
+0.2 of the time already includes the deliveries that failed. Multiplying
+by the chance of success again counted failure twice, and halved the
+value of every pick and put in a world where half of them fail.
+
+**Changes tried in development** (lives 0 to 7, development kinds, owner
+`hers`, against the same lives with E-026's mind).
+- (a) *Count failure once* (`goals.py`). A put is worth her reaction to
+  it; a pick is worth her reaction to the pick plus the chance it works
+  times her reaction to the best put. Picks 5.3 against 3.5 a room,
+  approvals 0.46 against 0.19 (8 of 8 lives higher), time delivering 44 s
+  against 17, her measure +0.23 [−0.05, +0.50] a room (4 of 8 higher),
+  falls +0.28 [−0.02, +0.57], her things moved +0.08.
+- (b) *Partial pooling*, with (a). A kind never tried started from the
+  flat prior, which expects a reaction to a third of all actions and so,
+  with her displeasure weighing more than her pleasure, values every new
+  kind at −0.06. Starting a kind from the other kinds of the same skill
+  instead: her measure +0.21 [−0.33, +0.75], picks unchanged against the
+  control, disapprovals −0.14. No better than (a) alone, and it blurs the
+  colour distinction E-024 introduced (a blue pick's disapproval leaks into
+  every colour's prior). Reverted.
+
+**Predictions** (lives 400 to 415, `--kinds late`, owner `hers`, rooms 11
+to 20, against the baseline of `../E-026-baseline/`, paired by life):
+1. Approvals a room: CI lower bound above 0.
+2. Her measure gained a room: mean above 0 and CI lower bound above −0.1.
+3. Falls a room: CI upper bound below +0.4.
+
+**Method.** Commit `39dd2de` (with E-026's prior). `birdbrain-run --world
+world2 --kinds late --owner hers --seeds 16 --seed0 400 --episodes 20
+--tag e027-hers` against `../E-026-baseline/hers.jsonl` (`report.txt`).
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | approvals a room | 0.31 against 0.08: +0.23 [+0.05, +0.41], 11 of 16 higher | met |
+| 2 | her measure gained a room | +0.18 against −0.08: +0.26 [−0.08, +0.59], 9 of 16 higher | met |
+| 3 | falls a room | 0.55 against 0.24: +0.31 [+0.17, +0.46] | missed |
+
+The duck picked 5.3 times a room against 3.7, spent 30 s delivering
+against 6, put away more (possible objects 0.09 against 0.02, +0.065
+[+0.019, +0.112]) and found more (never found 40% against 46%). It also
+moved more of her blue things (0.19 against 0.12 of them) and was
+disapproved of more (+0.08).
+
+**Analysis.** Counting failure once turned an idle duck into one that
+works for its owner, roughly as often as it should given how often her
+approval follows. Acting has the costs acting has in this world: falls,
+and her things moved by picks made before their colour was seen. Her
+measure rose, with an interval that does not exclude a small loss.
+
+**Decision.** Keep (a), a correction of how the scorecard combined two
+probabilities. H-023 is supported in part: the duck is no longer idle;
+the falls that come with acting are World 2's general problem (next).
+
+### E-026 · 2026-11-07 · Strong effects, believed (pre-registered)
+
+**Question.** E-025's duck learned "carrying a black object makes me fall"
+and kept carrying black objects (0.91 falls per heavy object grasped). Why,
+and does a prior that lets a strong effect be strong fix it (H-022)?
+
+**Diagnosis** (E-025's fresh lives, from the outcomes they kept). The duck
+fell in 72% of deliveries holding a black object (234 of them; 9% for the
+other colours) and its rules predicted 32%. The colour condition was
+credible, so the effect was found, but each condition's effect has a
+normal prior with sd 0.5 on the log-odds, which holds a 3-sd effect to a
+fraction of its size; a heavy object then looked worth 0.12 (the bar for a
+poor prospect is 0.1). Of 174 picks of heavy objects in rooms 11 to 20,
+156 were chosen as the nearest toy with the colour already known.
+
+**Change** (`rules.py`). The prior on each condition's effect is a Cauchy
+distribution with the same curvature at zero (scale 0.71): weak effects
+are shrunk as before, strong ones far less. It is fitted at the posterior
+mode by the same damped Newton steps, with the precision of the Gaussian
+that bounds the Cauchy at the current point; the Laplace covariance uses
+that precision too.
+
+**Development.**
+- *Offline* (`scripts/rules_replay.py`, every outcome of the 16
+  development lives of E-025 replayed in order, predicted before it is
+  learned): Brier score lower for falls in deliveries (−0.012 [−0.017,
+  −0.006], 13 of 16 lives), for the effect of deliveries (−0.004) and of
+  picks (−0.002); unchanged elsewhere. Falls holding a black object:
+  predicted 0.37 against the observed 0.55 (Gaussian: 0.18). A wider
+  Cauchy (scale 1.77) was better calibrated on strong conditions and worse
+  overall (picks +0.016), and was not kept. In the playroom and owner lives
+  the two priors predict alike.
+- *Lives* (0 to 7, development kinds, against the same lives with E-025's
+  mind): heavy objects grasped per heavy object 0.22 against 0.53, falls
+  holding one 0.25 against 0.53, falls a room 0.79 against 1.18 (−0.39
+  [−0.60, −0.18], 7 of 8 lower); possible objects tidied −0.015 [−0.046,
+  +0.016], heavy objects tidied −0.13. The owner and playroom lives were
+  identical: there the rules do not decide, or no rule is credibly against
+  anything.
+
+**Held-out set.** Lives 200 to 215 have been used four times and 300 to
+315 once; from here on, changes are checked on lives 400 to 415 against
+E-025's mind run once on them (commit `4e28859`, from a worktree,
+`../E-026-baseline/`), and the kept set on fresh lives at the end.
+
+**Predictions** (lives 400 to 415, `--kinds late`, rooms 11 to 20, paired
+by life, against the baseline):
+1. Falls while holding a heavy object: CI upper bound below 0.
+2. Heavy objects grasped per heavy object: CI upper bound below −0.1.
+3. Falls a room: CI upper bound below 0.
+4. Possible objects in the basket: CI lower bound above −0.04.
+5. Playroom toys in the basket: CI lower bound above −0.1.
+6. Offline, on the baseline's own task lives: Brier score for falls in
+   deliveries, Cauchy minus Gaussian, CI upper bound below 0.
+
+**Method.** Commit `9207b27`. `birdbrain-run --world world2 --kinds late
+--seeds 16 --seed0 400 --episodes 20 --tag e026-task` and the playroom
+(`e026-playroom`), against `../E-026-baseline/`. Reports: `report.txt`,
+`replay_baseline.txt`.
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | falls while holding a heavy object | 0.33 against 0.49: −0.16 [−0.29, −0.04], 11 of 16 lower | met |
+| 2 | heavy objects grasped per heavy object | 0.36 against 0.55: −0.19 [−0.32, −0.06] | missed (bound −0.1) |
+| 3 | falls a room | 0.89 against 1.05: −0.16 [−0.32, −0.01] | met |
+| 4 | possible objects in the basket | −0.008 [−0.025, +0.009] | met |
+| 5 | playroom toys in the basket | identical (+0.000) | met |
+| 6 | Brier, falls in deliveries, offline | −0.015 [−0.021, −0.009], 16 of 16 lives | met |
+
+Transfer to kinds never met improved: the new heavy kind was grasped
+−0.19 [−0.36, −0.02] less, new wide kinds −0.23 [−0.42, −0.04]. A
+delivery holding a black object was predicted to fall 0.39 of the time
+(observed 0.68; Gaussian 0.22).
+
+**Analysis.** One line of prior changed what the duck does about heavy
+objects: it now believes a strong effect when it sees one, avoids heavy
+objects more, falls less, and carries more of that to new kinds. Tidying
+did not change: the time not spent falling with heavy objects went to
+objects as hard to tidy. The predictions still understate strong effects
+(0.39 against 0.68), so the avoidance is partial.
+
+**Decision.** Keep the Cauchy prior. H-022 is supported in part.
+
+### E-025 · 2026-11-07 · The kept changes on fresh lives (pre-registered)
+
+**Question.** E-022 to E-024 were each judged on lives 200 to 215, which
+have now been used four times. Do the kept changes, together, hold on
+lives that informed nothing?
+
+**Review, before the results** (`semantic-review/2026-11-07-104801-pr-local.md`).
+A reviewer read the World 2 code in a clean context while the first E-025
+runs were under way (a quarter done). No truth reaches the mind. Its
+findings that bear on the experiments, all confirmed against the logs:
+- *A stopped pick did not stop the body.* Reconsidering closed the pick
+  program, but a pick reflex already begun ran on: in E-023b, 147 of 539
+  stops ended with the toy grasped about 0.2 s later, and the next pick,
+  of another toy, then failed and counted against that toy. Picks are now
+  reconsidered only on the way, before the duck stands to pick.
+- *Stopped picks were counted.* As pick decisions and failed picks (E-024
+  prediction 3, re-scored above as missed), as failed trials of `pick` in
+  the skill record, and, with an owner, as candidates for credit. Now none
+  of these.
+- *The occlusion test took the floor for an obstacle.* For a low object
+  1.5 to 2.5 m away, the range zones below it see the floor nearer than the
+  object, so misses of toys there stopped counting. A zone now counts as in
+  the way only if it reads nearer than both the object and the floor
+  along its ray.
+- *The basket's detection rate counted occlusion twice.* It was measured
+  with occluded frames included, and occluded frames are now not misses.
+  Re-measured live on frames the occlusion test calls visible
+  (`scripts/detection_probe.py`, 32 rooms): 0.97 to 1.25 m, 0.88 at
+  1.75, 0.68 at 2.5, 0.45 at 3.25, 0.10 at 4. A miss now never counts for
+  an object where detection is rarer than a ghost.
+- *The lost-basket share left out the search's own failure.* Now counted
+  (E-022 corrected above).
+- *"Credible" was any credible condition.* A toy was a poor prospect when
+  its chance was low and any credible condition applied, even one in its
+  favour. Now a credible condition must lower the chance of the effect or
+  raise the chance of a fall.
+- *With an owner, a pick stopped when its place changed* (open, wall), not
+  only its colour. Now only a newly seen colour stops it.
+- Smaller: deliver's search went on after a slippery object dropped (it
+  now stops); a toy held at the end of a room counted as never found;
+  ghost detections never had a colour, so "no colour" within 1 m meant
+  "not real" (the classifier now names one).
+
+The partial E-025 runs were stopped and discarded; E-025 runs again with
+the fixed code (commit `9fd8268`; in development, reconsidering until the
+pick reflex is asked for left 1 of 133 stops followed by a grasp, and
+tidying was unchanged). Earlier entries' verdicts stand as measured for the
+code they tested, with the corrections noted in them. One contamination:
+the reviewer reported, from the discarded quarter, a lost-basket share of
+20% to 23% for the new mind, against prediction 4's threshold of 20%. The
+threshold is left as written.
+
+**Arms.** The mind of E-021 (commit `089b22e`, run from a worktree with
+the current `world2.py`, whose changes since only count refusals once per
+try) against the current mind (E-022, E-023b and E-024), on lives 300 to
+315 (rooms 30001 to 31520): World 2 with the task, World 2 with the owner
+who wants her things left alone, and the playroom with the task.
+
+**Predictions** (rooms 11 to 20, paired by life):
+1. World 2, task: possible objects in the basket higher, CI lower bound
+   above 0.
+2. World 2, task: wide objects grasped per wide object, CI upper bound
+   below −0.4.
+3. World 2, task: falls, CI upper bound below +0.3.
+4. World 2, task: deliveries ending with the basket lost below 20% (the
+   E-021 mind: about 60%).
+5. World 2, owner: her measure gained a room, CI lower bound above 0.
+6. Playroom: toys in the basket, CI lower bound above −0.2.
+
+**Method.** Commit `9fd8268` for the new mind; `089b22e` from a worktree
+for the old. Six arms of 16 lives × 20 rooms (1,920 rooms). Reports:
+`world2_report.py old_task.jsonl new_task.jsonl` (`report_task.txt`),
+`... old_hers.jsonl new_hers.jsonl` (`report_hers.txt`),
+`world2_failures.py ... --from 11` (`failures.txt`).
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | World 2, task: possible objects in the basket | 0.40 against 0.31: +0.088 [+0.058, +0.119], 14 of 16 lives higher | met |
+| 2 | wide objects grasped per wide object | 0.51 against 1.20: −0.70 [−0.86, −0.54], 16 of 16 lower | met |
+| 3 | falls a room | 1.33 against 1.02: +0.31 [−0.01, +0.64] | missed |
+| 4 | deliveries ending with the basket lost | 16.9% (old mind 57.8%) | met |
+| 5 | World 2, owner: her measure gained a room | −0.10 against −0.24: +0.14 [+0.0001, +0.27], 10 of 16 higher | met, barely |
+| 6 | playroom toys in the basket | −0.10 [−0.27, +0.07] | missed |
+
+- *Kinds never met.* New wide kinds were grasped 0.75 times per object
+  (known 0.41; the old mind 1.14 and 1.20): the size rule carried over in
+  part. The new heavy kind was grasped as often as before (0.74 against
+  0.72). New kinds were tidied at 0.37 against 0.30 (+0.078 [+0.033,
+  +0.122]).
+- *Objects never found* fell from 34% to 27% (−0.071 [−0.103, −0.039]).
+- *Falls.* They rose during deliveries (0.91 to 1.09 a room) and picks
+  (0.11 to 0.24): the new mind reaches the basket and the far objects more
+  often, and falls there. Falls while holding a heavy object did not
+  change (+0.02).
+- *With the owner* her blue things were moved less (0.11 against 0.20 of
+  them a room, [−0.17, +0.00]); possible objects put away did not change.
+- *The playroom.* The point estimate is a tenth of a toy lower; E-022's
+  and E-023b's checks were −0.06 and 0.00. A loss up to a quarter of a toy
+  is not ruled out.
+
+**Analysis.** On lives that informed nothing, the kept changes raised
+tidying in World 2 by 9 points, cut grasps of wide objects by 58%, found
+more objects, and carried part of what was learned to kinds never met.
+With the owner the gain is a seventh of a toy a room and barely clear of
+zero. Two costs are real or possible: more falls, from doing more where
+falls happen, and perhaps a small loss in the playroom. The heavy objects
+are still not learned well (H-022), and with an owner the duck still does
+little (H-023).
+
+**Decision.** World 2 is done as a milestone: the harder world exposed
+what the playroom hid, and the changes kept are those that survived
+held-out and fresh checks. Next: H-022 and H-023 in World 2, and falls at
+the basket (H-011, now in a world where they matter more).
+
+### E-024 · 2026-11-07 · The owner who wants her things left alone (pre-registered)
+
+**Question.** In E-021 the duck with this owner did almost nothing: a pick
+from the open was sometimes of her blue things (disapproved) and sometimes
+of a toy she wanted put away (approved once delivered), and the duck,
+which learns her reactions per kind of action, could not tell the two
+apart. If its kinds of action name what it picks, does it learn what she
+wants?
+
+**Changes** (`mind.py`, `goals.py`, `reactions.py`).
+- *Kinds name the object.* A pick is described by where the toy is and,
+  once the duck has seen it, its colour ("pick blue from open"). Kinds of
+  action are what the owner model learns over, and what the scorecard
+  counts success and risk by, so both now distinguish objects by colour.
+- *Reconsidering.* Colour is seen within 1 m, so a pick chosen from afar is
+  of unknown colour. When the duck sees the colour on the way, the pick
+  stops and it chooses again knowing the kind. A stopped pick is not a
+  trial of its kind.
+
+**Development** (lives 0 to 7, development kinds; against the same lives
+with E-022 and E-023, `../E-023-appearance/dev2_hers.jsonl`). Colour in the
+kinds alone: her measure +0.15 [−0.02, +0.32] a room. With reconsidering:
+picks 5.0 against 2.9 a room, time delivering 22 s against 6, approvals
+0.17 against 0.07 a room, disapprovals 0.17 against 0.28, her things moved
+by picks 0.12 against 0.30, her measure +0.29 [−0.21, +0.78] (4 of 8 lives
+higher). The duck still spends 220 of 300 s looking, exploring and
+resting. With the owner model over conditions (`--owner-model
+conditions`, whose conditions now include colour), approvals were 0.33 a
+room and her measure +0.15 more again [−0.31, +0.61].
+
+**Predictions** (held-out lives 200 to 215, `--kinds late`, owner `hers`,
+rooms 11 to 20, paired by life; the control is the same code without the
+colour-named kinds and reconsidering: commit `b009c8c` with `896b956`
+reverted, run from a worktree):
+1. Her measure gained a room: higher, CI lower bound above −0.2.
+2. Her things moved by picks: CI upper bound below +0.05.
+3. Pick decisions a room: CI lower bound above 0.
+4. Reported, with no prediction: the owner model over conditions, as a
+   third arm.
+
+**Method.** Commit `9223866`. Arms: `ctl` (from the worktree), `kinds`
+(the default owner model), `conditions` (`--owner-model conditions`), each
+`--world world2 --kinds late --owner hers --seeds 16 --seed0 200
+--episodes 20`. Reports: `world2_report.py ctl.jsonl kinds.jsonl`
+(`report_kinds.txt`) and `... conditions.jsonl` (`report_conditions.txt`).
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | her measure gained a room | −0.02 against −0.22: +0.20 [+0.04, +0.37], 11 of 16 lives higher | met |
+| 2 | her things moved by picks (changes she disliked, made while the duck held the toy) | −0.02 [−0.17, +0.14] | missed |
+| 3 | pick decisions a room, stopped picks left out | 3.9 against 3.5: +0.45 [−0.27, +1.17] (first reported as +1.87, which counted 1.4 stops a room as picks; E-025 review) | missed |
+| 4 | the owner model over conditions | her measure +0.17 [+0.05, +0.29]; against kinds −0.03 [−0.26, +0.20] | reported |
+
+- *How her measure rose.* The duck picked more (1.4 picks a room were
+  stopped on the way once it saw the colour) and put more away (possible
+  objects in the basket 0.028 against 0.007). She disapproved less (0.14
+  a room against 0.24, [−0.21, +0.01]). The share of her blue things moved
+  fell from 0.15 to 0.10 ([−0.10, +0.01]).
+- *What did not change.* Changes she disliked that the duck made while
+  holding a toy stayed at 0.2 a room: those include taking a non-blue toy
+  out of the basket, and picks of things whose colour was not seen
+  before the grasp.
+- *Still passive.* Her measure only reached zero. The duck spends most of
+  each room looking around, exploring and resting.
+
+**Analysis.** Naming the object in the kind of action let the duck tell her
+things from the rest, and acting on that raised her measure by a fifth of a
+toy a room. The owner model over conditions did as well, not better; in
+World 2 its conditions include colour too, so the two now see the same
+distinction. The remaining limit is how little the duck does with an
+owner: in a large room curiosity outbids the small, uncertain value of
+pleasing her (E-021: exploring while holding a toy).
+
+**Decision.** Keep both changes. Next: check the whole kept set on fresh
+lives (E-025). The passivity with an owner is left open (H-023).
+
+### E-023 · 2026-11-07 · Learning about objects from how they look (pre-registered)
+
+**Question.** In E-021 the duck tried every wide object and carried every
+heavy one, because nothing it knew about an object said what it was like.
+If it notes how objects look and its rules use that, does it learn which
+kinds of object fail, and does that carry to kinds it has never met?
+
+**Changes** (`perception.py`, `rules.py`, `mind.py`).
+- *Appearance.* Perception keeps each object's size (apparent width times
+  range, the median of the last 15 sightings) and colour (the colour seen
+  most often). Rules gain four conditions: the target's colour and size,
+  and the held object's colour and size (sizes in bins: under 3 cm, 3 to
+  5, 5 to 7.5, over 7.5).
+- *Choosing.* With the task, the local policy ranks known toys by the rules'
+  chance that picking it and then delivering it both work without a fall,
+  per second it would take (30 s plus the walk at 0.2 m/s; L-025). A toy
+  whose chance is credibly below 0.1 (some rule at 3 sd bears on it) is a
+  poor prospect: it is tried only once the duck has looked and explored
+  and found nothing better.
+- *Reconsidering.* On the way to a toy the duck sees it better (its colour
+  within 1 m). If the toy becomes a poor prospect and a better one is known,
+  the pick stops and the duck chooses again. A stopped pick is not an
+  outcome and teaches nothing.
+
+**Development** (lives 0 to 7, development kinds, against E-022's
+development lives; `experiments/E-023-appearance/`). The rules found what
+the world hides, from the duck's own outcomes: "pick when target size 5 to
+7.5 cm: 1/4 the odds" (0 of 22 held), "deliver when held colour black: 4
+times the odds of a fall" (10 of 16). The first version dropped poor
+prospects for good; heavy objects tidied fell from 0.34 to 0.09, more than
+the gain elsewhere (possible objects −0.02). Deferring them instead:
+- wide objects grasped per wide object, rooms 11 to 20: 0.35 against 1.25;
+- heavy objects grasped per heavy object: 0.40 against 0.55; falls while
+  holding one: 0.43 against 0.56;
+- plain objects tidied +0.075 [−0.008, +0.159]; heavy −0.18; possible
+  objects +0.014 [−0.033, +0.062];
+- falls overall +0.18 [−0.14, +0.49];
+- 14% of picks were stopped on the way.
+
+**Predictions** (held-out lives 200 to 215, task, `--kinds late`, against
+E-022's task arm, rooms 11 to 20, paired by life unless stated):
+1. Wide objects grasped per wide object: CI upper bound below −0.4.
+2. Kinds never met transfer: wide objects of the two new wide kinds (green
+   and yellow big boxes), grasped per object, pooled over rooms 11 to 20, are
+   below 0.6 (E-022, where the mind could not tell kinds apart: 1.31 for
+   all wide objects).
+3. Falls while holding a heavy object: CI upper bound below 0.
+4. Possible objects in the basket: CI lower bound above −0.03.
+5. Falls a room: CI upper bound below +0.3.
+6. Playroom (lives 160 to 175 against E-022's playroom arm): toys in the
+   basket, CI lower bound above −0.3.
+
+**Method.** Commit `fa57799`. As E-022, tags `e023-task`, `e023-playroom`.
+Report: `world2_report.py ../E-022-far-basket/task.jsonl task.jsonl`
+(`report.txt`).
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | wide objects grasped per wide object | 0.46 against 1.31: −0.85 [−0.99, −0.71], 16 of 16 lives lower | met |
+| 2 | the same, new wide kinds only, pooled | 0.54 (66 of 123); known wide kinds 0.42 | met |
+| 3 | falls while holding a heavy object | −0.18 [−0.33, −0.02] | met |
+| 4 | possible objects in the basket | +0.022 [−0.006, +0.049] | met |
+| 5 | falls a room | −0.08 [−0.34, +0.19] | met |
+| 6 | playroom toys in the basket | −0.21 [−0.33, −0.09], 14 of 16 lives lower | missed |
+
+- *Transfer.* New kinds were met only from room 11, by a duck that had
+  learned on the others. The new wide kinds were grasped 0.61 times per
+  object in rooms 11 to 15 and 0.45 in rooms 16 to 20; the black block,
+  the one new heavy kind, 0.46 and 0.69 (known heavy kinds 0.42): the size
+  rule carried to new kinds, the colour rule less clearly.
+- *What it bought.* Plain objects tidied rose (+0.058 [+0.016, +0.100]),
+  heavy ones fell (−0.07), and the total gain was small. New kinds were
+  tidied at 0.43 against E-022's 0.37 (+0.06 [−0.00, +0.13]).
+- *The playroom got worse.* No rule there was credible in most lives, so
+  nothing was deferred and no pick was stopped. What changed was the
+  ranking: toys were ranked by the rules' mean chance per second instead
+  of by distance, and the means, uncertain, picked worse targets (failed
+  picks 2.86 a room against 2.38). This is L-020 again: choosing by
+  posterior means picks what looks best by error.
+
+**Analysis.** The duck learned from its own outcomes, through how objects
+look, which objects cannot be carried and which make it fall, and carried
+the size rule to kinds it had never met. Acting on credible rules worked.
+Ranking by uncertain means did not, which E-017 and E-018 had already
+shown and this design should have respected.
+
+**Decision.** Keep appearance, the credible deferral, and reconsidering.
+Rank toys by distance again (E-023b, below).
+
+### E-023b · 2026-11-07 · Credible rules only (development, then held-out)
+
+**Change.** The task policy picks the nearest toy that is not a poor
+prospect, as before E-023; the rules enter only through credible deferral
+and reconsidering.
+
+**Development** (lives 0 to 7). Against E-023: possible objects +0.005
+[−0.023, +0.032], heavy +0.09, wide grasps per wide object 0.30 against
+0.35. The playroom's development lives reproduce E-022's rows exactly: no
+rule there is credible enough to defer anything.
+
+**Predictions** (held-out lives 200 to 215 against E-022's task arm, and
+playroom lives 160 to 175 against E-022's playroom arm; rooms 11 to 20):
+1. Wide objects grasped per wide object: CI upper bound below −0.4.
+2. Possible objects in the basket: CI lower bound above −0.03.
+3. Falls while holding a heavy object: CI upper bound below +0.05.
+4. Playroom toys in the basket: CI lower bound above −0.1.
+
+**Method.** Commit `6cb564c` (with E-024's development code, which acts
+only with an owner). Tags `e023b-task`, `e023b-playroom` (`b_report.txt`).
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | wide objects grasped per wide object | −0.86 [−1.04, −0.68], 16 of 16 lower | met |
+| 2 | possible objects in the basket | +0.014 [−0.017, +0.045] | met |
+| 3 | falls while holding a heavy object | −0.07 [−0.26, +0.12] (a stop often left the duck holding the toy it had judged poor; E-025 review) | missed |
+| 4 | playroom toys in the basket | identical rows (+0.000) | met |
+
+Transfer was weaker than in E-023: new wide kinds were grasped 0.69 times
+per object (known 0.35), the new heavy kind 0.70 (known 0.50). A rule is
+one effect per condition, added: a green big box is "green", which picks
+well, and "5 to 7.5 cm", which picks badly, and the sum often stays above
+the bar for a poor prospect.
+
+**Analysis.** The two designs trade. Ranking by the rules' means (E-023)
+avoided heavy objects more and transferred better, and cost the playroom a
+fifth of a toy. Credible deferral alone (E-023b) leaves the playroom
+exactly as it was and keeps most of the gain on wide objects, and its
+effect on heavy objects is not distinguishable from none.
+
+**Decision.** Keep E-023b: a change that makes the familiar world worse
+needs more than this to justify it. Learning that a kind of object is
+heavy needs more than additive conditions (a condition for colour and
+size together, or per-object memory), which is left open (H-022).
+
+### E-022 · 2026-11-07 · Finding the basket in a larger room (pre-registered)
+
+**Question.** E-021's deliveries failed mostly because the duck stopped
+believing in the basket on the way to it. Why, and what fixes it?
+
+**Development** (lives 0 to 7, development kinds, task; rows in
+`experiments/E-022-far-basket/`). Three causes, found in turn, with a change
+for each:
+1. *The perception model expected to see a far basket.* Its detection rate
+   for the basket was 0.96 at any range (E-013, playroom). Measured in
+   World 2 against truth (`scripts/detection_by_range.py`, since replaced by
+   `scripts/detection_probe.py`), it is 0.94 to
+   1.75 m, 0.88 to 2 m, 0.55 to 0.65 at 2 to 2.75 m, and 0.2 beyond. The
+   table now holds these values. Lost-basket deliveries fell from 59% to
+   48%.
+2. *Furniture hides the basket, and the model did not know.* A frame that
+   should have shown the basket counted as a miss even when something
+   stood in the way. The range sensor sits beside the camera and looks the
+   same way over 45 degrees; a frame now counts as no evidence when the
+   range sensor shows something closer than the object (by 0.3 m) in its
+   direction. 48% to 45%.
+3. *Deliver gave up after one look.* In the trace that showed it (life 2,
+   room 1), the duck turned a full circle twice, saw no basket, and failed
+   each time without moving. Deliver now walks for 6 s and looks again, up
+   to four times. Deliveries `done` rose from 16% to 37%; lost-basket fell
+   to 33%.
+4. *A far basket was misplaced.* Range from elevation is poor beyond 2 m (a
+   degree of error at 3 m moves the estimate by a metre). The detector's
+   apparent width gives range to 11% (the basket reads as radius 0.12 m at
+   every range, measured), so far sightings now fuse both, weighted by
+   their errors. Deliveries `done` 46%, lost-basket 17%.
+
+With all four, possible objects in the basket rose by +0.049 [−0.012,
++0.111] (7 of 8 lives higher), objects never found fell by 0.09, and heavy
+objects tidied rose by 0.19. Falls did not change clearly (+0.08 [−0.31,
++0.46]). In the playroom (lives 0 to 7 against E-019's control), toys in
+the basket −0.06 [−0.22, +0.10], falls +0.09 [−0.09, +0.28].
+
+**Predictions** (held-out lives 200 to 215, task, against E-021's task
+arm; and the playroom's held-out lives 160 to 175 against E-020's task
+control; rooms 11 to 20, paired by life):
+1. Deliveries ending with the basket lost: below 30% (E-021: 61%).
+2. Possible objects in the basket: higher, CI lower bound above 0.
+3. Falls: CI upper bound below +0.5 a room.
+4. Playroom toys in the basket: CI lower bound above −0.3.
+5. Playroom falls: CI upper bound below +0.3.
+
+**Method.** Commit `4915ecc`.
+`birdbrain-run --world world2 --kinds late --seeds 16 --seed0 200 --episodes 20 --seconds 300 --tag e022-task`
+and `birdbrain-run --seeds 16 --seed0 160 --episodes 20 --seconds 300 --tag e022-playroom`.
+Report: `world2_report.py ../E-021-world2/task.jsonl task.jsonl` (`report.txt`).
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 | Result | Verdict |
+|---|---|---|---|
+| 1 | deliveries ending with the basket lost | 15.5%, counting the search's own failure (first reported as 12%; E-025 review); E-021: 61%; `done` 52% (16%) | met |
+| 2 | possible objects in the basket | 0.37 against 0.30: +0.066 [+0.028, +0.104], 13 of 16 lives higher | met |
+| 3 | falls a room | +0.06 [−0.09, +0.22] | met |
+| 4 | playroom toys in the basket | −0.06 [−0.20, +0.09] | met |
+| 5 | playroom falls | −0.05 [−0.17, +0.07] | met |
+
+Objects never found fell from 38% to 30% (−0.082 [−0.134, −0.031]): a
+delivery that looks again also sees toys. Slippery objects tidied rose
+(+0.05); heavy ones did not. The duck now tries more wide objects (1.31
+grasps per wide object against 1.08), because it finds more of them.
+
+**Analysis.** All four changes were corrections of beliefs about the
+duck's own senses, each measured against truth: how often the camera sees
+a far basket, when it cannot see it at all, how far away it is, and what
+to do when it is not in view. None was about objects. The gain in tidying
+(+7 points) is smaller than the gain in deliveries (+36 points `done`)
+because the other failures now set the pace: picks of what cannot be
+carried, and falls carrying heavy things.
+
+**Decision.** Keep all four. Next: learning about objects (E-023).
+
+### E-021 · 2026-11-04 · World 2: how the current mind does in a harder world (pre-registered)
+
+**Question.** How much of what BirdBrain does in a room of six similar toys
+carries over to a world with many kinds of object, hidden properties, and
+furniture? What breaks first, and what has to change?
+
+**World 2** (`world2.py`, world code the mind never imports; `--world world2`).
+- *Objects.* 24 kinds, each a colour (red, yellow, blue, green, white,
+  black) and a shape (2.5 cm cube, 4 cm block, 9 × 1.5 cm stick, 6 cm big
+  box). What a kind does is hidden and follows its appearance: black things
+  weigh 150 g and tip the duck over when carried (the grasp probe: about 10
+  falls a room when every toy was heavy); white things slip out of the beak
+  (8% a second); big things are too wide to hold (narrower side over 5 cm).
+  Eight kinds are held out of development; every colour and shape stays in.
+- *Rooms.* 3.5 to 4.5 m by 2.8 to 3.5 m (the playroom is 3 by 2.5), the
+  basket in a random corner, 2 to 5 pieces of furniture up to 30 cm tall,
+  an inner wall with a 60 cm doorway in half the rooms, 0 to 2 balls, and 4
+  to 15 objects. The duck starts at a random place.
+- *What the duck senses.* As before, plus a colour for objects within 1 m,
+  right 95% of the time (the lab's colour classifier for ducks, applied to
+  objects). Weight, slipperiness and width it can learn only by trying.
+- *The owner who wants her things left alone* (`--owner hers`): blue things
+  are hers and she wants them where they were; everything else she wants
+  in the basket.
+- *What changed outside the mind.* The lab is not edited. World 2's kinds are
+  added to the lab's table of pickable kinds at start-up (`world2.register`),
+  and two rules the lab does not model, wide objects and slipping, are
+  applied by `WorldRules` after each world step. The playroom reproduces
+  E-020's rows exactly (life 160, room 1).
+
+**Procedure for this milestone.** First the current mind, unchanged, on
+held-out lives (this entry). Then changes, one per ledger entry, each
+developed on development lives (0 to 15) and checked once on these held-out
+lives against this baseline, paired by life. The full set of kept changes
+is then checked once on fresh lives (300 to 315), since repeated checks on
+one held-out set wear it out.
+
+**Development** (lives 0 to 7, 20 rooms, development kinds only;
+`dev_task.jsonl`, `dev_auth.jsonl`, `dev_hers.jsonl`). With the task, the
+duck put 30% of the objects it could carry in the basket (the playroom:
+90%), fell 0.9 times a room, and 37% of the objects were never found.
+- *Deliveries fail because the basket is lost.* Of 2,136 deliveries, 16%
+  ended `done` (69% in E-020's development logs); 59% failed with "basket
+  no longer where it was believed". This does not depend on the furniture
+  or the inner wall (54% to 68% in every group). It depends on range. The
+  perception model says a basket is detected 96% of the time at any range
+  (measured in the playroom, E-013); in World 2 it was seen 79% of the time
+  at 1.5 to 2 m, 53% at 2 to 2.5 m, and 20% to 30% beyond. Each frame that
+  should have shown the basket and did not takes away log(0.04/0.9) of its
+  confidence, so the belief collapses while the duck walks toward it.
+- *Picks fail on what cannot be carried.* 45% of picks ended "requirement
+  not met" (the beak held nothing): most on wide objects (402 of 440 picks
+  aimed at them), and some on slippery and plain ones. The give-up rule is
+  per object (three failures), so every new wide object is tried three
+  times. The refusal counter counted every tick of the pick reflex's
+  closing window; it now counts one per try (the development rows carry
+  the old count).
+- *Heavy objects*: carried in about half the attempts, and then the duck
+  usually falls (51 of 133 deliveries of a heavy object ended in a fall).
+- *With the owner*, the duck did little: 3.5 picks and 0.5 deliveries a
+  room; her measure fell by 0.2 a room.
+- *Authoring* asked about the same situations as in the playroom and
+  changed little (+0.01 possible objects tidied, 8 lives).
+
+**Predictions for the held-out baseline**, written before it runs (lives
+200 to 215, rooms 20001 to 21520, 20 rooms; development kinds in rooms 1 to
+10 and all kinds from room 11, `--kinds late`; arms: task, task with
+authoring, and the owner who wants her things left alone):
+1. With the task, the share of possible objects in the basket, rooms 11 to
+   20, is below 0.40 (development 0.30; the playroom 0.90).
+2. More than 40% of deliveries end with the basket lost.
+3. The duck does not learn across objects: in rooms 16 to 20, wide objects
+   grasped per wide object and heavy objects grasped per heavy object are
+   each at least 80% of their values in rooms 1 to 5.
+4. Falls exceed 0.5 a room, rooms 11 to 20.
+5. Among possible objects, new kinds and known kinds are tidied at rates
+   within 0.10 of each other (the mind has no notion of kinds to transfer).
+6. Authoring raises the possible share by less than 0.05, rooms 11 to 20.
+7. With the owner, her measure gained is at most 0 a room, rooms 11 to 20.
+8. More than 25% of objects are never found in a room (task arm).
+
+**Method.** Commit `089b22e`. Each arm:
+`birdbrain-run --world world2 --kinds late --seeds 16 --seed0 200 --episodes 20 --seconds 300 --jobs 4 [--author | --owner hers] --tag e021-<arm>`.
+960 rooms. Reports: `scripts/world2_report.py task.jsonl auth.jsonl`
+(`report_task_auth.txt`), `world2_report.py hers.jsonl` (`report_hers.txt`),
+`scripts/world2_failures.py e021-task e021-hers e021-auth --from 11`
+(`failures.txt`). Rooms held 9.5 objects on average, 7.1 of them possible.
+
+**Result.**
+
+| Prediction | Measure, rooms 11 to 20 unless stated | Result | Verdict |
+|---|---|---|---|
+| 1 | possible objects in the basket (task) | 0.30 | met |
+| 2 | deliveries ending with the basket lost (task) | 61% | met |
+| 3 | grasps per object, rooms 16 to 20 against 1 to 5 | wide 1.09 against 0.98; heavy 0.67 against 0.44 (rose) | met |
+| 4 | falls a room (task) | 1.05 | met |
+| 5 | new kinds against known kinds, possible objects | 0.31 against 0.30 | met |
+| 6 | authoring minus task, possible share | −0.005 [−0.024, +0.014] | met |
+| 7 | her measure gained a room | −0.19 [−0.26, −0.13] | met |
+| 8 | objects never found (task) | 38% | met |
+
+- *Where the time goes.* Deliveries fail most: of 14 a room, 16% end
+  `done` and 61% fail with the basket lost. Picks: 42% fail with nothing in
+  the beak (wide objects, and slippery ones that slip as the beak closes).
+  A heavy object that is carried usually ends in a fall (0.6 falls a room
+  while holding one).
+- *Nothing is learned about objects.* The duck grasps heavy objects more
+  often late in life than early, and tries every wide object it finds. New
+  kinds fare like known ones because no kind is known: the mind's beliefs
+  about an object are its class, its position, and the colour it now sees,
+  which nothing uses.
+- *With the owner.* 3.4 picks and 0.3 deliveries a room. She approved 0.07
+  times a room and disapproved 0.18 times; the duck's beliefs end with
+  "pick from the open" slightly disapproved, so it mostly rests and looks.
+  Her measure fell because the few picks moved her things (15% of them
+  moved a room) or dropped other toys short of the basket.
+- *Authoring* asked about far deliveries and picks, as in the playroom,
+  and changed nothing here. It used 1.1 million tokens over 16 lives (the
+  sum of the rows), nine times E-020's, because more situations failed.
+
+**Analysis.** The current mind does not carry over. Its two hand-written
+skills assume an open room where the basket is always in view and every
+toy can be carried. When the first assumption fails, deliveries fail
+before any learning can matter. When the second fails, the duck has no
+way to learn about kinds of object: its rules use conditions about place
+and belief quality, and the give-up rule works one object at a time. The
+playroom result (5.4 of 6) depended on the room as much as on the mind.
+
+**Decision.** Fix in order of measured cost, one change per entry: first
+the lost basket (E-022), then learning about objects from their
+appearance, then the owner's preference over kinds of object.
 
 ### E-020 · 2026-11-04 · Milestone 5a: fair trials for written skills (pre-registered)
 

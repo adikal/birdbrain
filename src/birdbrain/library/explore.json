@@ -1,5 +1,5 @@
 {
-  "doc": "Wander for a while, keeping clear of the basket, then look around.",
+  "doc": "Walk to the edge of the floor seen so far (wander if there is none), keeping clear of the basket, then look around.",
   "params": {},
   "budget": 30,
   "expect": "true",
@@ -8,7 +8,7 @@
       "if": "known(basket)",
       "then": [
         {
-          "call": "wander",
+          "call": "walk_to_unseen",
           "args": {
             "seconds": 6,
             "avoid": "basket"
@@ -17,7 +17,7 @@
       ],
       "else": [
         {
-          "call": "wander",
+          "call": "walk_to_unseen",
           "args": {
             "seconds": 6
           }

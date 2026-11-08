@@ -1,0 +1,55 @@
+== e021-task: 160 rooms from room 11
+  pick: 1687 (10.5 a room)
+     41.9%  failed: requirement not met
+     37.2%  done
+     12.8%  failed: X is no longer where it was believed
+      2.8%  interrupted: run ended
+      2.0%  failed: blocked
+      1.5%  failed: fell
+      0.9%  failed: X position unknown
+      0.6%  timeout: walk_toward took over 35 s
+  deliver: 2231 (13.9 a room)
+     60.6%  failed: X is no longer where it was believed
+     16.0%  done
+     11.7%  failed: requirement not met
+      6.3%  failed: fell
+      3.4%  interrupted: run ended
+      1.5%  timeout: walk_toward took over 40 s
+      0.5%  failed: blocked
+      0.1%  timeout: over budget 20.0 s
+== e021-hers: 160 rooms from room 11
+  pick: 541 (3.4 a room)
+     47.9%  done
+     36.6%  failed: requirement not met
+      9.1%  failed: X is no longer where it was believed
+      2.4%  failed: blocked
+      2.2%  interrupted: run ended
+      0.9%  timeout: walk_toward took over 35 s
+      0.4%  failed: X position unknown
+      0.4%  failed: fell
+  deliver: 45 (0.3 a room)
+     46.7%  failed: X is no longer where it was believed
+     24.4%  done
+     17.8%  failed: requirement not met
+      4.4%  interrupted: run ended
+      4.4%  failed: fell
+      2.2%  timeout: over budget 20.0 s
+== e021-auth: 160 rooms from room 11
+  pick: 1654 (10.3 a room)
+     36.9%  failed: requirement not met
+     36.8%  done
+     12.7%  failed: X is no longer where it was believed
+      3.0%  interrupted: run ended
+      2.5%  failed: blocked
+      2.1%  failed: not holding(self) after 3 iterations
+      2.0%  failed: not holding(self) after 2 iterations
+      1.6%  failed: fell
+  deliver: 2020 (12.6 a room)
+     55.0%  failed: X is no longer where it was believed
+     16.9%  done
+     14.2%  failed: requirement not met
+      7.1%  failed: fell
+      3.6%  interrupted: run ended
+      1.2%  timeout: walk_toward took over 40 s
+      0.9%  failed: not known(basket) and distance(self, basket) < 1.0 after 3 iterations
+      0.6%  failed: blocked

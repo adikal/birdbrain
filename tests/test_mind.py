@@ -87,3 +87,48 @@ def test_briefing_mentions_known_objects_and_tools_need_known_targets():
     request = mind.request()
     assert toy in request.briefing
     assert next(t for t in request.tools if t.name == "pick").params == {"x": [toy]}
+
+
+def _toy(mind, x, colour, size=0.04):
+    toy = mind.kb.new_entity("toy", 0.0)
+    mind.kb.tell("at", (toy,), Position.round(x, 0.0, 0.02), t=0.0, conf=1.0)
+    mind.kb.tell("color", (toy,), colour, t=0.0)
+    mind.kb.tell("size", (toy,), size, t=0.0)
+    return toy
+
+
+def test_the_task_policy_defers_what_it_has_learned_will_not_work():
+    from birdbrain.rules import features
+    mind = Mind()
+    observe(mind, 0.0)
+    near_black, far_red = _toy(mind, 0.4, "black"), _toy(mind, 0.5, "red")   # colour the only difference
+    for colour, works in (("black", 0.0), ("red", 1.0)):
+        f = features(mind.kb, 0.0, {"x": near_black if colour == "black" else far_red})
+        for _ in range(30):
+            mind.rules["effect"].add("pick", f, works)
+    request = mind.request()
+    assert mind.local.choose(request).args == {"x": far_red}
+    assert mind.local.worth(near_black)[1]                        # a credible rule says so
+    mind.kb.untell("at", (far_red,), t=0.0)
+    assert mind.local.choose(mind.request()).skill != "pick"       # look for something better first
+    assert mind.local.choose(mind.request()).skill != "pick"
+    assert mind.local.choose(mind.request()).args == {"x": near_black}   # then try what there is
+
+
+def test_features_describe_how_the_target_and_the_held_object_look():
+    from birdbrain.rules import features
+    mind = Mind()
+    observe(mind, 0.0)
+    toy = _toy(mind, 0.4, "white", 0.06)
+    f = features(mind.kb, 0.0, {"x": toy})
+    assert f["target colour"] == "white" and f["target size"] == "5 to 7.5 cm"
+    g = features(mind.kb, 0.0, {}, held=toy)
+    assert g["holding"] == "yes" and g["held colour"] == "white"
+
+
+def test_a_pick_is_described_by_the_colour_of_what_is_picked_once_seen():
+    mind = Mind(needs="approval", room=(-2.0, -2.0, 2.0, 2.0))
+    observe(mind, 0.0)
+    seen, unseen = _toy(mind, 0.4, "blue"), with_toy(mind)
+    assert mind.action_kind("pick", {"x": seen}) == "pick blue from open"
+    assert mind.action_kind("pick", {"x": unseen}) == "pick from open"

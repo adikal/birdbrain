@@ -35,6 +35,7 @@ class Room:
     in_basket: Mapping[str, bool]
     held: str | None
     bounds: tuple[float, float, float, float]       # wall faces: xmin, ymin, xmax, ymax
+    colours: Mapping[str, str] = field(default_factory=dict)   # World 2: each toy's colour
 
 
 def wall_distance(p: Point, bounds: tuple[float, float, float, float]) -> float:
@@ -55,11 +56,22 @@ def _leave(room: Room, toy: str, start: Mapping[str, Point], wall_m: float) -> b
     return toy != room.held and math.dist(room.toys[toy], start[toy]) <= 0.1
 
 
+#: World 2: the blue things are hers, and she wants them left where they are.
+HER_COLOUR = "blue"
+
+
+def _hers(room: Room, toy: str, start: Mapping[str, Point], wall_m: float) -> bool:
+    if room.colours.get(toy) == HER_COLOUR:
+        return _leave(room, toy, start, wall_m)
+    return _basket(room, toy, start, wall_m)
+
+
 #: Hidden preferences: is this toy the way she likes it?
 PREFERENCES: dict[str, Callable[[Room, str, Mapping[str, Point], float], bool]] = {
     "basket": _basket,            # toys in the basket
     "wall": _wall,                # toys against a wall (not in the basket)
     "leave": _leave,              # toys left where they were at the start of the episode
+    "hers": _hers,                # World 2: her (blue) things left alone, the rest in the basket
 }
 
 

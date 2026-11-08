@@ -41,9 +41,11 @@ Features = dict[str, str]
 CREDIBLE_SD = 3.0
 
 
-def features(kb: KnowledgeBase, t: float, args: dict[str, Any]) -> Features:
+def features(kb: KnowledgeBase, t: float, args: dict[str, Any], held: str | None = None) -> Features:
     """The situation as the duck believes it: its target (the first entity argument),
-    itself, and the basket, each in a few coarse values."""
+    what it holds, itself, and the basket, each in a few coarse values. `held` asks
+    about a situation in which the duck holds that object (to judge a pick by how its
+    delivery would go)."""
     out: Features = {}
     here = kb.position(SELF)
     baskets = [b for b in kb.of_class("basket") if kb.get("at", b) is not None]
@@ -62,12 +64,23 @@ def features(kb: KnowledgeBase, t: float, args: dict[str, Any]) -> Features:
         out["target from the wall"] = _bin(wall_distance(kb, t, target), (0.1, 0.2, 0.3, 0.5),
                                            ("under 0.1 m", "0.1 to 0.2 m", "0.2 to 0.3 m", "0.3 to 0.5 m",
                                             "over 0.5 m"))
-    out["holding"] = "yes" if kb.value("holding", SELF) is not None else "no"
+        out.update(_looks(kb, target, "target"))
+    holding = held if held is not None else kb.value("holding", SELF)
+    out["holding"] = "yes" if holding is not None else "no"
+    if holding is not None:
+        out.update(_looks(kb, holding, "held"))
     out["basket"] = "unknown" if pb is None else ("precise" if pb.sigma < 0.05 else "vague")
     out["basket distance"] = _bin(None if pb is None or here is None else here.distance(pb),
                                   (0.6, 1.5), ("near", "mid", "far"))
     out["self by a wall"] = _bin(wall_distance(kb, t, SELF), (0.4,), ("yes", "no"))
     return out
+
+
+def _looks(kb: KnowledgeBase, x: str, role: str) -> Features:
+    """How an object looks (ledger E-023): its colour, and its size in coarse bins."""
+    return {f"{role} colour": kb.value("color", x, default="unknown"),
+            f"{role} size": _bin(kb.value("size", x), (0.03, 0.05, 0.075),
+                                 ("under 3 cm", "3 to 5 cm", "5 to 7.5 cm", "over 7.5 cm"))}
 
 
 def _bin(x: float | None, edges: tuple[float, ...], names: tuple[str, ...]) -> str:
@@ -139,6 +152,10 @@ class RuleLearner:
     prior: tuple[float, float] = (1.0, 1.0)       # Beta pseudo-counts: the prior base rate
     sd_base: float = 2.0
     sd_effect: float = 0.5
+    #: The prior on each condition's effect: "gaussian" (sd `sd_effect`), or "cauchy",
+    #: heavy-tailed with the same curvature at zero, so a weak effect is shrunk as much
+    #: and a strong one much less (ledger E-026).
+    effect_prior: str = "cauchy"
     examples: dict[str, list[tuple[Features, float, float]]] = field(default_factory=dict)  # skill -> (f, y, w)
     _models: dict[str, Model] = field(default_factory=dict)
 
@@ -162,6 +179,12 @@ class RuleLearner:
         applied = tuple((k, v) for k, v in f.items() if f"{k}={v}" in m.keys and self._credible(m, f"{k}={v}"))
         return _sigmoid(m.logit(f)), m.n, applied
 
+    def against(self, skill: str, applied: tuple, sign: int) -> bool:
+        """Some of the `applied` credible conditions moves the outcome's odds in the
+        direction of `sign` (+1 up, -1 down)."""
+        m = self.model(skill)
+        return any(sign * m.contrast(f"{k}={v}")[0] > 0 for k, v in applied)
+
     @staticmethod
     def _credible(m: Model, key: str) -> bool:
         effect, sd = m.contrast(key)
@@ -183,15 +206,30 @@ class RuleLearner:
         x[:, 1:] = (on - means) * has
         mean0 = np.zeros(len(keys) + 1)
         mean0[0] = self.prior_logit
-        precision = np.full(len(keys) + 1, 1.0 / self.sd_effect ** 2)
-        precision[0] = 1.0 / self.sd_base ** 2
+        cauchy = self.effect_prior == "cauchy"
+        scale2 = 2.0 * self.sd_effect ** 2         # Cauchy scale with the Gaussian's curvature at zero
+        base_precision = 1.0 / self.sd_base ** 2
+
+        def precisions(w: np.ndarray) -> np.ndarray:
+            """Prior precision of each weight. For the Cauchy prior, the precision of the
+            Gaussian that bounds it at `w` (a scale mixture, iterated to the mode)."""
+            out = (2.0 / (scale2 + w ** 2)) if cauchy else np.full(len(w), 1.0 / self.sd_effect ** 2)
+            out[0] = base_precision
+            return out
+
+        def log_prior(w: np.ndarray) -> float:
+            d = w - mean0
+            if cauchy:
+                return float(-0.5 * base_precision * d[0] ** 2 - np.sum(np.log1p(d[1:] ** 2 / scale2)))
+            return float(-0.5 * precisions(w) @ d ** 2)
 
         def log_post(w: np.ndarray) -> float:
             z = x @ w
-            return float(weight @ (y * z - np.logaddexp(0.0, z)) - 0.5 * precision @ (w - mean0) ** 2)
+            return float(weight @ (y * z - np.logaddexp(0.0, z))) + log_prior(w)
 
         w = mean0.copy()
         for _ in range(50):                       # damped Newton's method on the log posterior
+            precision = precisions(w)
             p = 1.0 / (1.0 + np.exp(-np.clip(x @ w, -30.0, 30.0)))
             grad = x.T @ (weight * (y - p)) - precision * (w - mean0)
             hess = (x * (weight * p * (1.0 - p))[:, None]).T @ x + np.diag(precision)
@@ -203,7 +241,7 @@ class RuleLearner:
             if float(np.max(np.abs(scale * step))) < 1e-7:
                 break
         p = 1.0 / (1.0 + np.exp(-np.clip(x @ w, -30.0, 30.0)))
-        hess = (x * (weight * p * (1.0 - p))[:, None]).T @ x + np.diag(precision)
+        hess = (x * (weight * p * (1.0 - p))[:, None]).T @ x + np.diag(precisions(w))
         cov = np.linalg.inv(hess)
         cov = (cov + cov.T) / 2.0
         return Model(float(w[0]), keys, w[1:], cov, means, float(weight.sum()))
@@ -221,13 +259,14 @@ class RuleLearner:
                     continue
                 feat, value = key.split("=", 1)
                 under = [(y, w) for f, y, w in ex if f.get(feat) == value]
-                out.append({"skill": skill, "when": f"{feat} {value}", "odds": round(math.exp(effect), 2),
+                out.append({"skill": skill, "when": f"{feat} {value}", "odds": float(f"{math.exp(effect):.3g}"),
                             "sd": round(sd, 2), "hits": round(sum(y * w for y, w in under), 1),
                             "n": round(sum(w for _, w in under), 1)})
         return out
 
     def text(self, rule: dict[str, Any]) -> str:
-        change = f"{rule['odds']:.1f} times the odds" if rule["odds"] >= 1 else f"1/{1 / rule['odds']:.1f} the odds"
+        change = (f"{rule['odds']:.3g} times the odds" if rule["odds"] >= 1
+                  else f"1/{1 / rule['odds']:.3g} the odds")
         return (f"{rule['skill']} when {rule['when']}: {change} that {self.outcome} "
                 f"({rule['hits']:g} of {rule['n']:g})")
 

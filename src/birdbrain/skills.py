@@ -23,7 +23,7 @@ from typing import Any
 
 from birdbrain.body import CLASSES, MICRODUCK, BodyProfile, Command, Observation
 from birdbrain.expr import ClassRef, Evaluator, ExprError, check_calls, names
-from birdbrain.kr import SELF, KnowledgeBase
+from birdbrain.kr import SELF, KnowledgeBase, Position
 from birdbrain.relations import bearing, distance, known
 
 DONE, FAILED, TIMEOUT, INTERRUPTED = "done", "failed", "timeout", "interrupted"
@@ -53,6 +53,7 @@ class Context:
     obs: Observation | None = None
     log: Callable[[str, dict[str, Any]], None] = lambda kind, payload: None
     last: Command | None = None             # the command sent last tick
+    map: Any = None                         # what is in the way (occupancy.OccupancyMap, E-030)
     _moving_t: float = -math.inf
     _prev_yaw: float | None = None
 
@@ -202,6 +203,11 @@ def turn_toward(ctx: Context, x: str, tolerance: float = 0.08) -> SkillRun:
         yield ctx.turn_command(b, f"turn toward {x}")
 
 
+#: A route stops planning this far short of where the walk stops: the last stretch is left
+#: to the approach, which may end at something mapped (a basket against a wall, E-030).
+ROUTE_SPARE_M = 0.15
+
+
 @primitive({"x": "entity", "stop_at": "number", "speed": "number", "look": "string",
             "aim_left": "number", "steady_last": "number", "avoid": "entity", "avoid_r": "number"},
            "Walk until x is stop_at metres ahead, steering on its believed position.",
@@ -217,6 +223,7 @@ def walk_toward(ctx: Context, x: str, stop_at: float = 0.1, speed: float = 0.30,
     body = ctx.body
     speed = max(speed, body.slow_speed)
     blocked_since = ctx.t
+    route, routed_t = None, -math.inf
     while True:
         here, there = ctx.kb.position(SELF), ctx.kb.position(x)
         if here is None or there is None:
@@ -226,7 +233,12 @@ def walk_toward(ctx: Context, x: str, stop_at: float = 0.1, speed: float = 0.30,
             return Outcome(DONE)
         if not known(ctx.kb, ctx.t, x):
             return Outcome(FAILED, f"{x} is no longer where it was believed")
-        via = _detour_point(here, there, ctx.kb.position(avoid) if avoid else None, avoid_r)
+        if ctx.map is not None and ctx.t - routed_t >= 0.5:
+            # A way round what the range sensor has seen in the way (E-030), re-planned twice a
+            # second; the last stretch to x is left to the approach below.
+            route, routed_t = ctx.map.route((here.x, here.y), (there.x, there.y),
+                                            spare=stop_at + ROUTE_SPARE_M), ctx.t
+        via = route or _detour_point(here, there, ctx.kb.position(avoid) if avoid else None, avoid_r)
         if via is not None:
             yaw = ctx.kb.value("heading", SELF, default=0.0)
             b = _wrap(math.atan2(via[1] - here.y, via[0] - here.x) - yaw)
@@ -250,6 +262,32 @@ def walk_toward(ctx: Context, x: str, stop_at: float = 0.1, speed: float = 0.30,
         wz = 0.0 if dist - stop_at < steady_last else max(-1.0, min(1.0, body.k_turn * b))
         yield Command(twist=(speed, 0.0, wz), head=body.head_down if down else body.head_level,
                       note=f"walk to {x} ({dist:.2f} m)")
+
+
+@primitive({"seconds": "number", "avoid": "entity", "avoid_r": "number"},
+           "Walk to the nearest edge of the floor seen so far, round what is in the way; "
+           "wander if there is none.", budget=60.0, avoid=None, avoid_r=0.45)
+def walk_to_unseen(ctx: Context, seconds: float, avoid: str | None = None, avoid_r: float = 0.45) -> SkillRun:
+    """Frontier exploration (E-031): head for the nearest place where floor the range sensor
+    has seen free meets floor it has never seen, for at most `seconds`."""
+    here = ctx.kb.position(SELF)
+    goal = None if ctx.map is None or here is None else ctx.map.frontier((here.x, here.y))
+    if goal is None:
+        return (yield from wander(ctx, seconds, avoid, avoid_r))
+    place = ctx.kb.ensure_entity("place:unseen", "place", ctx.t)
+    ctx.kb.tell("at", (place,), Position.round(goal[0], goal[1], 0.05), t=ctx.t, source="derived",
+                provenance="derived")
+    t0, run = ctx.t, walk_toward(ctx, place, stop_at=0.2, avoid=avoid, avoid_r=avoid_r)
+    while True:
+        if ctx.t - t0 > seconds:
+            run.close()
+            return Outcome(DONE)
+        try:
+            command = next(run)
+        except StopIteration as stop:
+            outcome = stop.value
+            return Outcome(DONE) if outcome.status == FAILED and outcome.reason == "blocked" else outcome
+        yield command
 
 
 @primitive({"seconds": "number", "avoid": "entity", "avoid_r": "number"},

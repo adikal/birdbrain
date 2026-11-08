@@ -25,14 +25,17 @@ def test_mind_modules_never_import_the_simulator():
 
     import birdbrain
     root = pathlib.Path(birdbrain.__file__).parent
-    allowed = {"lab.py", "run.py", "record.py", "camera.py"}       # adapters and evaluation, never the mind
+    # Adapters, evaluation and world code, never the mind.
+    allowed = {"lab.py", "run.py", "record.py", "camera.py", "world2.py"}
     for path in root.rglob("*.py"):
         if path.name in allowed:
             continue
         tree = ast.parse(path.read_text())
         imported = {n.module or "" for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)}
         imported |= {a.name for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
-        assert not any(m.startswith(("microduck_local", "mujoco")) for m in imported), path
+        # World code holds truth the mind must not see: the world itself, and the owner's preference.
+        assert not any(m.startswith(("microduck_local", "mujoco", "birdbrain.world2", "birdbrain.owner"))
+                       for m in imported), path
 
 
 @needs_lab

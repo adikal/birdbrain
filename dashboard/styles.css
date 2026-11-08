@@ -112,12 +112,17 @@ h1 { font-size: 19px; }
 #world-map .basket { fill: rgba(0,114,178,.10); stroke: var(--blue); stroke-width: 2.5; }
 #world-map .basket.doubt { stroke-dasharray: 4 3; opacity: .5; }
 #world-map .truth { fill: none; stroke: var(--vermillion); stroke-width: 2; stroke-dasharray: 5 3; }
+#world-map .truth-tag { fill: var(--vermillion); font-size: 11px; font-weight: 700; }
+#world-map .mapped { fill: rgba(80, 80, 80, .35); }
+#world-map .furniture { fill: #e4dccd; stroke: #9a8a6a; stroke-width: 1.5; }
+#world-map .inner-wall { stroke: #9a958a; stroke-width: 5; stroke-linecap: square; }
 #world-map .aim { stroke: var(--orange); stroke-width: 2; stroke-dasharray: 6 4; }
 #world-map .duck path { fill: var(--orange); stroke: var(--text); stroke-width: 1.5; }
 .legend { display: flex; flex-wrap: wrap; gap: 18px; padding: 0 18px 16px; color: var(--muted); font-size: 13px; }
 .dot { display: inline-block; width: 12px; height: 12px; margin-right: 7px; vertical-align: -1px; }
 .dot.toy { background: var(--blue); border-radius: 50%; }
 .dot.basket { border: 2.5px solid var(--blue); background: rgba(0,114,178,.10); border-radius: 2px; }
+.dot.mapped { background: rgba(80, 80, 80, .35); border-radius: 2px; }
 .dot.truth { border: 2px dashed var(--vermillion); border-radius: 2px; }
 
 /* Mind */

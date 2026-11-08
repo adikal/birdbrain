@@ -115,6 +115,8 @@ uv pip install --python .venv/bin/python -e ../microduck-lab/microduck_local -e 
 .venv/bin/python scripts/lifetimes.py wall.jsonl                               # summarize lifetimes
 .venv/bin/python scripts/predictions.py wall.jsonl                             # score predictions
 .venv/bin/birdbrain-run --author --episodes 20 --seeds 2 --jobs 2 --tag mine --out authored.jsonl  # cloud writes skills
+.venv/bin/birdbrain-run --world world2 --kinds late --episodes 20 --seeds 2 --jobs 2 --tag w2 --out w2.jsonl  # World 2
+.venv/bin/python scripts/world2_report.py w2.jsonl                              # World 2 measures by room band
 .venv/bin/birdbrain-compare A.jsonl B.jsonl          # paired, seed-matched comparison
 .venv/bin/birdbrain-dashboard --live --seed 3        # the mind, live, at http://127.0.0.1:8790
 .venv/bin/birdbrain-record playroom --brain d0=birdbrain --seconds 120 --out /tmp/rec   # video
@@ -147,7 +149,7 @@ credentials; model usage is billed to the AWS account.
 
 ## Status
 
-Milestones 0 to 5a are complete (see the report's results, section 6):
+Milestones 0 to 5a and World 2 are complete (see the report's results, section 6):
 
 - From the robot's own senses, with an explicit task, the mind tidies as
   well as the lab's hand-tuned controller on held-out rooms (E-008).
@@ -182,7 +184,23 @@ Milestones 0 to 5a are complete (see the report's results, section 6):
   and retired 3. With the task the room lost a tenth of a toy, because a
   better written delivery is slower (E-020).
 
-Next is Milestone 4b (one valence) or Milestone 6 (lifetimes and agents A
-to D); authoring still needs trials scored by success per second and
-trials that finish within a life (H-021). The roadmap is in
+- In World 2 (`--world world2`: 24 kinds of object whose weight, width and
+  grip follow how they look, furniture, inner walls, an owner who wants her
+  blue things left alone), the playroom's mind tidied 30% of what it could
+  carry and learned nothing about objects (E-021). After re-measuring the
+  camera at range and letting the rules use each object's size and colour,
+  it tidies 40%, mostly leaves alone what it has learned it cannot carry,
+  including kinds it never met, and pleases the owner a little more. Falls
+  rose, and heavy objects are still not learned well (E-022 to E-025).
+
+- A second round in World 2 (E-026 to E-032): a heavy-tailed prior lets
+  the rules believe strong effects (the duck now avoids what makes it
+  fall); objects are detected by how wide they look, so small ones are no
+  longer forgotten (the playroom gained a third of a toy a room); the duck
+  maps what is in its way from its range sensor, walks round it, and
+  explores the edge of what it has seen; and with an owner it values her
+  reactions correctly and no longer sits idle.
+
+Next: falls at the basket rim and the inner wall's doorway, then
+Milestone 6 (lifetimes and agents A to D). The roadmap is in
 [`docs/design.md`](docs/design.md#9-roadmap).

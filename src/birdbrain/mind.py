@@ -32,6 +32,7 @@ from birdbrain.expr import Evaluator, ExprError
 from birdbrain.goals import Goal, approval_candidates, candidates, kinds_owner
 from birdbrain.kr import SELF, KnowledgeBase, Position
 from birdbrain.needs import Needs
+from birdbrain.occupancy import CELL
 from birdbrain.perception import Perception
 from birdbrain.phrases import load as load_phrases
 from birdbrain.reactions import ConditionReactionModel, ReactionModel
@@ -126,14 +127,38 @@ class ProviderError(RuntimeError):
 # The local policy: the fallback, and agent A of the evaluation
 # ---------------------------------------------------------------------------
 
+
+#: (p the action works without a fall, whether a credible rule bears on it), for a skill
+#: on its arguments, optionally as if holding an object.
+Judge = Callable[..., tuple[float, bool]]
+
+
 class LocalPolicy:
-    """Deterministic rules for an explicit tidy goal."""
+    """Deterministic rules for an explicit tidy goal.
+
+    With a `judge` (the causal rules), a toy a credible rule speaks against (a condition
+    of it that lowers the chance a pick or its delivery works, or raises the chance of a
+    fall) is a poor prospect: it waits until nothing better is known (ledger E-023,
+    E-023b, E-029)."""
 
     name = "local"
 
-    def __init__(self, ctx: Context, give_up_after: int = 3, rest_after: int = 6) -> None:
+    def __init__(self, ctx: Context, give_up_after: int = 3, rest_after: int = 6,
+                 judge: Judge | None = None) -> None:
         self.ctx, self.give_up_after, self.rest_after = ctx, give_up_after, rest_after
+        self.judge = judge
         self._idle = 0
+
+    def better_than(self, toy: str) -> bool:
+        """Some other known toy is not a poor prospect."""
+        return any(e != toy and not self.worth(e)[1] for e in self.candidates())
+
+    def worth(self, toy: str) -> tuple[float, bool]:
+        """Chance that picking and delivering `toy` works without a fall, and whether a
+        credible rule speaks against it."""
+        pick, why_pick = self.judge("pick", {"x": toy})
+        carry, why_carry = self.judge("deliver", {}, held=toy)
+        return pick * carry, why_pick or why_carry
 
     def candidates(self) -> list[str]:
         kb, t = self.ctx.kb, self.ctx.t
@@ -153,9 +178,23 @@ class LocalPolicy:
             return Choice("deliver", {}, "holding a toy", p["deliver"])
         pickable = set(tools["pick"].params["x"]) if "pick" in tools else set()
         toys = [e for e in self.candidates() if e in pickable]
+        here = kb.position(SELF)
+        if toys and self.judge is not None:
+            worth = {e: self.worth(e) for e in toys}
+            good = [e for e in toys if not worth[e][1]]   # no credible rule against it (E-029)
+            # A poor prospect is deferred, not dropped: it is tried when nothing better is
+            # known and the duck has looked and explored for something better (E-023).
+            choices = good or (toys if self._idle >= 2 else [])
+            if choices:
+                # Nearest first: ranking by the rules' uncertain means picks what looks best
+                # by error (L-020; E-023, where it cost the playroom 0.2 toys a room).
+                self._idle = 0
+                best = min(choices, key=lambda e: kb.position(e).distance(here))
+                why = "nearest toy outside the basket" if good else "nothing better known"
+                return Choice("pick", {"x": best}, f"{why} (works {worth[best][0]:.2f})", p["pick"])
+            toys = []
         if toys:
             self._idle = 0
-            here = kb.position(SELF)
             nearest = min(toys, key=lambda e: kb.position(e).distance(here))
             return Choice("pick", {"x": nearest}, "nearest toy outside the basket", p["pick"])
         self._idle += 1
@@ -208,14 +247,14 @@ class Mind:
         self.log: Log = log or (lambda kind, payload: None)
         self.kb = KnowledgeBase(self._kb_event)
         self.perception = Perception(self.kb, body)
-        self.ctx = Context(self.kb, Evaluator(self.kb, CLASSES), body, log=self.log)
+        self.ctx = Context(self.kb, Evaluator(self.kb, CLASSES), body, log=self.log, map=self.perception.map)
         self.library = library or Library()
         # Needs mode (Milestone 3): no task; goals come from needs and are scored. The
         # social need is tidiness (needs=True) or approval (needs="approval", Milestone 3b).
         social = "tidiness" if needs is True else needs
         self.needs = Needs(social=social) if needs else None
         self.approval = bool(needs) and social == "approval"
-        self.local = NeedsPolicy() if needs else LocalPolicy(self.ctx)
+        self.local = NeedsPolicy() if needs else LocalPolicy(self.ctx, judge=self.judge)
         self.provider: Provider = provider or self.local
         if needs and goal == TIDY_GOAL:
             goal = APPROVAL_GOAL if self.approval else NEEDS_GOAL
@@ -275,6 +314,7 @@ class Mind:
         self._run: SkillRun | None = None
         self._action: dict[str, Any] | None = None
         self._snapshot_every = 1.0 / snapshot_hz if snapshot_hz > 0 else math.inf
+        self._next_map = self._next_look = 0.0     # MAP events (E-030); reconsidering (E-023)
         self._next_snapshot = 0.0
         self.recent: list[dict[str, Any]] = []
 
@@ -291,6 +331,7 @@ class Mind:
                 pass
             self._run.close()
             self._finish(Outcome("failed", "fell"))
+        self._reconsider(obs.t)
         if self.reactions is not None:
             # The duck's own changes to the room, as its body senses them (E-016).
             if obs.holding != self._held_before or (obs.bumped and not self._bumped_before):
@@ -320,10 +361,49 @@ class Mind:
             except StopIteration as stop:
                 self._finish(stop.value)
         self.ctx.last = command
+        if command.reflex is not None and self._action is not None:
+            self._action["reflexed"] = True       # the body is acting now; no reconsidering (E-025 review)
         if obs.t >= self._next_snapshot:
             self._next_snapshot = obs.t + self._snapshot_every
             self.log("STATE_SNAPSHOT", self.snapshot(obs, command))
+        if obs.t >= self._next_map:
+            # What the duck believes is in the way (E-030), for viewers: every 5 s.
+            self._next_map = obs.t + 5.0
+            cells = sorted(self.perception.map.occupied_cells)
+            self.log("MAP", {"cell": CELL, "occupied": [list(c) for c in cells]})
         return command
+
+    def _reconsider(self, t: float) -> None:
+        """On the way to a toy the duck sees it better (its colour within 1 m). If the
+        rules now credibly judge it a poor prospect (E-023), or, with an owner, the pick
+        turns out to be another kind of action (E-024), stop and choose again. A stopped
+        action is not an outcome of the skill and teaches nothing."""
+        action = self._action
+        if (action is None or self._run is None or self.provider is not self.local
+                or "pick" not in {action["skill"], action["variant_of"]} or t < self._next_look):
+            return
+        self._next_look = t + 0.5
+        toy = action["args"].get("x")
+        if toy is None or self.kb.value("holding", SELF) is not None or action.get("reflexed"):
+            return                  # a pick reflex once asked for runs to its end
+        why = None
+        if self.approval:
+            # With an owner (E-024): the pick was chosen as a kind of action; if the duck now
+            # sees what kind it is (the toy's colour), choose again with that knowledge.
+            colour = self.kb.value("color", toy)
+            if colour is not None and colour not in action["kind"].split():
+                why = f"it is {colour}"
+        elif isinstance(self.local, LocalPolicy) and self.local.judge is not None:
+            worth, credible = self.local.worth(toy)
+            if credible and self.local.better_than(toy):
+                why = f"now judged a poor prospect ({worth:.2f})"
+        if why is None:
+            return
+        self._run.close()
+        self.log("RECONSIDERED", {"skill": action["skill"], "x": toy, "why": why,
+                                  "summary": f"{action['skill']}({toy}) stopped: {why}"})
+        self.stats["reconsidered"] = self.stats.get("reconsidered", 0) + 1
+        self._finish(Outcome("interrupted", "reconsidered"))
 
     def _fell(self, obs: Observation) -> bool:
         """The body fell and got up elsewhere: odometry jumps further than one tick allows.
@@ -464,6 +544,18 @@ class Mind:
             out.append(1.0 / (1.0 + math.exp(-max(-30.0, min(30.0, self._rule_draws[key].logit(f))))))
         return out[0], out[1]
 
+    def judge(self, skill: str, args: dict[str, Any], held: str | None = None) -> tuple[float, bool]:
+        """The rules' chance that `skill` on `args` works (its expected effect holds) without
+        a fall, optionally as if holding `held`, and whether a credible rule speaks against it."""
+        f = features(self.kb, self.ctx.t, args, held=held)
+        effect, _, why_effect = self.rules["effect"].predict(skill, f)
+        fell, _, why_fell = self.rules["fell"].predict(skill, f)
+        # Credible against it: a credible condition that lowers the chance of the effect or
+        # raises the chance of a fall (E-025 review: any credible condition was taken).
+        against = (self.rules["effect"].against(skill, why_effect, -1)
+                   or self.rules["fell"].against(skill, why_fell, +1))
+        return effect * (1.0 - fell), against
+
     def _owner_p(self):
         """The owner's reaction to an action, one posterior draw, held while the duck
         holds a toy so a pick and its put are chosen with the same beliefs."""
@@ -520,9 +612,11 @@ class Mind:
             raise ValueError(f"memory file {path} is unreadable ({error}); move it aside to start fresh") from None
 
     def action_kind(self, skill: str, args: dict[str, Any]) -> str:
-        """The duck's own description of an action, for learning what its owner reacts to."""
+        """The duck's own description of an action, for learning what its owner reacts to:
+        a pick says where the toy was and, once the duck has seen it, its colour (E-024)."""
         if skill == "pick" and "x" in args:
-            return f"pick from {where_is(self.kb, self.ctx.t, args['x'])}"
+            colour = self.kb.value("color", args["x"])
+            return f"pick {colour + ' ' if colour else ''}from {where_is(self.kb, self.ctx.t, args['x'])}"
         return skill
 
     def _load_reactions(self) -> ReactionModel:
@@ -580,7 +674,8 @@ class Mind:
             predict = self.predict if self.use_rules else None
             self._rule_draws = {}                   # one posterior draw per skill per decision
             goals = tuple(approval_candidates(self.kb, self.ctx.t, self.needs, self.records, names,
-                                              self._owner_p(), self.kind_records, predict=predict)
+                                              self._owner_p(), self.kind_records, predict=predict,
+                                              kind_of=self.action_kind)
                           if self.approval else
                           candidates(self.kb, self.ctx.t, self.needs, self.records, names, predict=predict))
             tools = _serving(tools, goals)
@@ -812,11 +907,14 @@ class Mind:
                                   "trials": [t.child for t in action["written_trials"]]})
             self.authoring.record(action["written_trials"], action["skill"], held and not fell, fell)
         if self.reactions is not None:
-            self.reactions.ended(action["kind"], self.ctx.t)
-            self.kind_records.setdefault(action["kind"], SkillRecord()).record(
-                held, outcome.ok, self.ctx.t - action["t0"], outcome.reason == "fell")
-        record = self.records.setdefault(action["skill"], SkillRecord())
-        record.record(held, outcome.ok, self.ctx.t - action["t0"], outcome.reason == "fell")
+            stopped = outcome.reason == "reconsidered"
+            self.reactions.ended(action["kind"], self.ctx.t, counted=not stopped)
+            if not stopped:
+                self.kind_records.setdefault(action["kind"], SkillRecord()).record(
+                    held, outcome.ok, self.ctx.t - action["t0"], outcome.reason == "fell")
+        if outcome.reason != "reconsidered":            # a stopped pick is no trial of the skill
+            record = self.records.setdefault(action["skill"], SkillRecord())
+            record.record(held, outcome.ok, self.ctx.t - action["t0"], outcome.reason == "fell")
         result = {
             "skill": action["skill"], "args": action["args"], "status": outcome.status, "t0": action["t0"],
             "reason": outcome.reason, "path": outcome.path,
@@ -911,7 +1009,9 @@ class Mind:
                 continue
             entities.append({"id": e, "cls": kb.cls(e), "x": round(a.value.x, 3), "y": round(a.value.y, 3),
                              "sigma": round(a.value.sigma, 3), "conf": round(a.conf, 2),
-                             "seen_ago": round(obs.t - a.t_obs, 1)})
+                             "seen_ago": round(obs.t - a.t_obs, 1),
+                             **({"color": kb.value("color", e)} if kb.value("color", e) else {}),
+                             **({"size": kb.value("size", e)} if kb.value("size", e) else {})})
         return {
             "pose": [round(v, 3) for v in obs.odom], "speed": round(obs.speed, 3),
             "holding": kb.value("holding", SELF), "reflex": obs.reflex,

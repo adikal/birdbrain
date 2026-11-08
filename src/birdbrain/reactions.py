@@ -104,13 +104,16 @@ class ReactionModel:
         if self._actions and self._actions[-1][2] is None:
             self._actions[-1][3].append(t)
 
-    def ended(self, kind: str, t: float) -> None:
-        """The running action of `kind` ended: it is one more trial of its kind."""
+    def ended(self, kind: str, t: float, counted: bool = True) -> None:
+        """The running action of `kind` ended: it is one more trial of its kind, unless it
+        was stopped before it changed anything (`counted=False`)."""
         for a in reversed(self._actions):
             if a[0] == kind and a[2] is None:
                 a[2] = t
+                if not counted:
+                    self._actions.remove(a)     # nor can it take credit for a reaction
                 break
-        self.kinds.setdefault(kind, KindBelief()).trials += 1
+        self.kinds.setdefault(kind, KindBelief()).trials += counted
         horizon = t - self.window_s - 60.0
         self._actions = [a for a in self._actions if a[2] is None or a[2] >= horizon]
 
@@ -194,11 +197,13 @@ class ConditionReactionModel(ReactionModel):
                              "features": dict(context.get("features", {})), "ended": False})
         self._actions.append([len(self.actions) - 1, t, None, []])
 
-    def ended(self, kind: str, t: float) -> None:
+    def ended(self, kind: str, t: float, counted: bool = True) -> None:
         for a in reversed(self._actions):
             if a[2] is None:
                 a[2] = t
-                self.actions[a[0]]["ended"] = True
+                self.actions[a[0]]["ended"] = counted
+                if not counted:
+                    self._actions.remove(a)     # a stopped action is neither a trial nor a cause
                 break
         horizon = t - self.window_s - 60.0
         self._actions = [a for a in self._actions if a[2] is None or a[2] >= horizon]

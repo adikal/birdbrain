@@ -15,10 +15,21 @@ import math
 from collections import deque
 from dataclasses import dataclass
 
-from birdbrain.body import MICRODUCK, BodyProfile, Frame, Observation, Sighting
+from birdbrain.body import (
+    MICRODUCK,
+    BodyProfile,
+    Frame,
+    Observation,
+    RangeFrame,
+    Sighting,
+)
 from birdbrain.kr import SELF, KnowledgeBase, Position, same_place
+from birdbrain.occupancy import OccupancyMap
 
 CONFIRMED = 0.5          # an entity is acted on once its position confidence reaches this
+#: The map does not count cells this close to an object as in the way of seeing it: they may
+#: be the object itself, or its believed position may be off by about this much (E-030).
+OWN_FOOTPRINT_M = 0.15
 
 
 @dataclass(frozen=True)
@@ -49,16 +60,31 @@ class PerceptionParams:
     prior_logit: float = -3.0
     p_false: float = 0.1             # a consistent detection without the object (ghosts, mis-association)
     logit_limit: float = 5.0
-    # Measured detection rate by range (m), inside the field of view (ledger E-013).
-    # The last toy bin holds everything beyond 1.75 m; beyond the table the last value holds.
+    # Measured detection rate by range (m), inside the field of view, for classes of one size
+    # (objects of varied size go by `width_rate` below). The basket's rate beyond 1.25 m was
+    # measured in World 2's larger rooms (E-022): the playroom never put it that far away,
+    # and assuming 0.96 there made misses of a far basket erase the belief in it. Measured on
+    # frames the occlusion test calls visible (`scripts/detection_probe.py`, E-025 review),
+    # since occluded frames are not misses.
     detection_rate: tuple[tuple[str, tuple[tuple[float, float], ...]], ...] = (
-        ("toy", ((0.25, 0.97), (0.5, 0.95), (0.625, 0.84), (0.875, 0.61), (1.125, 0.41),
-                 (1.375, 0.33), (1.625, 0.21), (1.875, 0.11))),
-        ("basket", ((0.5, 0.97), (2.0, 0.96))),
+        ("basket", ((1.25, 0.97), (1.5, 0.95), (1.75, 0.88), (2.0, 0.81), (2.25, 0.72), (2.5, 0.68),
+                    (2.75, 0.52), (3.25, 0.45), (3.5, 0.41), (3.75, 0.28), (4.0, 0.10), (4.25, 0.0))),
     )
     default_detection_rate: float = 0.5
+    # Objects of the classes listed are detected by how wide they look (degrees), not by
+    # range: the detector's limits are in pixels, and objects of one class differ in size
+    # (World 2, measured on frames the model calls visible with `scripts/detection_probe.py`,
+    # ledger E-028). An object's width comes from its believed size, or `default_size`.
+    width_rate: tuple[tuple[str, tuple[tuple[float, float], ...]], ...] = (
+        ("toy", ((0.25, 0.0), (1.25, 0.08), (2.25, 0.33), (3.25, 0.68), (4.25, 0.91), (5.25, 0.94))),
+    )
+    default_size: float = 0.04
     fov_margin: float = math.radians(8.0)
     min_width: float = math.radians(2.0)   # objects that would look smaller than this may go unseen
+    # Occlusion (ledger E-022): the range sensor sits beside the camera on the head and
+    # looks the same way over a narrower field. An object it shows something in front of
+    # (closer by this margin, m) is hidden, and a frame without it is no evidence.
+    occlusion_margin: float = 0.3
 
 
 class Perception:
@@ -69,6 +95,15 @@ class Perception:
         self._last_frame_t = -math.inf
         self._held: str | None = None
         self._moving_until = -math.inf
+        self._range: RangeFrame | None = None
+        #: What is in the way, from the range sensor (E-030), and the head's pose as the
+        #: camera last reported it (the range sensor is beside it).
+        self.map = OccupancyMap()
+        self._head: tuple[float, float, float] | None = None
+        self._mapped_t = -math.inf
+        #: How each object looks (ledger E-023): apparent sizes and colours seen, per entity.
+        self._sizes: dict[str, list[float]] = {}
+        self._colours: dict[str, dict[str, int]] = {}
         #: The latest camera frame and what each sighting was taken to be (entity id, or a reason).
         self.last_view: dict | None = None
         #: Pairs of entities once seen in the same frame: provably distinct objects.
@@ -90,6 +125,12 @@ class Perception:
         kb.tell("heading", (SELF,), yaw, t=obs.t, source="odometry",
                 same=lambda a, b: abs(_wrap(a - b)) < 0.1)
         self._update_holding(obs)
+        if obs.range_frame is not None:
+            self._range = obs.range_frame
+            r = obs.range_frame
+            if r.t > self._mapped_t and self._head is not None:
+                self._mapped_t = r.t
+                self.map.update(r.depth_mm, r.valid, self._pose_at(r.t), *self._head, self.body.cam_ahead)
         if obs.frame is not None and obs.frame.t > self._last_frame_t:
             self._last_frame_t = obs.frame.t
             self._integrate(obs.frame, obs.t)
@@ -126,6 +167,7 @@ class Perception:
 
     # -- frames -----------------------------------------------------------------
     def _integrate(self, frame: Frame, now: float) -> None:
+        self._head = (frame.cam_z, frame.cam_pitch, frame.cam_yaw)
         pose = self._pose_at(frame.t)
         still = self.still(frame.t)
         view, placed = [], []
@@ -147,6 +189,7 @@ class Perception:
         for (sighting, located, seen), entity in zip(placed, assignment, strict=True):
             entity = entity or self.kb.new_entity(sighting.cls, frame.t)
             self._fuse(entity, located, frame.t, sighting)
+            self._appearance(entity, sighting, located, frame, pose)
             entity = self._merge_duplicates(entity, frame.t, matched)
             matched.add(entity)
             seen["as"] = entity
@@ -154,7 +197,7 @@ class Perception:
         self._distinct.update(frozenset((a, b)) for i, a in enumerate(same_frame) for b in same_frame[i + 1:])
         self._register_misses(frame, pose, matched | self._gated)
         self.last_view = {"t": round(frame.t, 3), "cam_yaw": round(frame.cam_yaw, 4),
-                          "cam_pitch": round(frame.cam_pitch, 4), "sightings": view}
+                          "cam_pitch": round(frame.cam_pitch, 4), "cam_z": round(frame.cam_z, 4), "sightings": view}
 
     def locate(self, s: Sighting, frame: Frame, pose: tuple[float, float, float],
                still: bool) -> Position | None:
@@ -173,17 +216,32 @@ class Perception:
         cp, sp = math.cos(frame.cam_pitch), math.sin(frame.cam_pitch)
         bx, by, bz = fx * cp + fz * sp, fy, -fx * sp + fz * cp                  # body frame, pitched down
         drop = frame.cam_z - height
-        if bz >= -0.02 or drop <= 0:
-            return None                          # at or above the horizon of that plane
-        travel = drop / -bz
-        hx, hy = travel * bx, travel * by        # floor offset from the camera, body frame
-        horizontal = math.hypot(hx, hy)
-        if horizontal > 4.0:
+        if drop <= 0:
             return None
-        depression = math.asin(min(1.0, -bz))
-        elevation_error = self.p.elevation_sigma_still if still else self.p.elevation_sigma_moving
-        s_range = math.hypot(drop / max(math.sin(depression), 0.05) ** 2 * elevation_error,
-                             0.02 * horizontal) + 0.01
+        flat = math.hypot(bx, by)
+        estimates = []                           # (horizontal range, its sd)
+        if bz < -0.02:
+            # Range from elevation: the ray meets the plane at the class's height.
+            depression = math.asin(min(1.0, -bz))
+            elevation_error = self.p.elevation_sigma_still if still else self.p.elevation_sigma_moving
+            h = drop / -bz * flat
+            estimates.append((h, math.hypot(drop / max(math.sin(depression), 0.05) ** 2 * elevation_error,
+                                            0.02 * h) + 0.01))
+        radius = self.body.class_width_radius.get(s.cls)
+        if radius is not None and s.width > 0:
+            # Range from apparent width, for a class of known size (ledger E-022): far
+            # away, where elevation hardly changes with range, it is the better of the two.
+            slant = radius / math.tan(s.width / 2)
+            h = math.sqrt(max(slant * slant - drop * drop, 0.0))
+            estimates.append((h, self.body.width_sigma_frac * h + 0.01))
+        if not estimates:
+            return None                          # at or above the horizon of that plane
+        weight = sum(1.0 / sd ** 2 for _, sd in estimates)
+        horizontal = sum(h / sd ** 2 for h, sd in estimates) / weight
+        if horizontal > 4.0 or flat <= 0:
+            return None
+        s_range = 1.0 / math.sqrt(weight)
+        hx, hy = horizontal * bx / flat, horizontal * by / flat     # floor offset, body frame
         s_cross = horizontal * self.p.bearing_sigma + 0.01
         x, y, yaw = pose
         heading = yaw + frame.cam_yaw
@@ -240,7 +298,7 @@ class Perception:
         old = self._predicted(entity, t)
         current = kb.get("at", entity)
         if old is None:
-            fused, conf = m, _prob(self.p.prior_logit + self._hit_logit(s.cls, m, t))
+            fused, conf = m, _prob(self.p.prior_logit + self._hit_logit(s.cls, m, t, entity))
         else:
             # Robust update: a measurement far from a confident estimate is more likely
             # an outlier of the heavy-tailed sensor than a move, so it counts for less.
@@ -255,10 +313,27 @@ class Perception:
                     old = old.scaled(d2 / self.p.robust_chi2)
             fused = old.fuse(m).floored(self.p.min_sigma)
             prior = _logit(current.conf) if current else self.p.prior_logit
-            conf = self._clip(prior + self._hit_logit(s.cls, m, t))
+            conf = self._clip(prior + self._hit_logit(s.cls, m, t, entity))
         kb.tell("at", (entity,), fused, t=t, conf=conf, source="camera", same=same_place())
+
+    def _appearance(self, entity: str, s: Sighting, m: Position, frame: Frame,
+                    pose: tuple[float, float, float]) -> None:
+        """How an object looks: its size from apparent width and range (the median of
+        what was seen), and its colour (the colour seen most often), ledger E-023."""
+        kb, t = self.kb, frame.t
+        if self._sized(s.cls) and s.width > 0:
+            x, y, yaw = pose
+            cx, cy = x + self.body.cam_ahead * math.cos(yaw), y + self.body.cam_ahead * math.sin(yaw)
+            slant = math.hypot(m.x - cx, m.y - cy, frame.cam_z - self.body.class_height["toy"])
+            sizes = self._sizes.setdefault(entity, [])
+            sizes.append(2 * slant * math.tan(s.width / 2))
+            del sizes[:-15]
+            kb.tell("size", (entity,), round(sorted(sizes)[len(sizes) // 2], 3), t=t, source="camera",
+                    same=lambda a, b: abs(a - b) < 0.005)
         if s.color:
-            kb.tell("color", (entity,), s.color, t=t, source="camera")
+            seen = self._colours.setdefault(entity, {})
+            seen[s.color] = seen.get(s.color, 0) + 1
+            kb.tell("color", (entity,), max(seen, key=seen.get), t=t, source="camera")
 
     def _merge_duplicates(self, entity: str, t: float, seen_now: set[str]) -> str:
         """Two entities of one class whose estimates agree are one object seen twice.
@@ -285,6 +360,9 @@ class Perception:
             kb.tell("at", (keep,), fused, t=t, conf=max(kept.conf, dropped.conf),
                     source=f"merged {drop}", same=same_place())
             kb.tell("same_as", (drop,), keep, t=t, source="perception")
+            self._sizes[keep] = (self._sizes.get(keep, []) + self._sizes.pop(drop, []))[-15:]
+            for colour, n in self._colours.pop(drop, {}).items():
+                self._colours.setdefault(keep, {})[colour] = self._colours.get(keep, {}).get(colour, 0) + n
             # The survivor inherits what was known to be distinct from the merged entity.
             self._distinct.update(frozenset((keep, x)) for pair in list(self._distinct) if drop in pair
                                   for x in pair if x != drop)
@@ -297,8 +375,9 @@ class Perception:
             entity = assertion.args[0]
             if entity == SELF or entity in matched or not self._should_see(entity, frame, pose):
                 continue
-            p_d = self.detection_rate(kb.cls(entity), self._range_to(entity, pose))
-            miss = math.log(max(1.0 - p_d, 1e-3) / (1.0 - self.p.p_false))
+            p_d = self.detection_rate(kb.cls(entity), self._range_to(entity, pose), self._size(entity))
+            # A miss never counts for an object, even where detection is rarer than a ghost.
+            miss = min(0.0, math.log(max(1.0 - p_d, 1e-3) / (1.0 - self.p.p_false)))
             assertion.conf = self._clip(_logit(assertion.conf) + miss)
 
     def _should_see(self, entity: str, frame: Frame, pose: tuple[float, float, float]) -> bool:
@@ -312,29 +391,69 @@ class Perception:
         x, y, yaw = pose
         cx, cy = x + self.body.cam_ahead * math.cos(yaw), y + self.body.cam_ahead * math.sin(yaw)
         horizontal = math.hypot(where.x - cx, where.y - cy)
-        radius = 0.02 if cls == "toy" else self.body.class_half_width.get(cls, 0.1)
+        radius = self._size(entity) / 2 if self._sized(cls) else self.body.class_half_width.get(cls, 0.1)
         if horizontal < 0.08 or 2 * math.atan2(radius, horizontal) < self.p.min_width:
             return False
         bearing = _wrap(math.atan2(where.y - cy, where.x - cx) - yaw - frame.cam_yaw)
         if abs(bearing) > self.body.fov_h / 2 - self.p.fov_margin:
             return False
-        depression = math.atan2(frame.cam_z - self.body.class_height.get(cls, 0.0), horizontal)
-        return abs(depression - frame.cam_pitch) < self.body.fov_v / 2 - self.p.fov_margin
+        drop = frame.cam_z - self.body.class_height.get(cls, 0.0)
+        depression = math.atan2(drop, horizontal)
+        if abs(depression - frame.cam_pitch) >= self.body.fov_v / 2 - self.p.fov_margin:
+            return False
+        if self.occluded(frame, bearing, depression - frame.cam_pitch, math.hypot(horizontal, drop)):
+            return False
+        # Beyond the range sensor's narrow view, the map of what is in the way (E-030): a
+        # wall or furniture between the camera and the object hides it.
+        return self.map.clear((cx, cy), (where.x, where.y), spare=OWN_FOOTPRINT_M, grown=False)
 
-    def detection_rate(self, cls: str | None, rng: float) -> float:
-        """Measured probability that the detector reports an object of `cls` at `rng` m."""
+    def occluded(self, frame: Frame, bearing: float, below_axis: float, slant: float) -> bool:
+        """The range sensor shows something in front of a point `slant` metres away at
+        `bearing` (rad, +left) and `below_axis` (rad) off the camera's axis."""
+        r = self._range
+        if r is None or abs(r.t - frame.t) > 0.3:
+            return False
+        half = math.tan(self.body.range_fov / 2)
+        y = math.tan(bearing)
+        z = -math.tan(below_axis) / math.cos(bearing)
+        if abs(y) >= half or abs(z) >= half:
+            return False                         # outside the range sensor's view
+        n = self.body.range_zones
+        col, row = int((half - y) / (2 * half) * n), int((half - z) / (2 * half) * n)
+        if not r.valid[row, col] or r.depth_mm[row, col] <= 0:
+            return False
+        # Where the zone's ray meets the floor, if it does: the floor in front of a low,
+        # far object is not something in the way (E-025 review). The zone's centre ray,
+        # pitched down with the head, from the camera's height.
+        zy = half - (2 * col + 1) * half / n
+        zz = half - (2 * row + 1) * half / n
+        down = math.sin(frame.cam_pitch) - zz * math.cos(frame.cam_pitch)     # downward part, per unit forward
+        floor = (frame.cam_z / down * math.sqrt(1.0 + zy * zy + zz * zz)) if down > 1e-6 else math.inf
+        return r.depth_mm[row, col] / 1000.0 < min(slant, floor) - self.p.occlusion_margin
+
+    def detection_rate(self, cls: str | None, rng: float, size: float | None = None) -> float:
+        """Measured probability that the detector reports an object of `cls` at `rng` m:
+        by how wide it looks for classes of varied size (E-028), else by range."""
+        widths = dict(self.p.width_rate).get(cls or "")
+        if widths is not None:
+            radius = (size or self.p.default_size) / 2
+            return _interpolate(widths, math.degrees(2 * math.atan2(radius, max(rng, 1e-3))))
         table = dict(self.p.detection_rate).get(cls or "")
         if table is None:
             return self.p.default_detection_rate
-        if rng <= table[0][0]:
-            return table[0][1]
-        for (r0, p0), (r1, p1) in itertools.pairwise(table):
-            if rng <= r1:
-                return p0 + (p1 - p0) * (rng - r0) / (r1 - r0)
-        return table[-1][1]
+        return _interpolate(table, rng)
 
-    def _hit_logit(self, cls: str, m: Position, t: float) -> float:
-        p_d = self.detection_rate(cls, self._range_to_point(m, self._pose_at(t)))
+    def _sized(self, cls: str | None) -> bool:
+        """Objects of this class differ in size: each one's size is estimated, and its
+        detection rate goes by how wide it looks (E-023, E-028)."""
+        return cls in dict(self.p.width_rate)
+
+    def _size(self, entity: str | None) -> float:
+        size = None if entity is None else self.kb.value("size", entity)
+        return size if size else self.p.default_size
+
+    def _hit_logit(self, cls: str, m: Position, t: float, entity: str | None = None) -> float:
+        p_d = self.detection_rate(cls, self._range_to_point(m, self._pose_at(t)), self._size(entity))
         return math.log(max(p_d, self.p.p_false) / self.p.p_false)    # a sighting never counts against
 
     def _range_to(self, entity: str, pose: tuple[float, float, float]) -> float:
@@ -374,6 +493,16 @@ class Perception:
             if abs(ts - t) < best_dt:
                 best, best_dt = pose, abs(ts - t)
         return best if best is not None and best_dt <= 0.5 else self._odom[-1][1]
+
+
+def _interpolate(table: tuple[tuple[float, float], ...], x: float) -> float:
+    """Piecewise linear in `x`, flat beyond the ends."""
+    if x <= table[0][0]:
+        return table[0][1]
+    for (x0, p0), (x1, p1) in itertools.pairwise(table):
+        if x <= x1:
+            return p0 + (p1 - p0) * (x - x0) / (x1 - x0)
+    return table[-1][1]
 
 
 def _logit(p: float) -> float:

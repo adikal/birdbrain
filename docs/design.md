@@ -217,10 +217,23 @@ they exist.
   beak.
 - **Existence.** Confidence that an object exists is a log-odds belief. A
   sighting raises it by log(p_d / p_false); a frame that should have shown
-  the object and did not lowers it by log((1 − p_d) / (1 − p_false)), where
-  p_d is the detector's measured hit rate at that range (toys: 0.97 at
-  0.25 m, 0.61 at 0.9 m, 0.11 beyond 1.75 m; basket: 0.96 at every range)
-  and p_false = 0.1. A miss far away therefore says little.
+  the object and did not lowers it by log((1 − p_d) / (1 − p_false)), never
+  raising it, where p_false = 0.1 and p_d is the detector's measured hit
+  rate. For objects it depends on how wide the object looks, from its
+  believed size and range (0.08 at 1 to 1.5 degrees, 0.68 at 3 to 3.5,
+  0.91 beyond 4; E-028); for the basket, on range (0.97 to 1.25 m, 0.68 at
+  2.5 m, 0.10 at 4 m; E-022). A frame is no evidence when the range sensor,
+  or the map below, shows something between the camera and the object
+  (E-022, E-030). Far, the basket is ranged by its apparent width as well as
+  by elevation, weighted by their errors.
+- **Appearance.** Each object's size (apparent width times range, the
+  median of recent sightings) and colour (the colour seen most often, within
+  1 m) are kept as beliefs (E-023).
+- **What is in the way.** Each range-sensor frame is folded into a log-odds
+  grid of 10 cm cells: the cells a zone's ray crosses are free, and where
+  it ends 7 to 50 cm above the floor something stands. Walking re-plans a
+  way round what it holds (A*), and exploring heads for the nearest edge of
+  the floor seen so far (E-030, E-031).
 
 ### 3.4 Representation
 
@@ -425,8 +438,9 @@ rates are counted per kind, since a pick beside a wall falls more often than
 one in the open. There is no separate exploration bonus: an uncertainty
 bonus kept the duck busy with nobody there (L-016).
 
-**What the duck knows of the room.** It knows the walls as a map in its
-odometry frame; on the robot this map would come from the range sensor. It
+**What the duck knows of the room.** With an owner it is given the outer
+walls in its odometry frame, for its notion of "against a wall"; what
+stands in its way it maps itself from the range sensor (section 3.3). It
 does not know the owner's threshold for "against a wall"; its own is
 0.25 m.
 
@@ -443,8 +457,15 @@ logistic model gives
 
 ```text
 logit p(outcome | skill, f) = b_skill + Σ_c w_skill,c (1[c holds in f] − mean_c)
-b ~ N(logit(prior rate), sd_b²),   w ~ N(0, 0.5²)
+b ~ N(logit(prior rate), sd_b²),   w ~ Cauchy(0, 0.71)
 ```
+
+The Cauchy prior has the curvature at zero of a normal prior with sd 0.5,
+so weak effects are shrunk as much, and strong ones far less: a fall rate
+of 70% when holding a black object was predicted at 22% under the normal
+prior, which made the duck keep carrying them (E-026, L-027). In World 2
+the conditions also include the target's and the held object's colour
+and size.
 
 It is fitted at its posterior mode by damped Newton steps after each
 outcome, with a Laplace approximation for each effect's uncertainty.
@@ -458,8 +479,12 @@ sentences. Actions stopped from outside (the episode ended, the battery
 reflex) are neither scored nor learned. Every
 prediction is recorded before the action runs, next to the count per
 skill and per kind of action, and is scored by its Brier score when the
-action ends. The rules are learned and scored in every run; by default,
-decisions still use the counts (section 6.8).
+action ends. The rules are learned and scored in every run. Choosing by
+their means did worse (section 6.8); with the task, the local policy uses
+them in one way: a toy that a credible rule speaks against (a condition of
+it that lowers the chance a pick or its delivery works, or raises the
+chance of a fall) is deferred until nothing better is known, and a pick is
+stopped on the way when the toy turns out to be one (E-023, E-029).
 
 ### 4.5 Skills written by the cloud brain
 
@@ -773,6 +798,111 @@ finishes, the extra seconds cost toys. The trial scored success per try;
 the room rewards success per second (L-025). With the owner, the duck had
 time to spare and showed no cost.
 
+### 6.12 World 2: a harder world (E-021 to E-025)
+
+World 2 has 24 kinds of object, each a colour and a shape, whose hidden
+properties follow how they look: black things are heavy enough to tip the
+duck over when carried, white things slip out of the beak, and 6 cm boxes
+are too wide to hold. Eight kinds are held out of development. Rooms are
+larger (up to 4.5 by 3.5 m), with furniture, an inner wall with a doorway
+in half of them, and 4 to 15 objects. The duck sees colour within 1 m; it
+learns weight, slipperiness and width only by trying. A new owner wants
+her blue things left where they are and everything else put away. The lab
+is not edited: World 2 is world code beside it (`world2.py`).
+
+The mind of the playroom did not carry over (E-021). It put 30% of the
+objects it could carry in the basket (the playroom: 90%), fell once a room,
+never found 38% of the objects, and learned nothing about objects: it
+grasped heavy ones more often late in life than early. With the new owner
+it did almost nothing, and her measure fell.
+
+Four changes followed, each developed on its own lives and checked on
+held-out ones:
+
+| Entry | Change | Main result, rooms 11 to 20 |
+|---|---|---|
+| E-022 | The basket's detection rate re-measured at range; misses behind obstacles not counted; range from apparent width; deliver walks and looks again | Deliveries with the basket lost 61% → 16%; possible objects tidied +0.066 [+0.028, +0.104] |
+| E-023 | Size and colour per object, as conditions of the rules; poor prospects deferred, ranked by predicted worth | Wide objects grasped −0.85 a wide object, new kinds included; the playroom −0.21 toys (missed) |
+| E-023b | The same, nearest toy first | Wide −0.86; the playroom unchanged; heavy objects not clearly avoided |
+| E-024 | With an owner, kinds of action name the object's colour; a pick stops when the colour seen changes its kind | Her measure +0.20 [+0.04, +0.37] a room |
+
+A review in a clean context found that a stopped pick did not stop the pick
+reflex, that stopped picks were counted as picks and as failed trials, and
+that the new occlusion test took the floor for an obstacle; these were
+fixed before the kept changes were checked together on fresh lives
+(E-025), against the mind of E-021:
+
+| Measure, rooms 11 to 20, 16 fresh lives | E-021's mind | Kept changes | Difference |
+|---|---|---|---|
+| Possible objects in the basket (task) | 0.31 | 0.40 | +0.088 [+0.058, +0.119] |
+| Wide objects grasped per wide object | 1.20 | 0.51 | −0.70 [−0.86, −0.54] |
+| New wide kinds, grasped per object | 1.14 | 0.75 | |
+| Objects never found | 34% | 27% | −0.071 [−0.103, −0.039] |
+| Deliveries ending with the basket lost | 58% | 17% | |
+| Falls a room | 1.02 | 1.33 | +0.31 [−0.01, +0.64] |
+| Her measure gained a room (owner) | −0.24 | −0.10 | +0.14 [+0.00, +0.27] |
+| Playroom toys in the basket | 5.41 | 5.31 | −0.10 [−0.27, +0.07] |
+
+What carried over, and what did not:
+- *The body's parameters, not the mind, failed first.* The largest single
+  gain came from re-measuring how often the camera sees a far basket
+  (L-026). The playroom never put it more than 2 m away.
+- *The rules found the world's hidden properties from the duck's own
+  outcomes.* "Pick when target size 5 to 7.5 cm: 1/4 the odds"; "deliver
+  when held colour black: 4 times the odds of a fall". Acting on credible
+  rules worked; ranking by their means repeated L-020.
+- *Transfer to new kinds is partial.* A new wide kind shares its size with
+  known wide kinds, and was mostly avoided. A new heavy kind shares its
+  colour with known heavy kinds, but also its shape with known light ones,
+  and additive conditions blur the two (H-022).
+- *With an owner, the duck is too idle.* Even after E-024 it spends most
+  of a room looking, exploring and resting, because in a large room the
+  curiosity term outbids the uncertain value of pleasing her (H-023).
+
+### 6.13 World 2, second round (E-026 to E-032)
+
+Each change was diagnosed from the logs of the one before, developed on
+its own lives, and checked on lives 400 to 415 against the mind before it.
+
+| Entry | What the logs showed | Change | Held-out result, rooms 11 to 20 |
+|---|---|---|---|
+| E-026 | The duck fell in 72% of deliveries holding a black object; its rules predicted 22% | A Cauchy prior on each condition's effect | Falls holding heavy objects −0.16 a room; heavy grasps −0.19 per object |
+| E-027 | With an owner, a pick's value multiplied her reaction, learned per attempt, by the chance of success again | Count failure once | Approvals 0.31 against 0.08 a room; her measure +0.26 |
+| E-028 | 39% of picks of 2.5 cm cubes failed with the cube no longer believed; it was seen 8% of the time at 1 m, and the model said 41% | Detection by apparent width, measured against the detector's own frames | Those failures 39% → 6%; playroom +0.31 toys |
+| E-029 | Wide objects sat just above an arbitrary bar for a poor prospect | A credible rule against a toy is enough | Falls −0.15 |
+| E-030 | Deliveries with furniture between ended `done` 29% of the time, with the inner wall 8% | A map of what is in the way from the range sensor; walks routed round it | Tidying +0.054; past furniture 54% `done` |
+| E-031 | Most objects never found lay where the duck never came within a metre | Explore the nearest edge of the floor seen so far | With the owner, never found 40% → 33% |
+
+Against E-025's mind on the same lives, the six together: possible objects
+in the basket +0.056 [+0.035, +0.078] (15 of 16 lives higher), wide objects
+of kinds never met grasped −0.56 per object, falls holding heavy objects
+−0.19; with the owner her measure +0.36 [+0.01, +0.71] and falls +0.25;
+the playroom +0.31 toys [+0.15, +0.46]. On fresh lives (E-032, 500 to 515):
+
+| Measure, rooms 11 to 20 | E-025's mind | Second round | Difference |
+|---|---|---|---|
+| Possible objects in the basket (task) | 0.38 | 0.41 | +0.030 [−0.018, +0.078] |
+| Objects of kinds never met, in the basket | 0.34 | 0.44 | +0.099 [+0.044, +0.154] |
+| Heavy objects grasped per heavy object | 0.56 | 0.30 | −0.27 [−0.38, −0.15] |
+| Falls a room (task) | 1.11 | 0.83 | −0.28 [−0.55, −0.00] |
+| Objects never found (task) | 29% | 25% | −0.039 [−0.077, −0.002] |
+| Her measure gained a room (owner) | −0.13 | +0.27 | +0.40 [+0.22, +0.59] |
+| Falls a room (owner) | 0.31 | 0.51 | +0.20 [+0.01, +0.40] |
+| Playroom toys in the basket | 5.26 | 5.56 | +0.29 [+0.21, +0.38], 16 of 16 lives |
+
+The gain in tidying with the task was smaller on fresh lives than on the
+lives the changes were checked on (+5.6 points there), and not clear of
+zero; the rest held (L-028).
+
+After it, deliver's search for an unseen basket was made to walk to the
+frontier too (E-033: across the inner wall, basket lost 36% → 23%). A
+second review found real defects in the map: the planner can close a
+0.6 m doorway, low boxes hide what the camera sees over, and routing
+drops the basket's detour. Fixing them, together or with mapping rules
+varied, did worse than leaving them (E-034, E-035), so the mind stays at
+E-033's code and the defects are recorded as expected-failure tests, to be
+fixed one at a time (L-029).
+
 ## 7. Discussion
 
 **Ground the beliefs before tuning the behavior.** The largest gains in
@@ -830,8 +960,8 @@ the architecture learns.
   minds. One consequence: picking a toy the leave-it owner dislikes and
   dropping it on the spot earns "no" then "nice", so that lesson is only
   half available.
-- **Given knowledge.** The wall map is given; on the robot it would come
-  from the range sensor. The duck's descriptions of actions (where a toy
+- **Given knowledge.** The outer walls are given to the owner arms; what is
+  in the way the duck maps itself (E-030). The duck's descriptions of actions (where a toy
   was picked from) are hand-chosen categories.
 - **Hand-chosen categories.** The kinds of action the owner model learns
   over, and the features the rules use, are chosen by hand. The duck's
@@ -844,9 +974,14 @@ the architecture learns.
 - **One task for authoring.** Written skills were tested with the
   task-driven policy, which tidies 5.4 of 6 toys already, so they could not
   raise toys in the basket.
-- **One room family and one model.** Every experiment uses the same
-  playroom layout family and Claude Sonnet 5.5. The cloud owner arm has two
-  lives per arm.
+- **Few room families and one model.** Experiments use the playroom and
+  World 2, and Claude Sonnet 5.5. The cloud owner arm has two lives per
+  arm.
+- **World 2's rules are written beside the lab.** Wide objects and
+  slipping are applied after each physics step, and object colour comes
+  from a simulated classifier modelled on the lab's colour classifier for
+  ducks. The lab models every grasp as a weld, so size matters only
+  through that rule, and its detector reads a stick as 9 cm from any side.
 - **Thresholds from development.** Prediction thresholds for Milestone 3b
   were set after development lives; the held-out verdicts use fresh lives.
 
@@ -865,6 +1000,7 @@ the architecture learns.
 | 4b | One valence | Falls, an empty battery, new objects found, and the owner's reactions become valence events learned by one mechanism, replacing hand-set scorecard terms without losing the results of E-014 and E-015 | planned |
 | 5 | Skills composed by the cloud brain | A compound skill the cloud brain wrote is kept on measured merit and does something no hand-written skill does, or does it better | met (E-019) |
 | 5a | Authoring, sharpened | Keep decisions judged on fresh outcomes (L-023); kept skills become parents; authoring in the owner arms | met: gains hold with fair trials and with the owner; no skill was built on another; a small whole-room cost with the task (E-020) |
+| W | World 2: a harder world | The mind meets 24 kinds of object with hidden properties, furniture and inner walls; measure what breaks, fix it one change at a time on held-out lives, and check the kept changes together on fresh lives | done (E-021 to E-025) |
 | 6 | Lifetimes, agents A to D, changing owners | The developmental agent beats the proactive one on competence gained per room; after the owner's preference changes mid-life the duck recovers within a stated number of rooms | planned |
 | 7 | Hardware | On-device keyword spotting for the phrase lists, toy and basket detection, a wall map from the range sensor; the same mind drives the physical Microduck under supervision | planned |
 
@@ -879,7 +1015,8 @@ Open questions that the roadmap does not yet settle:
   briefing grow before cost or latency hurts?
 - Would a charging spot make energy a need the duck has to plan for?
 - Which objects and properties give curiosity something real to learn
-  (pushable against carriable, rolling against sliding)?
+  (pushable against carriable, rolling against sliding)? World 2 is a
+  start: weight, width and slipperiness, learned from outcomes.
 - Which loop, recursion, and time budgets keep compound skills useful
   without hiding failures?
 
@@ -891,9 +1028,12 @@ outcomes. The same structure lets the creature learn something nobody told
 it: what its owner likes, from her approval and disapproval alone. It also
 learns, from its own outcomes, which conditions make its skills work, and
 uses them to ask the cloud brain for new skills where its own fail, keeping
-only those that do better. The next steps are to judge those skills on fresh
-evidence, to let written skills build on each other, and to carry the mind
-onto the physical duck.
+only those that do better. In a harder world, with objects whose weight,
+width and grip it can learn only by trying, the same rules find which kinds
+fail from how they look, and carry part of that to kinds never met; what
+broke first there was a measured parameter of the body, not the mind. The
+next steps are heavy objects and an idle duck with an owner in that world,
+lifetimes that compare agents, and the physical duck.
 
 ## Appendix A. Parameters
 

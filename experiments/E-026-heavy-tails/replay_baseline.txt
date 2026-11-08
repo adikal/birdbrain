@@ -1,0 +1,17 @@
+Brier score per outcome, cauchy minus gaussian, paired by life (lower is better):
+  effect deliver      n  1600 · brier: A 0.231 · B 0.228 · B-A -0.003 [95% CI -0.005, -0.000] · B higher 4, equal 0, lower 12 · sign-flip p = 0.013 · n = 16
+  effect pick         n  3382 · brier: A 0.211 · B 0.211 · B-A -0.001 [95% CI -0.003, +0.002] · B higher 10, equal 0, lower 6 · sign-flip p = 0.558 · n = 16
+  fell   deliver      n  1600 · brier: A 0.137 · B 0.122 · B-A -0.015 [95% CI -0.021, -0.009] · B higher 0, equal 0, lower 16 · sign-flip p = 0.000 · n = 16
+  fell   pick         n  3382 · brier: A 0.020 · B 0.021 · B-A +0.001 [95% CI -0.000, +0.002] · B higher 14, equal 0, lower 2 · sign-flip p = 0.043 · n = 16
+
+mean prediction against the observed rate, pooled over lives:
+  effect deliver when held colour black (n 218): observed 0.04; gaussian predicts 0.35, cauchy predicts 0.26
+  effect pick when target size 5 to 7.5 cm (n 980): observed 0.11; gaussian predicts 0.26, cauchy predicts 0.20
+  effect deliver when held colour white (n 348): observed 0.28; gaussian predicts 0.38, cauchy predicts 0.37
+  effect pick when target by the rim yes (n 55): observed 0.33; gaussian predicts 0.44, cauchy predicts 0.46
+  fell   deliver when held colour black (n 218): observed 0.68; gaussian predicts 0.22, cauchy predicts 0.39
+  fell   pick when target size 5 to 7.5 cm (n 980): observed 0.02; gaussian predicts 0.02, cauchy predicts 0.02
+  fell   deliver when held colour white (n 348): observed 0.08; gaussian predicts 0.13, cauchy predicts 0.10
+  fell   pick when target by the rim yes (n 55): observed 0.16; gaussian predicts 0.03, cauchy predicts 0.05
+
+16 lives; mean outcomes per life 713

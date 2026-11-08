@@ -1,0 +1,18 @@
+== experiments/E-021-world2/hers.jsonl: 16 lifetimes, 320 rooms, owner hers, kinds late
+  measure                               rooms 1-5   rooms 6-10  rooms 11-15  rooms 16-20
+  tidied, possible                          0.023        0.018        0.012        0.009
+  tidied, plain                             0.029        0.025        0.017        0.007
+  tidied, heavy                             0.000        0.010        0.000        0.012
+  tidied, slippery                          0.022        0.000        0.000        0.011
+  tidied, known kinds                       0.023        0.018        0.005        0.008
+  tidied, new kinds                             -            -        0.023        0.010
+  falls                                     0.150        0.212        0.225        0.138
+  falls holding heavy                       0.050        0.113        0.150        0.087
+  heavy grasped per heavy object            0.141        0.253        0.250        0.163
+  wide grasped per wide object              0.241        0.291        0.229        0.291
+  slipped                                   0.275        0.287        0.275        0.212
+  never found, share of objects             0.490        0.533        0.527        0.562
+  pick decisions                            3.350        3.875        3.700        3.062
+  failed pick decisions                     1.675        2.038        1.800        1.725
+  her things moved                          0.109        0.178        0.175        0.117
+  owner's measure gained                   -0.025       -0.188       -0.250       -0.138

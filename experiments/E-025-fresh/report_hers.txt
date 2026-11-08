@@ -1,0 +1,60 @@
+== experiments/E-025-fresh/old_hers.jsonl: 16 lifetimes, 320 rooms, owner hers, kinds late
+  measure                               rooms 1-5   rooms 6-10  rooms 11-15  rooms 16-20
+  tidied, possible                          0.014        0.009        0.020        0.013
+  tidied, plain                             0.019        0.014        0.023        0.013
+  tidied, heavy                             0.010        0.000        0.025        0.020
+  tidied, slippery                          0.000        0.000        0.000        0.000
+  tidied, known kinds                       0.014        0.009        0.028        0.013
+  tidied, new kinds                             -            -        0.006        0.011
+  falls                                     0.212        0.150        0.200        0.100
+  falls holding heavy                       0.087        0.100        0.087        0.050
+  heavy grasped per heavy object            0.250        0.192        0.275        0.172
+    of new kinds                                -            -        0.241        0.034
+  wide grasped per wide object              0.192        0.219        0.458        0.277
+    of new kinds                                -            -        0.656        0.333
+  slipped                                   0.200        0.300        0.163        0.125
+  never found, share of objects             0.478        0.525        0.464        0.445
+  pick decisions                            3.138        3.575        4.425        3.013
+  failed pick decisions                     1.400        1.738        2.487        1.425
+  her things moved                          0.163        0.169        0.161        0.217
+  owner's measure gained                   -0.188       -0.212       -0.138       -0.338
+== experiments/E-025-fresh/new_hers.jsonl: 16 lifetimes, 320 rooms, owner hers, kinds late
+  measure                               rooms 1-5   rooms 6-10  rooms 11-15  rooms 16-20
+  tidied, possible                          0.045        0.030        0.016        0.014
+  tidied, plain                             0.061        0.029        0.020        0.008
+  tidied, heavy                             0.029        0.040        0.013        0.020
+  tidied, slippery                          0.000        0.023        0.000        0.037
+  tidied, known kinds                       0.045        0.030        0.018        0.013
+  tidied, new kinds                             -            -        0.012        0.017
+  falls                                     0.388        0.362        0.237        0.225
+  falls holding heavy                       0.138        0.087        0.138        0.125
+  heavy grasped per heavy object            0.221        0.212        0.263        0.283
+    of new kinds                                -            -        0.310        0.310
+  wide grasped per wide object              0.291        0.301        0.260        0.304
+    of new kinds                                -            -        0.453        0.312
+  slipped                                   0.325        0.250        0.125        0.263
+  never found, share of objects             0.402        0.444        0.455        0.468
+  pick decisions                            4.463        4.475        3.275        3.087
+  failed pick decisions                     2.300        2.450        1.788        1.812
+  her things moved                          0.225        0.131        0.152        0.084
+  owner's measure gained                   -0.062       -0.050       -0.138       -0.062
+
+rooms 11 on, per lifetime, experiments/E-025-fresh/new_hers.jsonl minus experiments/E-025-fresh/old_hers.jsonl:
+  tidied, possible: A 0.016 · B 0.015 · B-A -0.001 [95% CI -0.022, +0.020] · B higher 4, equal 7, lower 5 · sign-flip p = 0.922 · n = 16
+  tidied, plain: A 0.017 · B 0.015 · B-A -0.003 [95% CI -0.026, +0.021] · B higher 2, equal 10, lower 4 · sign-flip p = 0.844 · n = 16
+  tidied, heavy: A 0.025 · B 0.015 · B-A -0.010 [95% CI -0.036, +0.016] · B higher 2, equal 11, lower 3 · sign-flip p = 0.438 · n = 16
+  tidied, slippery: A 0.000 · B 0.017 · B-A +0.017 [95% CI -0.009, +0.043] · B higher 2, equal 14, lower 0 · sign-flip p = 0.500 · n = 16
+  tidied, known kinds: A 0.020 · B 0.015 · B-A -0.006 [95% CI -0.029, +0.018] · B higher 4, equal 7, lower 5 · sign-flip p = 0.629 · n = 16
+  tidied, new kinds: A 0.007 · B 0.016 · B-A +0.009 [95% CI -0.013, +0.030] · B higher 2, equal 13, lower 1 · sign-flip p = 0.500 · n = 16
+  falls: A 0.150 · B 0.231 · B-A +0.081 [95% CI -0.022, +0.185] · B higher 11, equal 2, lower 3 · sign-flip p = 0.146 · n = 16
+  falls holding heavy: A 0.069 · B 0.131 · B-A +0.062 [95% CI +0.011, +0.114] · B higher 9, equal 5, lower 2 · sign-flip p = 0.039 · n = 16
+  heavy grasped per heavy object: A 0.210 · B 0.285 · B-A +0.076 [95% CI -0.054, +0.205] · B higher 9, equal 2, lower 5 · sign-flip p = 0.230 · n = 16
+    of new kinds: A 0.132 · B 0.349 · B-A +0.217 [95% CI +0.058, +0.377] · B higher 9, equal 6, lower 1 · sign-flip p = 0.010 · n = 16
+  wide grasped per wide object: A 0.377 · B 0.276 · B-A -0.102 [95% CI -0.245, +0.041] · B higher 5, equal 1, lower 10 · sign-flip p = 0.150 · n = 16
+    of new kinds : A 0.548 · B 0.393 · B-A -0.156 [95% CI -0.437, +0.126] · B higher 5, equal 2, lower 9 · sign-flip p = 0.258 · n = 16
+  slipped: A 0.144 · B 0.194 · B-A +0.050 [95% CI -0.108, +0.208] · B higher 6, equal 3, lower 7 · sign-flip p = 0.583 · n = 16
+  never found, share of objects: A 0.449 · B 0.462 · B-A +0.013 [95% CI -0.038, +0.065] · B higher 8, equal 1, lower 7 · sign-flip p = 0.594 · n = 16
+  pick decisions: A 3.719 · B 3.181 · B-A -0.537 [95% CI -1.575, +0.500] · B higher 6, equal 1, lower 9 · sign-flip p = 0.292 · n = 16
+  failed pick decisions: A 1.956 · B 1.800 · B-A -0.156 [95% CI -0.804, +0.492] · B higher 8, equal 0, lower 8 · sign-flip p = 0.629 · n = 16
+  her things moved: A 0.196 · B 0.113 · B-A -0.082 [95% CI -0.169, +0.004] · B higher 4, equal 1, lower 11 · sign-flip p = 0.063 · n = 16
+  owner's measure gained: A -0.237 · B -0.100 · B-A +0.138 [95% CI +0.000, +0.275] · B higher 10, equal 2, lower 4 · sign-flip p = 0.064 · n = 16

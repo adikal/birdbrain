@@ -7,7 +7,7 @@ expressions, for example
     nearest(toy, known(it) and not inside(it, basket))
     holding(self, 'toy#2')
 
-Expressions are parsed with Python's `ast` and only a whitelist of node types
+Expressions are parsed with Python's `ast` and only an allowlist of node types
 is evaluated, so nothing in an expression can execute code. Names resolve to
 bound variables, `self`, `none`/`true`/`false`, or an object class. A class
 name used where an entity is expected means the best-known entity of that

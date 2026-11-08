@@ -7,7 +7,7 @@ const svg = $("#world-map");
 const state = {
   runId: null, live: false, liveRunId: null, events: [], snapshots: [], truths: [], frames: [], generation: 0,
   index: 0, playing: false, follow: true, filter: "mind", selected: null,
-  room: [3.0, 2.5], source: null, timer: null,
+  room: [3.0, 2.5], walls: [], boxes: [], maps: [], source: null, timer: null,
 };
 
 const FILTERS = {
@@ -61,7 +61,7 @@ async function loadRuns() {
 async function open(runId, live) {
   if (state.source) state.source.close();
   const generation = ++state.generation;      // a newer open() makes this one stop
-  Object.assign(state, { runId, live, events: [], snapshots: [], truths: [], frames: [], index: 0, follow: true, selected: null, lastYaw: undefined });
+  Object.assign(state, { runId, live, events: [], snapshots: [], truths: [], frames: [], walls: [], boxes: [], maps: [], index: 0, follow: true, selected: null, lastYaw: undefined });
   text("#run-id", runId);
   text("#connection-label", live ? "Live" : "Replay");
   let after = 0;
@@ -88,9 +88,12 @@ function ingest(e) {
   state.events.push(e);
   if (e.type === "STATE_SNAPSHOT") state.snapshots.push(e);
   else if (e.type === "CAMERA_FRAME") state.frames.push(e);
+  else if (e.type === "MAP") state.maps.push(e);
   else if (e.type === "TRUTH" || (e.type === "RUN_STOPPED" && e.payload.truth)) state.truths.push({ t: e.sim_time, ...(e.payload.truth || e.payload) });
   else if (e.type === "RUN_STARTED") {
     if (e.payload.room) state.room = e.payload.room;
+    state.walls = e.payload.walls || [];
+    state.boxes = e.payload.boxes || [];
     text("#brain-name", e.payload.model || e.payload.provider || "—");
   }
 }
@@ -118,6 +121,9 @@ function render(i) {
   renderTrace(upTo);
 }
 
+// World 2's object colours, as the duck believes them (dashboard fill only).
+const OBJECT_COLOURS = { red: "#d55e00", yellow: "#f0e442", blue: "#0072b2", green: "#009e73", white: "#ffffff", black: "#222222" };
+
 function toSvg([x, y]) {
   const [w, h] = state.room;
   const scale = Math.min(560 / w, 460 / h);
@@ -130,6 +136,22 @@ function renderWorld(snap, upTo) {
   const [x0, y0, s] = toSvg([-w / 2, h / 2]);
   const parts = [`<clipPath id="room-clip"><rect x="${x0}" y="${y0}" width="${w * s}" height="${h * s}" rx="6" /></clipPath>`,
     `<rect class="room" x="${x0}" y="${y0}" width="${w * s}" height="${h * s}" rx="6" />`];
+  const map = [...state.maps].reverse().find((m) => m.sim_time <= snap.sim_time + 1e-9);
+  if (map) {   // what the duck believes is in the way, from its range sensor (E-030)
+    const c = map.payload.cell;
+    for (const [i, j] of map.payload.occupied) {
+      const [mx, my] = toSvg([i * c, (j + 1) * c]);
+      parts.push(`<rect class="mapped" x="${mx}" y="${my}" width="${c * s}" height="${c * s}" />`);
+    }
+  }
+  for (const [bx, by, bw, bd, yaw] of state.boxes) {   // furniture (World 2)
+    const [cx, cy] = toSvg([bx, by]);
+    parts.push(`<rect class="furniture" x="${cx - (bw * s) / 2}" y="${cy - (bd * s) / 2}" width="${bw * s}" height="${bd * s}" transform="rotate(${(-yaw * 180) / Math.PI} ${cx} ${cy})"><title>furniture</title></rect>`);
+  }
+  for (const [x1, y1, x2, y2] of state.walls) {        // inner walls (World 2)
+    const [ax, ay] = toSvg([x1, y1]), [bx, by] = toSvg([x2, y2]);
+    parts.push(`<line class="inner-wall" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" />`);
+  }
   const trail = state.snapshots.slice(0, state.index + 1).filter((_, k) => k % 2 === 0).map((sn) => toSvg(sn.payload.pose).slice(0, 2).join(","));
   if (trail.length > 1) parts.push(`<polyline class="trail" points="${trail.join(" ")}" />`);
   const target = p.action && Object.values(p.action.args || {})[0];
@@ -143,7 +165,9 @@ function renderWorld(snap, upTo) {
       parts.push(`<rect class="basket ${confident ? "" : "doubt"}" x="${ex - half}" y="${ey - half}" width="${2 * half}" height="${2 * half}" rx="3"><title>${esc(e.id)}</title></rect>`);
     } else {
       parts.push(`<circle class="sigma" cx="${ex}" cy="${ey}" r="${r}" />`);
-      parts.push(`<circle class="entity ${esc(e.cls)} ${confident ? "" : "doubt"} ${e.id === target ? "target" : ""}" cx="${ex}" cy="${ey}" r="5"><title>${esc(e.id)} ±${e.sigma.toFixed(2)} m conf ${e.conf}</title></circle>`);
+      const looks = [e.color, e.size ? `${Math.round(e.size * 100)} cm` : null].filter(Boolean).join(", ");
+      const fill = e.color && confident && e.id !== target ? ` style="fill:${OBJECT_COLOURS[e.color] || "var(--blue)"}"` : "";
+      parts.push(`<circle class="entity ${esc(e.cls)} ${confident ? "" : "doubt"} ${e.id === target ? "target" : ""}" cx="${ex}" cy="${ey}" r="5"${fill}><title>${esc(e.id)}${looks ? ` (looks ${esc(looks)})` : ""} ±${e.sigma.toFixed(2)} m conf ${e.conf}</title></circle>`);
     }
   }
   if ($("#truth-toggle").checked) {
@@ -160,7 +184,11 @@ function renderWorld(snap, upTo) {
       }
       for (const toy of truth.toys) {
         const [tx, ty] = toSvg([toy.x, toy.y]);
-        parts.push(`<circle class="truth" cx="${tx}" cy="${ty}" r="7"><title>${esc(toy.id)} (truth)</title></circle>`);
+        const what = toy.kind ? `: ${toy.kind}${toy.what && toy.what !== "plain" ? `, ${toy.what}` : ""}` : "";
+        parts.push(`<circle class="truth" cx="${tx}" cy="${ty}" r="7"><title>${esc(toy.id)}${esc(what)} (truth)</title></circle>`);
+        if (toy.what && toy.what !== "plain") {   // a letter, so the hidden property reads without colour
+          parts.push(`<text class="truth-tag" x="${tx + 8}" y="${ty - 6}">${{ heavy: "H", slippery: "S", wide: "W" }[toy.what] || ""}</text>`);
+        }
       }
     }
   }

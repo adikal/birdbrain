@@ -38,7 +38,8 @@ class PlayroomSession:
                  memory_dir: Path | None = None, needs: bool | str = False, room: str = "messy",
                  owner: str | None = None, episode: int | None = None, lifetime: int | None = None,
                  credit: str = "moments", rules: str | None = None, owner_model: str = "kinds",
-                 author: bool = False, title: str | None = None) -> None:
+                 author: bool = False, title: str | None = None, world: str = "playroom",
+                 kinds: str = "dev") -> None:
         from microduck_local.brain.brain_env import POLICIES_DIR, onnx_infer
         from microduck_local.world import World, make_playroom
 
@@ -49,7 +50,18 @@ class PlayroomSession:
         self._kinds: list[tuple[float, str | None]] = []     # (decision time, kind of action)
         self._heard_changes: list[float] = []
         self.credit_given: list[float] = []
-        self.scenario = make_playroom(seed=seed, n=toys, brain=None)
+        self.world_name, self.kinds_split = world, kinds if world == "world2" else None
+        if world == "world2":
+            from birdbrain import world2
+            if room != "messy":
+                raise ValueError("World 2 has no tidy room")
+            world2.register()
+            self.scenario = world2.make_world(seed, world2.kinds_for(kinds, episode))
+            self.toys = len(self.scenario.pickables)
+        elif world == "playroom":
+            self.scenario = make_playroom(seed=seed, n=toys, brain=None)
+        else:
+            raise ValueError(f"unknown world {world!r}")
         if room == "tidy":
             # Every toy starts in the basket: the test of doing nothing when nothing is worth doing.
             from dataclasses import replace
@@ -65,6 +77,13 @@ class PlayroomSession:
         self.world = World(self.scenario, infer_for={"d0": onnx_infer(POLICIES_DIR / "alpha_walking.onnx")},
                            seed=seed)
         self.duck = self.world.ducks["d0"]
+        self.rules2 = None
+        if world == "world2":
+            import random
+
+            from birdbrain.world2 import WorldRules
+            self.rules2 = WorldRules(self.world, self.duck, seed)
+            self._colour_rng, self._coloured = random.Random(seed * 17 + 3), (None, None)
         self.journal = journal or EventJournal()
         chooser = None
         if provider == "bedrock":
@@ -105,7 +124,12 @@ class PlayroomSession:
             "title": title, "seed": seed, "toys": toys, "provider": self.mind.provider.name,
             "model": getattr(self.mind.provider, "model", None), "latency": latency,
             "scenario": self.scenario.name, "room": list(self.scenario.floor),
-            "basket_size": list(self.scenario.basket.size) if self.scenario.basket else None})
+            "basket_size": list(self.scenario.basket.size) if self.scenario.basket else None,
+            # The room's layout, for viewers: walls beyond the four outer ones, and furniture.
+            "walls": [[*w.start, *w.end] for w in self.scenario.walls[4:]],
+            "boxes": [[round(b.pos[0], 3), round(b.pos[1], 3), round(b.size[0], 3), round(b.size[1], 3),
+                       round(b.yaw, 3)] for b in self.scenario.boxes],
+            "world": world})
 
     def _log(self, kind: str, payload: dict[str, Any]) -> None:
         if kind == "DECISION":
@@ -129,6 +153,12 @@ class PlayroomSession:
         world, duck = self.world, self.duck
         tof, tof_age = world.senses_tof(duck)
         det = duck.detector.last if duck.detector is not None else None
+        if det is not None and self.rules2 is not None:
+            # World 2's colour classifier, read once per detector frame.
+            if self._coloured[0] is not det:
+                from birdbrain.world2 import colour_sensor
+                self._coloured = (det, colour_sensor(det, self.rules2.kind, self._colour_rng))
+            det = self._coloured[1]
         senses = Senses(t=world.t, tof=tof, tof_age=tof_age, det=det,
                         det_age=None if det is None else world.t - det.t,
                         speed=duck.heading_speed(world.data), odom=world.odom(duck),
@@ -150,6 +180,8 @@ class PlayroomSession:
         if duck.skill is None:
             duck.set_cmd(world.data, command.twist, command.head)
         world.step()
+        if self.rules2 is not None:
+            self.rules2.step(0.02)
         self._evaluate()
 
     def _evaluate(self) -> None:
@@ -200,8 +232,11 @@ class PlayroomSession:
     def truth(self) -> dict[str, Any]:
         """Simulator truth for viewers: never passed to the mind."""
         w = self.world
+        kinds = {} if self.rules2 is None else self.rules2.kind
         toys = [{"id": n, "x": round(float(w.data.xpos[b][0]), 3), "y": round(float(w.data.xpos[b][1]), 3),
-                 "in_basket": bool(w.in_basket(n))} for n, b in w.pickables.items()]
+                 "in_basket": bool(w.in_basket(n)),
+                 **({"kind": kinds[n].name, "colour": kinds[n].colour, "what": kinds[n].category}
+                    if n in kinds else {})} for n, b in w.pickables.items()]
         pos = self.duck.trunk_pos(w.data)
         return {"duck": [round(float(pos[0]), 3), round(float(pos[1]), 3)], "toys": toys,
                 "basket": list(w.basket.pos) if w.basket else None}
@@ -221,8 +256,11 @@ class PlayroomSession:
             "confidentBaskets": len(confident),
             "merges": sum(1 for a in kb.history if a.rel == "same_as"),
             "toyIds": len(kb.of_class("toy")),
-            "pickDecisions": len(picks),
-            "pickDecisionsFailed": sum(1 for e in picks if e.data.get("outcome") != "done"),
+            # Picks stopped on the way (E-023) are counted apart (E-025 review).
+            "pickDecisions": len(picks) - self.mind.stats.get("reconsidered", 0),
+            "pickDecisionsFailed": sum(1 for e in picks if e.data.get("outcome") != "done")
+            - self.mind.stats.get("reconsidered", 0),
+            "pickStops": self.mind.stats.get("reconsidered", 0),
         }
 
     @staticmethod
@@ -235,8 +273,9 @@ class PlayroomSession:
         from birdbrain.owner import Room
         w = self.world
         toys = {n: (float(w.data.xpos[b][0]), float(w.data.xpos[b][1])) for n, b in w.pickables.items()}
+        colours = {} if self.rules2 is None else {n: k.colour for n, k in self.rules2.kind.items()}
         return Room(toys=toys, in_basket={n: bool(w.in_basket(n)) for n in toys},
-                    held=self.duck.holding, bounds=self.bounds)
+                    held=self.duck.holding, bounds=self.bounds, colours=colours)
 
     def owner_metrics(self) -> dict[str, Any]:
         """Evaluation only: how the room stands against each preference, from truth."""
@@ -284,8 +323,17 @@ class PlayroomSession:
             "simSeconds": round(self.world.t, 1), "wallSeconds": round(wall_seconds, 1),
             "writtenSkills": mind.authoring.summary(), "authoringTokens": mind.authoring.tokens,
             "rules": mind.use_rules, "ownerModelKind": mind.owner_model if mind.reactions is not None else None,
-            **self.owner_metrics(),
+            **self.owner_metrics(), **self.world_metrics(),
         }
+
+    def world_metrics(self) -> dict[str, Any]:
+        """Evaluation only: World 2's truth measures."""
+        if self.rules2 is None:
+            return {}
+        from birdbrain.world2 import measures
+        return {"world": self.world_name, "kinds": self.kinds_split,
+                **measures(self.world, self.mind.kb, self.rules2,
+                            {p.id: p.pos for p in self.scenario.pickables})}
 
 
 def run_one(seed: int, *, toys: int = 6, seconds: float = 300.0, provider: str = "local",
@@ -295,7 +343,8 @@ def run_one(seed: int, *, toys: int = 6, seconds: float = 300.0, provider: str =
             memory_dir: Path | None = None, needs: bool = False, room: str = "messy",
             owner: str | None = None, episode: int | None = None, lifetime: int | None = None,
             credit: str = "moments", rules: str | None = None, owner_model: str = "kinds",
-            author: bool = False, title: str | None = None) -> dict[str, Any]:
+            author: bool = False, title: str | None = None, world: str = "playroom",
+            kinds: str = "dev") -> dict[str, Any]:
     life = "" if episode is None else f"-L{lifetime}e{episode}"
     run_id = f"{tag or 'run'}{life}-s{seed}-{provider}-{int(time.time() * 1000) % 10**9}"
     store = JsonlRunStore(runs_dir) if runs_dir else None
@@ -304,7 +353,8 @@ def run_one(seed: int, *, toys: int = 6, seconds: float = 300.0, provider: str =
                               token_budget=token_budget, model=model, speculate=speculate,
                               memory_dir=memory_dir, needs=needs, room=room,
                               owner=owner, episode=episode, lifetime=lifetime, credit=credit,
-                              rules=rules, owner_model=owner_model, author=author, title=title)
+                              rules=rules, owner_model=owner_model, author=author, title=title,
+                              world=world, kinds=kinds)
     head = None
     if camera and store is not None:
         from birdbrain.observability.camera import HeadCamera
@@ -393,7 +443,7 @@ def main() -> None:
                     help="messy: toys scattered; tidy: every toy starts in the basket")
     ap.add_argument("--memory", type=Path, default=None,
                     help="lifetime memory directory: seeds run in order as episodes of one life (forces --jobs 1)")
-    ap.add_argument("--owner", choices=["none", "basket", "wall", "leave"], default=None,
+    ap.add_argument("--owner", choices=["none", "basket", "wall", "leave", "hers"], default=None,
                     help="Milestone 3b: the social need is approval; a scripted owner with this hidden "
                          "preference reacts with phrases (none: the control, nobody there)")
     ap.add_argument("--credit", choices=["moments", "underway"], default="moments",
@@ -418,6 +468,10 @@ def main() -> None:
     ap.add_argument("--camera", action="store_true",
                     help="record viewer data for the dashboard at 2 Hz: head-camera images and the truth overlay")
     ap.add_argument("--title", default=None, help="what the run shows, for the dashboard's run list")
+    ap.add_argument("--world", choices=["playroom", "world2"], default="playroom",
+                    help="world2: many kinds of object with hidden properties, furniture, inner walls (E-021)")
+    ap.add_argument("--kinds", choices=["dev", "all", "late"], default="dev",
+                    help="World 2's object kinds: development only, all, or new kinds from room 11 of a life")
     ap.add_argument("--jobs", type=int, default=1)
     ap.add_argument("--out", required=True, help="rows are appended here as JSON lines")
     ap.add_argument("--tag", default="")
@@ -430,7 +484,7 @@ def main() -> None:
               "token_budget": args.token_budget, "model": args.model, "camera": args.camera,
               "speculate": args.speculate, "memory_dir": args.memory, "needs": args.needs, "room": args.room,
               "owner": args.owner, "credit": args.credit, "rules": args.rules, "owner_model": args.owner_model,
-              "author": args.author, "title": args.title}
+              "author": args.author, "title": args.title, "world": args.world, "kinds": args.kinds}
     memory_root = None
     if args.episodes is not None:
         memory_root = args.memory or Path("data/lifetimes") / (args.tag or "untagged")

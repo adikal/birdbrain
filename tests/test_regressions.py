@@ -286,8 +286,18 @@ def test_scorecard_agreement_counts_only_cloud_choices():
 
 def test_a_far_sighting_never_lowers_existence_confidence():
     p = Perception(KnowledgeBase())
-    for rng in (1.0, 2.0, 3.0, 4.0):
-        assert p.detection_rate("toy", rng) >= 0.1 and p.detection_rate("basket", rng) >= 0.9
+    p._odom.append((0.0, (0.0, 0.0, 0.0)))
+    for rng in (1.0, 2.0, 3.0, 4.0, 5.0):
+        for cls in ("toy", "basket"):
+            assert p._hit_logit(cls, Position.round(rng, 0.0, 0.05), 0.0) >= 0.0
+
+
+def test_a_far_basket_missed_costs_less_than_a_near_one():
+    # The basket is often missed beyond 2 m (World 2, E-022): a miss there is weak evidence.
+    p = Perception(KnowledgeBase())
+    assert p.detection_rate("basket", 1.0) > 0.9
+    assert p.detection_rate("basket", 2.6) < 0.7
+    assert p.detection_rate("basket", 4.5) < p.p.p_false   # rarer than a ghost: a miss says nothing
 
 
 def test_deliver_is_judged_by_the_best_estimates():

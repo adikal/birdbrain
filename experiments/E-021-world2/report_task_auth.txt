@@ -1,0 +1,54 @@
+== experiments/E-021-world2/task.jsonl: 16 lifetimes, 320 rooms, owner None, kinds late
+  measure                               rooms 1-5   rooms 6-10  rooms 11-15  rooms 16-20
+  tidied, possible                          0.271        0.278        0.298        0.312
+  tidied, plain                             0.307        0.313        0.368        0.352
+  tidied, heavy                             0.200        0.212        0.205        0.302
+  tidied, slippery                          0.180        0.202        0.085        0.141
+  tidied, known kinds                       0.271        0.278        0.302        0.304
+  tidied, new kinds                             -            -        0.292        0.325
+  falls                                     0.850        1.312        1.113        0.988
+  falls holding heavy                       0.362        0.600        0.625        0.600
+  heavy grasped per heavy object            0.435        0.566        0.693        0.674
+  wide grasped per wide object              0.979        1.095        1.094        1.091
+  slipped                                   1.025        1.050        0.850        0.700
+  never found, share of objects             0.412        0.405        0.394        0.356
+  pick decisions                            9.775       10.938       10.850       10.238
+  failed pick decisions                     6.138        7.013        6.800        6.450
+  her things moved                          0.305        0.264        0.372        0.281
+  owner's measure gained                    0.000        0.000        0.000        0.000
+== experiments/E-021-world2/auth.jsonl: 16 lifetimes, 320 rooms, owner None, kinds late
+  measure                               rooms 1-5   rooms 6-10  rooms 11-15  rooms 16-20
+  tidied, possible                          0.271        0.287        0.295        0.303
+  tidied, plain                             0.307        0.324        0.368        0.345
+  tidied, heavy                             0.200        0.253        0.159        0.267
+  tidied, slippery                          0.180        0.167        0.106        0.152
+  tidied, known kinds                       0.271        0.287        0.299        0.291
+  tidied, new kinds                             -            -        0.288        0.325
+  falls                                     0.850        1.225        1.100        1.012
+  falls holding heavy                       0.362        0.613        0.613        0.562
+  heavy grasped per heavy object            0.435        0.586        0.659        0.616
+  wide grasped per wide object              0.979        1.048        1.255        1.091
+  slipped                                   1.025        0.950        0.787        0.775
+  never found, share of objects             0.412        0.398        0.380        0.382
+  pick decisions                            9.775       10.488       10.938        9.963
+  failed pick decisions                     6.138        6.700        7.025        6.188
+  her things moved                          0.305        0.256        0.387        0.320
+  owner's measure gained                    0.000        0.000        0.000        0.000
+
+rooms 11 on, per lifetime, experiments/E-021-world2/auth.jsonl minus experiments/E-021-world2/task.jsonl:
+  tidied, possible: A 0.304 · B 0.299 · B-A -0.005 [95% CI -0.024, +0.014] · B higher 6, equal 5, lower 5 · sign-flip p = 0.550 · n = 16
+  tidied, plain: A 0.358 · B 0.355 · B-A -0.003 [95% CI -0.023, +0.017] · B higher 6, equal 5, lower 5 · sign-flip p = 0.737 · n = 16
+  tidied, heavy: A 0.270 · B 0.225 · B-A -0.045 [95% CI -0.110, +0.020] · B higher 3, equal 5, lower 8 · sign-flip p = 0.162 · n = 16
+  tidied, slippery: A 0.093 · B 0.119 · B-A +0.026 [95% CI -0.016, +0.067] · B higher 5, equal 8, lower 3 · sign-flip p = 0.211 · n = 16
+  tidied, known kinds: A 0.304 · B 0.297 · B-A -0.007 [95% CI -0.025, +0.010] · B higher 3, equal 5, lower 8 · sign-flip p = 0.416 · n = 16
+  tidied, new kinds: A 0.310 · B 0.306 · B-A -0.004 [95% CI -0.039, +0.032] · B higher 7, equal 2, lower 7 · sign-flip p = 0.831 · n = 16
+  falls: A 1.050 · B 1.056 · B-A +0.006 [95% CI -0.135, +0.147] · B higher 7, equal 1, lower 8 · sign-flip p = 1.000 · n = 16
+  falls holding heavy: A 0.613 · B 0.588 · B-A -0.025 [95% CI -0.111, +0.061] · B higher 5, equal 4, lower 7 · sign-flip p = 0.646 · n = 16
+  heavy grasped per heavy object: A 0.689 · B 0.639 · B-A -0.050 [95% CI -0.136, +0.037] · B higher 4, equal 3, lower 9 · sign-flip p = 0.243 · n = 16
+  wide grasped per wide object: A 1.077 · B 1.176 · B-A +0.099 [95% CI -0.059, +0.257] · B higher 8, equal 1, lower 7 · sign-flip p = 0.212 · n = 16
+  slipped: A 0.775 · B 0.781 · B-A +0.006 [95% CI -0.129, +0.142] · B higher 7, equal 4, lower 5 · sign-flip p = 1.000 · n = 16
+  never found, share of objects: A 0.378 · B 0.383 · B-A +0.005 [95% CI -0.024, +0.033] · B higher 8, equal 1, lower 7 · sign-flip p = 0.728 · n = 16
+  pick decisions: A 10.544 · B 10.450 · B-A -0.094 [95% CI -0.715, +0.528] · B higher 8, equal 0, lower 8 · sign-flip p = 0.765 · n = 16
+  failed pick decisions: A 6.625 · B 6.606 · B-A -0.019 [95% CI -0.572, +0.535] · B higher 7, equal 0, lower 9 · sign-flip p = 0.962 · n = 16
+  her things moved: A 0.322 · B 0.348 · B-A +0.026 [95% CI +0.002, +0.049] · B higher 7, equal 8, lower 1 · sign-flip p = 0.055 · n = 16
+  owner's measure gained: A 0.000 · B 0.000 · B-A +0.000 [95% CI +0.000, +0.000] · B higher 0, equal 16, lower 0 · sign-flip p = 1.000 · n = 16

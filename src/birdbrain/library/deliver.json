@@ -1,7 +1,7 @@
 {
-  "doc": "Carry the held toy to the basket and drop it in.",
+  "doc": "Carry the held toy to the basket and drop it in. If the basket is not in view, look around, then walk to the edge of what has been seen and look again.",
   "params": {},
-  "budget": 75,
+  "budget": 140,
   "expect": "inside(held, basket, 0.03, 0)",
   "body": [
     {
@@ -16,8 +16,35 @@
         {
           "call": "look_around",
           "until": "known(basket)"
+        },
+        {
+          "if": "not known(basket)",
+          "then": [
+            {
+              "repeat": [
+                {
+                  "call": "walk_to_unseen",
+                  "args": {
+                    "seconds": 6
+                  }
+                },
+                {
+                  "call": "look_around",
+                  "until": "known(basket)"
+                }
+              ],
+              "until": "known(basket) or not holding(self)",
+              "max": 4
+            }
+          ]
         }
       ]
+    },
+    {
+      "call": "require",
+      "args": {
+        "condition": "holding(self)"
+      }
     },
     {
       "bind": "b",

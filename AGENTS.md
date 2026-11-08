@@ -90,14 +90,20 @@ uv run record-world playroom --brain d0=tidy --seconds 120 --seed 1 --stride 10 
   (`--rules cautious`, E-018). `--owner-model conditions` learns the owner's
   reactions over conditions. `--author` (Bedrock) lets the cloud brain write
   skills between rooms, tried and kept on evidence (E-019, E-020);
-  `scripts/skills_report.py` summarizes them. The owner's phrases are in
+  `scripts/skills_report.py` summarizes them. `--world world2` runs World 2
+  (`src/birdbrain/world2.py`, world code the mind never imports): 24 kinds of
+  object whose hidden properties follow their colour and shape, furniture,
+  inner walls; `--kinds dev|all|late` chooses which kinds appear, and
+  `--owner hers` is the owner who wants her blue things left alone (E-021).
+  `scripts/world2_report.py` and `scripts/world2_failures.py` summarize it.
+  The owner's phrases are in
   `src/birdbrain/phrases.toml` (or `BIRDBRAIN_PHRASES`). Compare arms with `.venv/bin/birdbrain-compare A.jsonl B.jsonl`.
   Event logs go to `data/runs/` (set `BIRDBRAIN_RUNS_DIR` to change it); each run is about
   2 MB, so delete an experiment's logs once its rows and summaries are committed. The
   dashboard keeps its replays in `data/replays/`, the newest 50 (`--keep`). `--title` on
   `birdbrain-run` or the dashboard names a run in the run list (live runs get one
   automatically), and `scripts/showcase.py` records one titled replay per milestone.
-- **The mind:** `.venv/bin/birdbrain-dashboard --live --seed 3 [--needs] [--room tidy] [--owner basket]`, then open
+- **The mind:** `.venv/bin/birdbrain-dashboard --live --seed 3 [--needs] [--room tidy] [--owner basket] [--world world2 [--owner hers]]`, then open
   `http://127.0.0.1:8790`. Without `--live` it replays recorded runs;
   `?run=<id>&t=<seconds>&truth=1` opens a run at a time with the truth
   overlay on. Live runs record the duck's head-camera image at 2 Hz; add
@@ -111,6 +117,9 @@ uv run record-world playroom --brain d0=tidy --seconds 120 --seed 1 --stride 10 
   shows its own brains.
 - **Diagnostics:** `scripts/perception_probe.py`, `pick_probe.py`, and
   `fall_probe.py` compare the mind's beliefs with simulator truth;
+  `detection_probe.py` measures detection rates in World 2 rooms (the basket's
+  by range, objects' by apparent width) under the mind's own visibility test;
+  `grasp_probe.py` checks which object sizes and masses the duck can carry;
   `scripts/outcomes.py` and `scripts/cloud_report.py` summarize recorded
   runs. They read truth for evaluation only and are never imported by the mind.
 

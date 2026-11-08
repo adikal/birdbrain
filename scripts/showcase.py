@@ -29,6 +29,12 @@ SHOWCASE = [
     ("M3b-none", "Milestone 3b · control: no owner · after 10 rooms", {"owner": "none"}, "e017r2-counts-none/life-112"),
     ("M5", "Milestone 5 · task, with skills the cloud brain wrote (w_…) · after 20 rooms",
      {}, "e019-auth/life-150"),
+    ("W2", "World 2 · task · a fresh duck that knows nothing of the objects",
+     {"world": "world2", "kinds": "all"}, None),
+    ("W2-learned", "World 2 · task · after 20 rooms of learning which objects fail (E-025)",
+     {"world": "world2", "kinds": "all"}, "e025-new-task/life-300"),
+    ("W2-hers", "World 2 · owner who wants her blue things left alone · after 20 rooms (E-025)",
+     {"world": "world2", "kinds": "all", "owner": "hers"}, "e025-new-hers/life-300"),
 ]
 
 
